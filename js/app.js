@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.5.4';
+  const APP_VERSION = '0.5.5';
   const APP_BUILD_DATE = '2026-07-08';
 
   const SPECIES = [
@@ -449,10 +449,14 @@
     document.getElementById('sp-fetch-start').textContent = 'Henting pågår …';
     progress.textContent = 'Starter jobb …';
 
+    // Viktig: registrer tidspunktet FØR vi trigger jobben, slik at polling kan
+    // filtrere bort eventuelle eldre, allerede fullførte kjøringer.
+    const dispatchedAt = new Date(Date.now() - 5000).toISOString(); // liten margin for klokke-avvik
+
     try {
       await window.FungiStore.triggerWorkflow('fetch-area.yml', inputs);
-      progress.textContent = '⏳ Jobb bedt om å starte — venter på at GitHub Actions bekrefter (kan ta 10-30 sekunder) …';
-      pollFetchStatus(progress);
+      progress.textContent = '⏳ Jobb bedt om å starte — venter på at GitHub Actions registrerer den nye kjøringen (kan ta 10-30 sekunder) …';
+      pollFetchStatus(progress, dispatchedAt);
     } catch (e) {
       console.error(e);
       progress.textContent = '⚠ Kunne ikke starte jobben: ' + e.message + ' (sjekk at tokenet har "Actions: Read and write")';
@@ -462,14 +466,14 @@
     }
   }
 
-  function pollFetchStatus(progress){
+  function pollFetchStatus(progress, sinceIso){
     let attempts = 0;
     const maxAttempts = 60; // ~15 min ved 15 sek mellomrom
     clearTimeout(fetchPollTimer);
     const poll = async () => {
       attempts++;
       try {
-        const run = await window.FungiStore.getLatestRun('fetch-area.yml');
+        const run = await window.FungiStore.getLatestRun('fetch-area.yml', sinceIso);
         if (run) {
           if (run.status === 'completed') {
             if (run.conclusion === 'success') {

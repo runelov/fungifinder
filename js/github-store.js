@@ -167,10 +167,17 @@ async function triggerWorkflow(workflowFile, inputs){
 
 // Henter siste kjøring av en gitt workflow-fil, for å følge med på status
 // (queued / in_progress / completed) etter at triggerWorkflow() er kalt.
-async function getLatestRun(workflowFile){
+//
+// sinceIso (valgfritt): hvis satt, returneres kun kjøringer opprettet PÅ ELLER
+// ETTER dette tidspunktet. Dette er kritisk under polling rett etter en
+// trigging — GitHub kan bruke noen sekunder på å registrere den nye kjøringen,
+// og uten dette filteret ville vi i mellomtiden lese status fra en ELDRE,
+// allerede fullført kjøring og feilaktig tro at den nye jobben var ferdig.
+async function getLatestRun(workflowFile, sinceIso){
   const cfg = getConfig();
   if (!cfg) throw new Error('GitHub-synk er ikke konfigurert.');
-  const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/actions/workflows/${workflowFile}/runs?per_page=1`;
+  let url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/actions/workflows/${workflowFile}/runs?per_page=5`;
+  if (sinceIso) url += `&created=%3E%3D${encodeURIComponent(sinceIso)}`;
   const res = await fetch(url, {
     headers: {
       'Authorization': `Bearer ${cfg.token}`,
