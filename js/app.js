@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.5.1';
+  const APP_VERSION = '0.5.2';
   const APP_BUILD_DATE = '2026-07-08';
 
   const SPECIES = [
@@ -236,8 +236,16 @@
       const token = document.getElementById('sync-token').value.trim();
       const [owner, repo] = repoVal.split('/');
       if (!owner || !repo || !token) { setSyncStatus('⚠ Fyll ut eier/repo og token.'); return; }
-      window.FungiStore.setConfig({ owner, repo, locationsPath, personalPath, token, branch: 'main' });
-      setSyncStatus('Kobler til …');
+      setSyncStatus('Kobler til … sjekker repo-innstillinger');
+      let branch = 'main';
+      try {
+        branch = await window.FungiStore.detectDefaultBranch(owner, repo, token);
+      } catch (e) {
+        console.warn('Kunne ikke autodetektere default-branch, bruker "main".', e);
+        setSyncStatus('⚠ Kunne ikke bekrefte repo/branch — sjekk eier/repo-navn. Prøver med "main".');
+      }
+      window.FungiStore.setConfig({ owner, repo, locationsPath, personalPath, token, branch });
+      setSyncStatus(`Kobler til … (branch: ${branch})`);
       await loadLocations();
       await loadFetchedAreas();
       await loadStorage();
