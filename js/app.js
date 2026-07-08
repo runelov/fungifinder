@@ -80,9 +80,9 @@
 
   // Nødfallback: brukes KUN hvis det private data-repoet ikke er konfigurert
   // ennå, eller ikke kan nås. Bevisst holdt som tydelig merkede DEMO-steder
-  // uten ekte norsk stedsnavn/geografi — ekte terrengdata (88 steder, inkl.
-  // detaljert Hobøl-dekning) ligger i data/locations.json i det PRIVATE
-  // data-repoet, og lastes normalt inn av loadLocations() via GitHub-synk.
+  // uten ekte norsk stedsnavn/geografi — data-repoet starter tomt og fylles
+  // gradvis på-forespørsel (se fetch_area.py), og lastes normalt inn av
+  // loadLocations() via GitHub-synk.
   let BASE_LOCATIONS = [
     { id:'demo-1', name:'Eksempelskog A (demo)', fylke:'Demo', kommune:'Demo', lat:60.0, lon:10.0, treslag:['gran','bjork'], skogalder:'gammel', fuktighet:'frisk', berggrunn:'fattig', avstandVeiM:null, befolkning:'ukjent', hogstAr:null, kjenteFunn:[], custom:false, kjorbarVei:'ukjent', parkeringNotat:'Koble til ditt private data-repo for ekte steder', stier:'ukjent', avstandParkeringM:null },
     { id:'demo-2', name:'Eksempelskog B (demo)', fylke:'Demo', kommune:'Demo', lat:60.2, lon:10.4, treslag:['furu'], skogalder:'middels', fuktighet:'tørr', berggrunn:'moderat', avstandVeiM:null, befolkning:'ukjent', hogstAr:null, kjenteFunn:[], custom:false, kjorbarVei:'ukjent', parkeringNotat:'Koble til ditt private data-repo for ekte steder', stier:'ukjent', avstandParkeringM:null }
