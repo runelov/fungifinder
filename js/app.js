@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.6.0';
+  const APP_VERSION = '0.6.1';
   const APP_BUILD_DATE = '2026-07-08';
 
   const SPECIES = [
@@ -826,24 +826,14 @@
   // ikke polarområdene, så det viser seg som tomt, grått felt uten noe kart.
   const MAP_BOUNDS = L.latLngBounds([53, -10], [82, 45]);
 
-  function initMap(){
-    leafletMap = L.map('sp-leaflet-map', {
-      scrollWheelZoom: true,
-      maxBounds: MAP_BOUNDS,
-      maxBoundsViscosity: 1.0,
-      minZoom: 4
-    }).setView([60.5, 10.7], 6);
-    const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-bidragsytere'
-    }).addTo(leafletMap);
-    // Ved rask påfølgende panorering/zooming (f.eks. fitBounds rett etter
-    // mange steder lastes, eller flere raske klikk på zoom-knappen) avbryter
-    // nettleseren fliser som er under lasting. Leaflet prøver IKKE disse på
-    // nytt av seg selv — de blir stående tomme (grått) til brukeren
-    // tilfeldigvis panorerer akkurat den ruten på nytt. Prøver derfor
-    // avbrutte/feilede fliser på nytt automatisk et par ganger.
-    tileLayer.on('tileerror', (e) => {
+  // Ved rask påfølgende panorering/zooming (f.eks. fitBounds rett etter mange
+  // steder lastes, eller flere raske klikk på zoom-knappen) avbryter
+  // nettleseren fliser som er under lasting. Leaflet prøver IKKE disse på
+  // nytt av seg selv — de blir stående tomme (grått) til brukeren tilfeldigvis
+  // panorerer akkurat den ruten på nytt. Prøver derfor avbrutte/feilede
+  // fliser på nytt automatisk et par ganger, for alle bakgrunnskart.
+  function attachTileRetry(layer){
+    layer.on('tileerror', (e) => {
       const tile = e.tile;
       const attempts = (parseInt(tile.dataset.retryCount || '0', 10)) + 1;
       if (attempts <= 4) {
@@ -851,8 +841,47 @@
         setTimeout(() => { tile.src = tile.src; }, 400 * attempts);
       }
     });
+  }
+
+  function initMap(){
+    leafletMap = L.map('sp-leaflet-map', {
+      scrollWheelZoom: true,
+      maxBounds: MAP_BOUNDS,
+      maxBoundsViscosity: 1.0,
+      minZoom: 4
+    }).setView([60.5, 10.7], 6);
+
+    // Standard OSM-gatekart viser ikke høydekoter, bekker eller stier — for
+    // å faktisk kunne lese terrenget (poenget med appen) trengs et ordentlig
+    // topografisk kart som standardvalg. Kartverkets "topo"-lag har det;
+    // OSM og satellittfoto tilbys som alternativer via lag-kontrollen.
+    const topoLayer = L.tileLayer('https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png', {
+      maxZoom: 18,
+      attribution: '&copy; <a href="https://www.kartverket.no/">Kartverket</a>'
+    });
+    const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-bidragsytere'
+    });
+    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      attribution: 'Flyfoto &copy; Esri, Maxar, Earthstar Geographics'
+    });
+    [topoLayer, standardLayer, satelliteLayer].forEach(attachTileRetry);
+    topoLayer.addTo(leafletMap);
+
     markerLayer = L.layerGroup().addTo(leafletMap);
     radiusLayer = L.layerGroup().addTo(leafletMap);
+
+    // Lag-kontroll: bytt bakgrunnskart (radioknapper) og skru målepunktene
+    // av/på (avkrysning) — praktisk når man vil se rent terreng for å merke
+    // seg egne funnsteder uten at prikkene er i veien.
+    L.control.layers(
+      { 'Topografisk (Kartverket)': topoLayer, 'Standard': standardLayer, 'Satellitt': satelliteLayer },
+      { 'Målepunkter': markerLayer },
+      { collapsed: true }
+    ).addTo(leafletMap);
+
     leafletMap.on('click', (e) => {
       if (filterMode === 'radius') {
         radiusCenter = { lat: e.latlng.lat, lon: e.latlng.lng };
