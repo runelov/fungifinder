@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.5.3';
+  const APP_VERSION = '0.5.4';
   const APP_BUILD_DATE = '2026-07-08';
 
   const SPECIES = [
@@ -473,13 +473,18 @@
         if (run) {
           if (run.status === 'completed') {
             if (run.conclusion === 'success') {
-              progress.textContent = '✓ Fullført! Laster inn ny data …';
+              progress.textContent = 'GitHub-jobben er ferdig kjørt hos GitHub. Henter oppdatert data til nettleseren din …';
               await loadLocations();
               await loadFetchedAreas();
+              const match = findFetchedAreaMatch();
+              const detail = match ? ` ${match.pointsAdded} nye steder lagt til (av ${match.pointsChecked} punkter sjekket).` : '';
+              progress.textContent = `✓ Ferdig!${detail} Oppdaterer visningen …`;
               fetchInProgress = false;
               document.getElementById('sp-fetch-start').disabled = false;
               document.getElementById('sp-fetch-start').textContent = 'Hent data';
-              render();
+              // Liten pause slik at du faktisk rekker å lese sluttmeldingen før
+              // panelet eventuelt skjules (fordi området nå har data).
+              setTimeout(() => render(), 2200);
               return;
             } else {
               progress.textContent = `⚠ Jobben feilet (${run.conclusion}). Sjekk Actions-fanen på GitHub → siste kjøring → logg, for detaljer om hvilken datakilde som eventuelt svikter.`;
