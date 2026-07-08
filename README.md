@@ -2,8 +2,7 @@
 
 Dette er den **offentlige** delen av FungiFinder: rene statiske filer (HTML/CSS/JS)
 uten noe personlig innhold. Terrengdata og personlige data (funn, hogst-merker,
-egne steder) hentes fra et **privat** data-repo — se
-[fungifinder-data](../fungifinder-data) (eller ditt eget tilsvarende repo).
+egne steder) hentes fra et **privat** data-repo
 
 ## Struktur
 
