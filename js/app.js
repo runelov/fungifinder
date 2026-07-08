@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.5.0';
+  const APP_VERSION = '0.5.1';
   const APP_BUILD_DATE = '2026-07-08';
 
   const SPECIES = [
@@ -115,6 +115,8 @@
   let customLocations = [];
   let fetchedAreas = [];
   let gridKm = 1.5;
+  let kommuneRegister = []; // {kommunenavn, fylkesnavn} — hentet fra Kartverkets Kommuneinfo-API
+  let kommuneNarrowFylke = 'alle';
   let fetchInProgress = false;
   let fetchPollTimer = null;
   let bboxAreaCache = {}; // cache av Nominatim bbox-areal per fylke/kommune-navn
@@ -595,6 +597,63 @@
   // noe som gjorde det umulig å velge et område i utgangspunktet.
   const FYLKER_STATISK = ['Østfold','Akershus','Oslo','Innlandet','Buskerud','Vestfold','Telemark','Agder','Rogaland','Vestland','Møre og Romsdal','Trøndelag','Nordland','Troms','Finnmark'];
 
+  // Henter hele fylke/kommune-registeret fra Kartverkets offisielle Kommuneinfo-API.
+  // Brukes i stedet for en hardkodet kommuneliste — Kartverket er alltid oppdatert
+  // ved reformer (f.eks. planlagt endring i 2028), og jeg kan ikke garantere at
+  // en liste over alle 357 kommuner fra hukommelsen ville vært 100% korrekt.
+  // VERIFISER: nøyaktig endepunkt/feltnavn er satt opp basert på dokumentasjon,
+  // ikke testet med faktisk nettverkstilgang i miljøet dette ble bygget i.
+  // Feiler kallet, faller appen tilbake til kun å vise "Alle fylker" som filter
+  // og bygge kommunelisten fra allerede lastet stedsdata (som før).
+  async function loadKommuneRegister(){
+    const CACHE_KEY = 'fungifinder-kommuneregister';
+    const CACHE_MAX_AGE_DAYS = 30;
+    try {
+      const cachedRaw = localStorage.getItem(CACHE_KEY);
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw);
+        const ageDays = (Date.now() - cached.fetchedAt) / (1000*60*60*24);
+        if (ageDays < CACHE_MAX_AGE_DAYS && Array.isArray(cached.data) && cached.data.length) {
+          kommuneRegister = cached.data;
+          return;
+        }
+      }
+    } catch(e) { /* ignorer korrupt cache */ }
+
+    try {
+      const res = await fetch('https://ws.geonorge.no/kommuneinfo/v1/kommuner');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      const list = Array.isArray(json) ? json : (json.kommuner || []);
+      kommuneRegister = list.map(k => ({
+        kommunenavn: k.kommunenavnNorsk || k.kommunenavn || k.navn,
+        fylkesnavn: k.fylkesnavn || (k.fylke && k.fylke.fylkesnavn) || null
+      })).filter(k => k.kommunenavn);
+      if (kommuneRegister.length) {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ fetchedAt: Date.now(), data: kommuneRegister }));
+      } else {
+        throw new Error('Uventet responsformat fra Kommuneinfo-API');
+      }
+    } catch (e) {
+      console.warn('Kunne ikke hente kommuneregister fra Kartverket — faller tilbake til lokal stedsdata.', e);
+      kommuneRegister = [];
+    }
+  }
+
+  function alleKommunerAlfabetisk(){
+    if (kommuneRegister.length) {
+      return kommuneRegister.map(k => k.kommunenavn).sort((a,b)=>a.localeCompare(b,'no'));
+    }
+    return kommuneList(); // fallback: kun det som finnes i allerede lastet stedsdata
+  }
+
+  function kommunerIFylke(fylkesnavn){
+    if (kommuneRegister.length) {
+      return kommuneRegister.filter(k => k.fylkesnavn === fylkesnavn).map(k => k.kommunenavn).sort((a,b)=>a.localeCompare(b,'no'));
+    }
+    return kommuneList().filter(k => allLocations().some(l => l.kommune === k && l.fylke === fylkesnavn));
+  }
+
   function fylkeList(){
     const set = new Set([...FYLKER_STATISK, ...allLocations().map(l=>l.fylke).filter(Boolean)]);
     return Array.from(set).sort((a,b)=>a.localeCompare(b,'no'));
@@ -781,7 +840,14 @@
 
     const kInput = document.getElementById('sp-kommune-filter-input');
     if (document.activeElement !== kInput) kInput.value = kommuneFilter === 'alle' ? '' : kommuneFilter;
-    document.getElementById('sp-kommune-datalist').innerHTML = kommuneList().map(k => `<option value="${escapeHtml(k)}">`).join('');
+
+    const narrowEl = document.getElementById('sp-kommune-narrow-fylke');
+    if (document.activeElement !== narrowEl) {
+      narrowEl.innerHTML = `<option value="alle">Alle fylker</option>` + FYLKER_STATISK.map(f => `<option value="${escapeHtml(f)}" ${f===kommuneNarrowFylke?'selected':''}>${escapeHtml(f)}</option>`).join('');
+      narrowEl.value = kommuneNarrowFylke;
+    }
+    const kommuner = kommuneNarrowFylke === 'alle' ? alleKommunerAlfabetisk() : kommunerIFylke(kommuneNarrowFylke);
+    document.getElementById('sp-kommune-datalist').innerHTML = kommuner.map(k => `<option value="${escapeHtml(k)}">`).join('');
   }
 
   function gaugeSvg(score){
@@ -1100,6 +1166,10 @@
   document.getElementById('sp-kommune-filter-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') e.target.blur(); // trigger 'change'
   });
+  document.getElementById('sp-kommune-narrow-fylke').addEventListener('change', (e) => {
+    kommuneNarrowFylke = e.target.value;
+    renderFilterControls();
+  });
   document.getElementById('sp-kommune-clear').addEventListener('click', () => {
     kommuneFilter = 'alle';
     document.getElementById('sp-kommune-filter-input').value = '';
@@ -1120,6 +1190,7 @@
     await loadLocations();
     await loadFetchedAreas();
     await loadStorage();
+    loadKommuneRegister().then(() => renderFilterControls()); // ikke-blokkerende, oppdaterer UI når klar
     render();
     loadWeather();
   })();

@@ -110,7 +110,10 @@
               </div>
               <select class="sp-select" id="sp-fylke-filter"></select>
               <div class="sp-kommune-input-wrap" id="sp-kommune-input-wrap" style="display:none;">
-                <input type="text" class="sp-select" id="sp-kommune-filter-input" list="sp-kommune-datalist" placeholder="Skriv kommunenavn…"/>
+                <select class="sp-select" id="sp-kommune-narrow-fylke" title="Snevre inn til ett fylke (valgfritt)">
+                  <option value="alle">Alle fylker</option>
+                </select>
+                <input type="text" class="sp-select" id="sp-kommune-filter-input" list="sp-kommune-datalist" placeholder="Skriv/søk kommunenavn…"/>
                 <datalist id="sp-kommune-datalist"></datalist>
                 <button class="sp-mini-btn" id="sp-kommune-clear">Vis alle</button>
               </div>

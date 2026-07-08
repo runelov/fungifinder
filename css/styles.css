@@ -204,3 +204,5 @@
 
   .sp-kommune-input-wrap { display: flex; align-items: center; gap: 6px; }
   .sp-kommune-input-wrap input { min-width: 140px; }
+
+  #sp-kommune-narrow-fylke { max-width: 110px; }
