@@ -109,7 +109,11 @@
                 <button data-mode="radius">Radius</button>
               </div>
               <select class="sp-select" id="sp-fylke-filter"></select>
-              <select class="sp-select" id="sp-kommune-filter" style="display:none;"></select>
+              <div class="sp-kommune-input-wrap" id="sp-kommune-input-wrap" style="display:none;">
+                <input type="text" class="sp-select" id="sp-kommune-filter-input" list="sp-kommune-datalist" placeholder="Skriv kommunenavn…"/>
+                <datalist id="sp-kommune-datalist"></datalist>
+                <button class="sp-mini-btn" id="sp-kommune-clear">Vis alle</button>
+              </div>
               <div class="sp-radius-controls" id="sp-radius-controls" style="display:none;">
                 <span id="sp-radius-label">20 km</span>
                 <input type="range" id="sp-radius-slider" min="2" max="60" value="20" step="1"/>

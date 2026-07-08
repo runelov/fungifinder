@@ -589,12 +589,18 @@
     };
   }
 
+  // Statisk liste over Norges 15 fylker (2024-strukturen) — vises alltid i
+  // dropdownen, uavhengig av om det finnes data for dem ennå. Uten denne
+  // ville fylke-velgeren vært tom helt til data faktisk var hentet et sted,
+  // noe som gjorde det umulig å velge et område i utgangspunktet.
+  const FYLKER_STATISK = ['Østfold','Akershus','Oslo','Innlandet','Buskerud','Vestfold','Telemark','Agder','Rogaland','Vestland','Møre og Romsdal','Trøndelag','Nordland','Troms','Finnmark'];
+
   function fylkeList(){
-    const set = new Set(allLocations().map(l=>l.fylke));
+    const set = new Set([...FYLKER_STATISK, ...allLocations().map(l=>l.fylke).filter(Boolean)]);
     return Array.from(set).sort((a,b)=>a.localeCompare(b,'no'));
   }
   function kommuneList(){
-    const set = new Set(allLocations().map(l=>l.kommune));
+    const set = new Set(allLocations().map(l=>l.kommune).filter(Boolean));
     return Array.from(set).sort((a,b)=>a.localeCompare(b,'no'));
   }
 
@@ -764,7 +770,7 @@
   function renderFilterControls(){
     document.querySelectorAll('#sp-mode-seg button').forEach(b => b.classList.toggle('active', b.dataset.mode === filterMode));
     document.getElementById('sp-fylke-filter').style.display = filterMode === 'fylke' ? '' : 'none';
-    document.getElementById('sp-kommune-filter').style.display = filterMode === 'kommune' ? '' : 'none';
+    document.getElementById('sp-kommune-input-wrap').style.display = filterMode === 'kommune' ? 'flex' : 'none';
     document.getElementById('sp-radius-controls').style.display = filterMode === 'radius' ? 'flex' : 'none';
     document.getElementById('sp-radius-label').textContent = radiusKm + ' km';
     document.getElementById('sp-radius-slider').value = radiusKm;
@@ -773,9 +779,9 @@
     fEl.innerHTML = `<option value="alle">Alle fylker</option>` + fylkeList().map(f => `<option value="${escapeHtml(f)}" ${f===fylkeFilter?'selected':''}>${escapeHtml(f)}</option>`).join('');
     fEl.value = fylkeFilter;
 
-    const kEl = document.getElementById('sp-kommune-filter');
-    kEl.innerHTML = `<option value="alle">Alle kommuner</option>` + kommuneList().map(k => `<option value="${escapeHtml(k)}" ${k===kommuneFilter?'selected':''}>${escapeHtml(k)}</option>`).join('');
-    kEl.value = kommuneFilter;
+    const kInput = document.getElementById('sp-kommune-filter-input');
+    if (document.activeElement !== kInput) kInput.value = kommuneFilter === 'alle' ? '' : kommuneFilter;
+    document.getElementById('sp-kommune-datalist').innerHTML = kommuneList().map(k => `<option value="${escapeHtml(k)}">`).join('');
   }
 
   function gaugeSvg(score){
@@ -1086,7 +1092,19 @@
   document.getElementById('sp-toggle-quiet').addEventListener('click', () => { prioritizeQuiet = !prioritizeQuiet; render(); });
   document.getElementById('sp-toggle-hogst').addEventListener('click', () => { hideHogst = !hideHogst; render(); });
   document.getElementById('sp-fylke-filter').addEventListener('change', (e) => { fylkeFilter = e.target.value; render(); });
-  document.getElementById('sp-kommune-filter').addEventListener('change', (e) => { kommuneFilter = e.target.value; render(); });
+  document.getElementById('sp-kommune-filter-input').addEventListener('change', (e) => {
+    const val = e.target.value.trim();
+    kommuneFilter = val === '' ? 'alle' : val;
+    render();
+  });
+  document.getElementById('sp-kommune-filter-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') e.target.blur(); // trigger 'change'
+  });
+  document.getElementById('sp-kommune-clear').addEventListener('click', () => {
+    kommuneFilter = 'alle';
+    document.getElementById('sp-kommune-filter-input').value = '';
+    render();
+  });
   document.getElementById('sp-add-place').addEventListener('click', () => openAddLocationModal({}));
   document.querySelectorAll('#sp-mode-seg button').forEach(btn => btn.addEventListener('click', () => { filterMode = btn.dataset.mode; render(); }));
   document.getElementById('sp-radius-slider').addEventListener('input', (e) => { radiusKm = parseInt(e.target.value); render(); });

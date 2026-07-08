@@ -201,3 +201,6 @@
   .sp-tab-btn { background: none; border: none; padding: 7px 12px; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: 'Source Sans 3', sans-serif; }
   .sp-tab-btn.active { color: var(--pine-deep); border-bottom-color: var(--russet); }
   .sp-tab-btn:hover:not(.active) { color: var(--pine); }
+
+  .sp-kommune-input-wrap { display: flex; align-items: center; gap: 6px; }
+  .sp-kommune-input-wrap input { min-width: 140px; }
