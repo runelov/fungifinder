@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.5.2';
+  const APP_VERSION = '0.5.3';
   const APP_BUILD_DATE = '2026-07-08';
 
   const SPECIES = [
@@ -343,6 +343,25 @@
     }
   }
 
+  function describeRunStatus(run){
+    if (!run) return 'Ukjent status';
+    if (run.status === 'queued') return '⏳ I kø hos GitHub (venter på ledig kapasitet — dette er normalt og kan ta litt tid)';
+    if (run.status === 'in_progress') return '⚙ Kjører nå hos GitHub …';
+    if (run.status === 'completed') {
+      return run.conclusion === 'success' ? '✓ Fullført' : `⚠ Feilet (${run.conclusion})`;
+    }
+    return `Status: ${run.status}`;
+  }
+
+  async function checkForActiveRun(){
+    if (!window.FungiStore || !window.FungiStore.isConfigured()) return null;
+    try {
+      const run = await window.FungiStore.getLatestRun('fetch-area.yml');
+      if (run && (run.status === 'queued' || run.status === 'in_progress')) return run;
+    } catch (e) { /* stille feil her — dette er kun en høflig sjekk */ }
+    return null;
+  }
+
   async function updateFetchPanel(){
     const panel = document.getElementById('sp-fetch-panel');
     if (fetchInProgress) { panel.style.display = ''; return; } // behold synlig under pågående henting
@@ -354,6 +373,24 @@
     if (match) { panel.style.display = 'none'; return; }
 
     panel.style.display = '';
+
+    // Sjekk om en jobb allerede kjører (f.eks. fra før siden ble lastet på nytt),
+    // slik at vi ikke inviterer til å starte en ny henting oppå en pågående.
+    const activeRun = await checkForActiveRun();
+    if (activeRun) {
+      document.getElementById('sp-fetch-info').textContent = `Ingen ferdig terrengdata for ${label} ennå — men det ser ut som en henting allerede pågår.`;
+      document.getElementById('sp-fetch-start').disabled = true;
+      document.getElementById('sp-fetch-start').textContent = 'Henting pågår …';
+      const progress = document.getElementById('sp-fetch-progress');
+      progress.style.display = '';
+      progress.textContent = describeRunStatus(activeRun);
+      fetchInProgress = true;
+      pollFetchStatus(progress);
+      return;
+    }
+
+    document.getElementById('sp-fetch-start').disabled = false;
+    document.getElementById('sp-fetch-start').textContent = 'Hent data';
     document.getElementById('sp-fetch-info').textContent = `Ingen terrengdata hentet for ${label} ennå.`;
     await updateFetchEstimate();
   }
@@ -381,9 +418,25 @@
 
   async function startFetch(){
     if (!window.FungiStore || !window.FungiStore.isConfigured()) {
-      document.getElementById('sp-fetch-info').textContent = 'Koble til ditt private data-repo under "Synk" først.';
+      document.getElementById('sp-fetch-info').textContent = 'Koble til ditt private data-repo under "Config" først.';
       return;
     }
+
+    // Dobbeltsjekk rett før trigging — unngår at to jobber startes samtidig
+    // hvis brukeren rekker å klikke to ganger eller har en fane åpen fra før.
+    const progress = document.getElementById('sp-fetch-progress');
+    progress.style.display = '';
+    progress.textContent = 'Sjekker om en jobb allerede kjører …';
+    const already = await checkForActiveRun();
+    if (already) {
+      progress.textContent = 'En henting kjører allerede — kobler til den i stedet for å starte en ny. ' + describeRunStatus(already);
+      fetchInProgress = true;
+      document.getElementById('sp-fetch-start').disabled = true;
+      document.getElementById('sp-fetch-start').textContent = 'Henting pågår …';
+      pollFetchStatus(progress);
+      return;
+    }
+
     const inputs = { gridKm: String(gridKm) };
     if (filterMode === 'fylke') { inputs.mode = 'fylke'; inputs.value = fylkeFilter; }
     else if (filterMode === 'kommune') { inputs.mode = 'kommune'; inputs.value = kommuneFilter; }
@@ -393,19 +446,19 @@
 
     fetchInProgress = true;
     document.getElementById('sp-fetch-start').disabled = true;
-    const progress = document.getElementById('sp-fetch-progress');
-    progress.style.display = '';
+    document.getElementById('sp-fetch-start').textContent = 'Henting pågår …';
     progress.textContent = 'Starter jobb …';
 
     try {
       await window.FungiStore.triggerWorkflow('fetch-area.yml', inputs);
-      progress.textContent = 'Jobb startet — venter på at GitHub Actions plukker den opp …';
+      progress.textContent = '⏳ Jobb bedt om å starte — venter på at GitHub Actions bekrefter (kan ta 10-30 sekunder) …';
       pollFetchStatus(progress);
     } catch (e) {
       console.error(e);
       progress.textContent = '⚠ Kunne ikke starte jobben: ' + e.message + ' (sjekk at tokenet har "Actions: Read and write")';
       fetchInProgress = false;
       document.getElementById('sp-fetch-start').disabled = false;
+      document.getElementById('sp-fetch-start').textContent = 'Hent data';
     }
   }
 
@@ -420,22 +473,26 @@
         if (run) {
           if (run.status === 'completed') {
             if (run.conclusion === 'success') {
-              progress.textContent = '✓ Ferdig! Laster inn ny data …';
+              progress.textContent = '✓ Fullført! Laster inn ny data …';
               await loadLocations();
               await loadFetchedAreas();
               fetchInProgress = false;
               document.getElementById('sp-fetch-start').disabled = false;
+              document.getElementById('sp-fetch-start').textContent = 'Hent data';
               render();
               return;
             } else {
-              progress.textContent = `⚠ Jobben feilet (${run.conclusion}). Sjekk Actions-fanen på GitHub for detaljer.`;
+              progress.textContent = `⚠ Jobben feilet (${run.conclusion}). Sjekk Actions-fanen på GitHub → siste kjøring → logg, for detaljer om hvilken datakilde som eventuelt svikter.`;
               fetchInProgress = false;
               document.getElementById('sp-fetch-start').disabled = false;
+              document.getElementById('sp-fetch-start').textContent = 'Hent data';
               return;
             }
           } else {
-            progress.textContent = `Kjører … (${run.status}, forsøk ${attempts}/${maxAttempts})`;
+            progress.textContent = `${describeRunStatus(run)} (sjekket ${attempts} gang${attempts>1?'er':''} — oppdateres automatisk, du trenger ikke gjøre noe)`;
           }
+        } else {
+          progress.textContent = `Fant ingen kjøring ennå hos GitHub — venter litt til (forsøk ${attempts}/${maxAttempts}) …`;
         }
       } catch (e) {
         console.warn('Feil under polling', e);
@@ -443,9 +500,10 @@
       if (attempts < maxAttempts) {
         fetchPollTimer = setTimeout(poll, 15000);
       } else {
-        progress.textContent = 'Bruker lenger tid enn ventet — sjekk Actions-fanen på GitHub manuelt. Siden kan lastes på nytt senere for å hente resultatet.';
+        progress.textContent = 'Bruker lenger tid enn ventet (over 15 min) — sjekk Actions-fanen på GitHub manuelt. Data lastes automatisk neste gang du åpner siden, uansett.';
         fetchInProgress = false;
         document.getElementById('sp-fetch-start').disabled = false;
+        document.getElementById('sp-fetch-start').textContent = 'Hent data';
       }
     };
     poll();
