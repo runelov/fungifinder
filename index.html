@@ -133,6 +133,16 @@
           </div>
           <div class="sp-map-hint" id="sp-map-hint"></div>
 
+          <div class="sp-route-panel">
+            <div class="sp-route-row">
+              <span>Foreslå rundtur — maks lengde: <b id="sp-route-km-label">5 km</b></span>
+              <input type="range" id="sp-route-km-slider" min="1" max="15" step="0.5" value="5"/>
+              <button class="sp-btn sp-primary" id="sp-route-suggest">🥾 Foreslå tur</button>
+              <button class="sp-btn" id="sp-route-clear" style="display:none;">Fjern forslag</button>
+            </div>
+            <div id="sp-route-summary" style="display:none;"></div>
+          </div>
+
           <div id="sp-fetch-panel" style="display:none; margin-top:14px; padding-top:12px; border-top: 1px dashed var(--line); border-left: 3px solid var(--gold); padding-left: 12px;">
             <h3>Hente terrengdata for dette området?</h3>
             <div id="sp-fetch-info" style="font-size:13px;color:var(--ink);margin-bottom:10px;"></div>
