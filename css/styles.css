@@ -181,3 +181,23 @@
   .sp-timing-bar { position: relative; height: 6px; border-radius: 3px; background: rgba(38,48,31,0.12); margin: 4px 0 2px; overflow: visible; }
   .sp-timing-bar-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #C8974A, #5F7A3E, #C8974A); }
   .sp-timing-bar-marker { position: absolute; top: -3px; width: 2px; height: 12px; background: var(--pine-deep); }
+
+  .sp-version { font-size: 10px; color: var(--ink-soft); opacity: 0.7; text-transform: none; letter-spacing: 0; }
+  .sp-config-version { font-size: 11px; color: var(--ink-soft); margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
+
+  .sp-collapsible { margin-bottom: 14px; }
+  .sp-collapsible summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 8px; }
+  .sp-collapsible summary::-webkit-details-marker { display: none; }
+  .sp-collapsible summary::before { content: '▸'; font-size: 11px; color: var(--ink-soft); transition: transform 0.15s; margin-right: 2px; }
+  .sp-collapsible[open] summary::before { transform: rotate(90deg); }
+  .sp-collapse-hint { font-size: 10.5px; color: var(--ink-soft); opacity: 0.6; font-weight: 400; }
+  .sp-collapsible-body { margin-top: 8px; }
+  .sp-collapsible.sp-notice { background: #DCE3CB; border: 1px solid rgba(52,67,44,0.25); border-radius: 3px; padding: 10px 14px; font-size: 12.5px; color: var(--pine-deep); }
+  .sp-collapsible.sp-notice summary { font-size: 12.5px; }
+  .sp-collapsible.sp-safety { background: #F3E3DA; border: 1.5px solid var(--danger); border-radius: 4px; padding: 14px 16px; }
+  .sp-collapsible.sp-safety summary h4 { color: var(--danger); font-family: 'Fraunces', serif; font-size: 15px; }
+
+  .sp-tab-bar { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .sp-tab-btn { background: none; border: none; padding: 7px 12px; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: 'Source Sans 3', sans-serif; }
+  .sp-tab-btn.active { color: var(--pine-deep); border-bottom-color: var(--russet); }
+  .sp-tab-btn:hover:not(.active) { color: var(--pine); }

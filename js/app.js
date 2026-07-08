@@ -1,5 +1,8 @@
 (function(){
 
+  const APP_VERSION = '0.5.0';
+  const APP_BUILD_DATE = '2026-07-08';
+
   const SPECIES = [
     { id:'kantarell', name:'Kantarell', latin:'Cantharellus cibarius', season:[7,10],
       treslag:['gran','furu','bjork'], skogalder:['middels','gammel'], fuktighet:['frisk','fuktig'], berggrunn:['fattig','moderat'],
@@ -181,6 +184,36 @@
   function setSyncStatus(text){
     const el = document.getElementById('sp-sync-status');
     if (el) el.textContent = text;
+  }
+
+  function wireVersionInfo(){
+    document.getElementById('sp-version').textContent = 'v' + APP_VERSION;
+    document.getElementById('sp-config-version').textContent = `FungiFinder v${APP_VERSION} (${APP_BUILD_DATE})`;
+  }
+
+  function wireTabs(){
+    const buttons = document.querySelectorAll('#sp-tab-bar .sp-tab-btn');
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.sp-tabbed-panel .sp-tab-content').forEach(c => {
+          c.style.display = (c.dataset.tabContent === btn.dataset.tab) ? '' : 'none';
+        });
+      });
+    });
+  }
+
+  function wireCollapsibles(){
+    ['sp-notice', 'sp-safety'].forEach(id => {
+      const el = document.getElementById(id);
+      const key = 'fungifinder-collapse-' + id;
+      const saved = localStorage.getItem(key);
+      if (saved !== null) el.open = saved === 'open';
+      el.addEventListener('toggle', () => {
+        localStorage.setItem(key, el.open ? 'open' : 'closed');
+      });
+    });
   }
 
   function wireSyncPanel(){
@@ -1060,6 +1093,9 @@
   document.getElementById('sp-radius-clear').addEventListener('click', () => { radiusCenter = null; render(); });
 
   (async function init(){
+    wireVersionInfo();
+    wireTabs();
+    wireCollapsibles();
     wireSyncPanel();
     wireFetchPanel();
     initMap();
