@@ -100,4 +100,42 @@ function saveLocal(key, dataObj){
   localStorage.setItem(LOCAL_FALLBACK_PREFIX + key, JSON.stringify(dataObj));
 }
 
-window.FungiStore = { getConfig, setConfig, clearConfig, isConfigured, loadFile, saveFile, loadLocal, saveLocal };
+// Trigger en GitHub Actions-workflow (workflow_dispatch) med gitte input-parametere.
+// Krever at tokenet har "Actions: Read and write" i tillegg til Contents.
+async function triggerWorkflow(workflowFile, inputs){
+  const cfg = getConfig();
+  if (!cfg) throw new Error('GitHub-synk er ikke konfigurert.');
+  const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/actions/workflows/${workflowFile}/dispatches`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${cfg.token}`,
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ ref: cfg.branch || 'main', inputs })
+  });
+  if (!res.ok) throw new Error(`Kunne ikke starte jobben (${res.status}): ${await res.text()}`);
+  return true;
+}
+
+// Henter siste kjøring av en gitt workflow-fil, for å følge med på status
+// (queued / in_progress / completed) etter at triggerWorkflow() er kalt.
+async function getLatestRun(workflowFile){
+  const cfg = getConfig();
+  if (!cfg) throw new Error('GitHub-synk er ikke konfigurert.');
+  const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/actions/workflows/${workflowFile}/runs?per_page=1`;
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${cfg.token}`,
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28'
+    }
+  });
+  if (!res.ok) throw new Error(`Kunne ikke hente jobbstatus (${res.status}): ${await res.text()}`);
+  const data = await res.json();
+  return (data.workflow_runs && data.workflow_runs[0]) || null;
+}
+
+window.FungiStore = { getConfig, setConfig, clearConfig, isConfigured, loadFile, saveFile, loadLocal, saveLocal, triggerWorkflow, getLatestRun };

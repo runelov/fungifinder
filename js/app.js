@@ -85,6 +85,11 @@
     { id:'demo-2', name:'Eksempelskog B (demo)', fylke:'Demo', kommune:'Demo', lat:60.2, lon:10.4, treslag:['furu'], skogalder:'middels', fuktighet:'tørr', berggrunn:'moderat', avstandVeiM:null, befolkning:'ukjent', hogstAr:null, kjenteFunn:[], custom:false, kjorbarVei:'ukjent', parkeringNotat:'Koble til ditt private data-repo for ekte steder', stier:'ukjent', avstandParkeringM:null }
   ];
 
+  // Arter som er kjent for å foretrekke varme, soleksponerte vokseplasser —
+  // brukes til å gi et lite tillegg for sørvendte skråninger når vi har ekte
+  // helnings-/himmelretningsdata fra et auto-hentet punkt.
+  const WARMTH_LOVING_SPECIES = new Set(['steinsopp', 'matriske', 'kransmusserong', 'furuknippesopp']);
+
   const TXT = {
     treslag: { gran:'gran', furu:'furu', bjork:'bjørk', apen:'åpen mark', ukjent:'ukjent treslag' },
     fuktighet: { tørr:'tørr', frisk:'frisk', fuktig:'fuktig', ukjent:'ukjent fuktighet' },
@@ -105,6 +110,11 @@
   let userFinds = [];
   let userCuts = [];
   let customLocations = [];
+  let fetchedAreas = [];
+  let gridKm = 1.5;
+  let fetchInProgress = false;
+  let fetchPollTimer = null;
+  let bboxAreaCache = {}; // cache av Nominatim bbox-areal per fylke/kommune-navn
 
   const monthNow = new Date().getMonth() + 1;
   const yearNow = new Date().getFullYear();
@@ -194,6 +204,7 @@
       window.FungiStore.setConfig({ owner, repo, locationsPath, personalPath, token, branch: 'main' });
       setSyncStatus('Kobler til …');
       await loadLocations();
+      await loadFetchedAreas();
       await loadStorage();
       render();
     });
@@ -223,6 +234,178 @@
       BASE_LOCATIONS = cached;
     }
     // Ellers: beholder den innebygde SAMPLE_LOCATIONS-fallbacken definert øverst i filen.
+  }
+
+  async function loadFetchedAreas(){
+    const cfg = window.FungiStore ? window.FungiStore.getConfig() : null;
+    if (cfg && window.FungiStore.isConfigured()) {
+      try {
+        const result = await window.FungiStore.loadFile('data/fetched-areas.json');
+        fetchedAreas = Array.isArray(result.data) ? result.data : [];
+        return;
+      } catch (e) {
+        console.warn('Kunne ikke laste fetched-areas.json.', e);
+      }
+    }
+    fetchedAreas = [];
+  }
+
+  // ---------- on-demand henting av terrengdata ----------
+
+  function findFetchedAreaMatch(){
+    if (filterMode === 'fylke' && fylkeFilter !== 'alle') {
+      return fetchedAreas.find(a => a.mode === 'fylke' && a.value === fylkeFilter) || null;
+    }
+    if (filterMode === 'kommune' && kommuneFilter !== 'alle') {
+      return fetchedAreas.find(a => a.mode === 'kommune' && a.value === kommuneFilter) || null;
+    }
+    if (filterMode === 'radius' && radiusCenter) {
+      return fetchedAreas.find(a => a.mode === 'radius' && a.lat != null &&
+        haversineKm(a.lat, a.lon, radiusCenter.lat, radiusCenter.lon) < 2 &&
+        a.radiusKm >= radiusKm) || null;
+    }
+    return null;
+  }
+
+  function currentAreaLabel(){
+    if (filterMode === 'fylke') return fylkeFilter !== 'alle' ? fylkeFilter : null;
+    if (filterMode === 'kommune') return kommuneFilter !== 'alle' ? kommuneFilter : null;
+    if (filterMode === 'radius') return radiusCenter ? `${radiusKm} km rundt valgt punkt` : null;
+    return null;
+  }
+
+  async function estimateAreaKm2(){
+    if (filterMode === 'radius') return Math.PI * radiusKm * radiusKm;
+    const name = filterMode === 'fylke' ? fylkeFilter : kommuneFilter;
+    if (!name || name === 'alle') return null;
+    if (bboxAreaCache[name] !== undefined) return bboxAreaCache[name];
+    try {
+      const q = filterMode === 'fylke' ? `${name} fylke, Norge` : `${name}, Norge`;
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=jsonv2&limit=1`, {
+        headers: { 'Accept-Language': 'no' }
+      });
+      const json = await res.json();
+      if (!json.length) { bboxAreaCache[name] = null; return null; }
+      const bb = json[0].boundingbox.map(parseFloat); // [south, north, west, east]
+      const latKm = (bb[1] - bb[0]) * 111.32;
+      const midLat = (bb[0] + bb[1]) / 2;
+      const lonKm = (bb[3] - bb[2]) * 111.32 * Math.cos(midLat * Math.PI/180);
+      const area = Math.abs(latKm * lonKm);
+      bboxAreaCache[name] = area;
+      return area;
+    } catch (e) {
+      console.warn('Kunne ikke estimere areal via Nominatim', e);
+      bboxAreaCache[name] = null;
+      return null;
+    }
+  }
+
+  async function updateFetchPanel(){
+    const panel = document.getElementById('sp-fetch-panel');
+    if (fetchInProgress) { panel.style.display = ''; return; } // behold synlig under pågående henting
+
+    const label = currentAreaLabel();
+    if (!label) { panel.style.display = 'none'; return; }
+
+    const match = findFetchedAreaMatch();
+    if (match) { panel.style.display = 'none'; return; }
+
+    panel.style.display = '';
+    document.getElementById('sp-fetch-info').textContent = `Ingen terrengdata hentet for ${label} ennå.`;
+    await updateFetchEstimate();
+  }
+
+  async function updateFetchEstimate(){
+    const est = document.getElementById('sp-fetch-estimate');
+    est.textContent = 'Beregner estimat …';
+    const areaKm2 = await estimateAreaKm2();
+    if (!areaKm2) { est.textContent = 'Kunne ikke beregne arealestimat — henting fungerer likevel.'; return; }
+    const pointCount = Math.round(areaKm2 / (gridKm * gridKm));
+    const minEstimate = Math.max(1, Math.round(pointCount * 1.0 / 60));
+    const maxEstimate = Math.max(minEstimate, Math.round(pointCount * 2.0 / 60));
+    est.textContent = `Areal ≈ ${Math.round(areaKm2)} km² → opptil ca. ${pointCount} kandidatpunkter å sjekke, anslått ${minEstimate}-${maxEstimate} minutter.`;
+  }
+
+  function wireFetchPanel(){
+    const slider = document.getElementById('sp-grid-slider');
+    slider.addEventListener('input', (e) => {
+      gridKm = parseFloat(e.target.value);
+      document.getElementById('sp-grid-label').textContent = gridKm + ' km';
+      updateFetchEstimate();
+    });
+    document.getElementById('sp-fetch-start').addEventListener('click', startFetch);
+  }
+
+  async function startFetch(){
+    if (!window.FungiStore || !window.FungiStore.isConfigured()) {
+      document.getElementById('sp-fetch-info').textContent = 'Koble til ditt private data-repo under "Synk" først.';
+      return;
+    }
+    const inputs = { gridKm: String(gridKm) };
+    if (filterMode === 'fylke') { inputs.mode = 'fylke'; inputs.value = fylkeFilter; }
+    else if (filterMode === 'kommune') { inputs.mode = 'kommune'; inputs.value = kommuneFilter; }
+    else if (filterMode === 'radius') {
+      inputs.mode = 'radius'; inputs.lat = String(radiusCenter.lat); inputs.lon = String(radiusCenter.lon); inputs.radiusKm = String(radiusKm);
+    } else return;
+
+    fetchInProgress = true;
+    document.getElementById('sp-fetch-start').disabled = true;
+    const progress = document.getElementById('sp-fetch-progress');
+    progress.style.display = '';
+    progress.textContent = 'Starter jobb …';
+
+    try {
+      await window.FungiStore.triggerWorkflow('fetch-area.yml', inputs);
+      progress.textContent = 'Jobb startet — venter på at GitHub Actions plukker den opp …';
+      pollFetchStatus(progress);
+    } catch (e) {
+      console.error(e);
+      progress.textContent = '⚠ Kunne ikke starte jobben: ' + e.message + ' (sjekk at tokenet har "Actions: Read and write")';
+      fetchInProgress = false;
+      document.getElementById('sp-fetch-start').disabled = false;
+    }
+  }
+
+  function pollFetchStatus(progress){
+    let attempts = 0;
+    const maxAttempts = 60; // ~15 min ved 15 sek mellomrom
+    clearTimeout(fetchPollTimer);
+    const poll = async () => {
+      attempts++;
+      try {
+        const run = await window.FungiStore.getLatestRun('fetch-area.yml');
+        if (run) {
+          if (run.status === 'completed') {
+            if (run.conclusion === 'success') {
+              progress.textContent = '✓ Ferdig! Laster inn ny data …';
+              await loadLocations();
+              await loadFetchedAreas();
+              fetchInProgress = false;
+              document.getElementById('sp-fetch-start').disabled = false;
+              render();
+              return;
+            } else {
+              progress.textContent = `⚠ Jobben feilet (${run.conclusion}). Sjekk Actions-fanen på GitHub for detaljer.`;
+              fetchInProgress = false;
+              document.getElementById('sp-fetch-start').disabled = false;
+              return;
+            }
+          } else {
+            progress.textContent = `Kjører … (${run.status}, forsøk ${attempts}/${maxAttempts})`;
+          }
+        }
+      } catch (e) {
+        console.warn('Feil under polling', e);
+      }
+      if (attempts < maxAttempts) {
+        fetchPollTimer = setTimeout(poll, 15000);
+      } else {
+        progress.textContent = 'Bruker lenger tid enn ventet — sjekk Actions-fanen på GitHub manuelt. Siden kan lastes på nytt senere for å hente resultatet.';
+        fetchInProgress = false;
+        document.getElementById('sp-fetch-start').disabled = false;
+      }
+    };
+    poll();
   }
 
   // ---------- weather ----------
@@ -328,6 +511,14 @@
 
     const acc = adkomstScore(loc);
     total += acc.pts; breakdown.push(['Adkomst (vei/parkering/stier)', acc.pts]);
+
+    if (WARMTH_LOVING_SPECIES.has(species.id) && loc.himmelretning && loc.helningGrader != null) {
+      const sorvendt = ['S','SØ','SV'].includes(loc.himmelretning);
+      const passeHelning = loc.helningGrader >= 3 && loc.helningGrader <= 25;
+      if (sorvendt && passeHelning) {
+        total += 5; breakdown.push(['Sørvendt skråning (varmekrevende art)', 5]);
+      }
+    }
 
     let weatherVerdict = null;
     const w = weatherBySpecies[loc.id];
@@ -580,10 +771,13 @@
         </div>
         <div class="sp-tags">
           ${loc.custom ? `<span class="sp-tag custom">eget sted</span>` : ''}
+          ${loc.kilde==='auto-etl' ? `<span class="sp-tag good">auto-hentet</span>` : ''}
           <span class="sp-tag">${t.treslagTekst}</span>
-          <span class="sp-tag">${t.fuktighetTekst} mark</span>
+          <span class="sp-tag">${t.fuktighetTekst} mark${loc.fuktighetIndex!=null ? ' (målt)' : ''}</span>
           <span class="sp-tag">${t.berggrunnTekst}</span>
           <span class="sp-tag">${t.alderTekst} skog</span>
+          ${loc.helningGrader!=null ? `<span class="sp-tag">${loc.helningGrader}° helning${loc.himmelretning ? ', ' + loc.himmelretning + '-vendt' : ''}</span>` : ''}
+          ${loc.hoydeMoh!=null ? `<span class="sp-tag">${Math.round(loc.hoydeMoh)} moh</span>` : ''}
           <span class="sp-tag ${loc.befolkning==='lav'?'good':loc.befolkning==='hoy'?'warn':''}">${loc.befolkning==='lav'?'rolig, lite folk':loc.befolkning==='hoy'?'mye ferdsel':loc.befolkning==='ukjent'||!loc.befolkning?'folketetthet ukjent':'moderat ferdsel'}</span>
           ${res.accessTags.map(tg => `<span class="sp-tag ${tg.cls}">${tg.text}</span>`).join('')}
           ${loc.hogstAr ? `<span class="sp-tag warn">flatehogd ${loc.hogstAr}</span>` : ''}
@@ -653,6 +847,8 @@
       if (a.res.isCut !== b.res.isCut) return a.res.isCut ? 1 : -1;
       return b.res.total - a.res.total;
     });
+
+    updateFetchPanel();
 
     const areaLabel = filterMode === 'fylke' ? (fylkeFilter!=='alle' ? ' i ' + fylkeFilter : '')
       : filterMode === 'kommune' ? (kommuneFilter!=='alle' ? ' i ' + kommuneFilter : '')
@@ -865,8 +1061,10 @@
 
   (async function init(){
     wireSyncPanel();
+    wireFetchPanel();
     initMap();
     await loadLocations();
+    await loadFetchedAreas();
     await loadStorage();
     render();
     loadWeather();
