@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.5.5';
+  const APP_VERSION = '0.6.0';
   const APP_BUILD_DATE = '2026-07-08';
 
   const SPECIES = [
@@ -103,6 +103,10 @@
   let selectedSpecies = SPECIES[0].id;
   let prioritizeQuiet = true;
   let hideHogst = false;
+  // Skjuler kun LISTEN under en viss score — kartet fortsetter å vise alle
+  // steder i området (fargekodet etter score) slik at man kan oppdage og
+  // klikke seg til lavere-scorende punkter der uten å måtte senke terskelen.
+  let minScoreFilter = 0;
   let filterMode = 'fylke'; // 'fylke' | 'kommune' | 'radius'
   let fylkeFilter = 'alle';
   let kommuneFilter = 'alle';
@@ -392,6 +396,12 @@
     document.getElementById('sp-fetch-start').disabled = false;
     document.getElementById('sp-fetch-start').textContent = 'Hent data';
     document.getElementById('sp-fetch-info').textContent = `Ingen terrengdata hentet for ${label} ennå.`;
+    // Rydd bort ev. statustekst fra en TIDLIGERE fullført/feilet henting (f.eks.
+    // "Oppdaterer visningen …") — den ble stående synlig under "Hent data" for
+    // et helt NYTT område ellers, og ga inntrykk av at noe fortsatt pågikk.
+    const progress = document.getElementById('sp-fetch-progress');
+    progress.style.display = 'none';
+    progress.textContent = '';
     await updateFetchEstimate();
   }
 
@@ -522,28 +532,44 @@
   async function loadWeather(){
     const box = document.getElementById('sp-weather-box');
     const locs = allLocations();
-    try {
-      const lats = locs.map(l=>l.lat).join(',');
-      const lons = locs.map(l=>l.lon).join(',');
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&daily=precipitation_sum,temperature_2m_mean&past_days=14&forecast_days=1&timezone=Europe%2FOslo`;
-      const res = await fetch(url);
-      const data = await res.json();
-      const arr = Array.isArray(data) ? data : [data];
-      arr.forEach((d,i) => {
-        const loc = locs[i]; if(!d || !d.daily) return;
-        const precipArr = d.daily.precipitation_sum || [];
-        const tempArr = d.daily.temperature_2m_mean || [];
-        const last14p = precipArr.slice(0,14);
-        const last5t = tempArr.slice(9,14);
-        const sumP = last14p.reduce((a,b)=>a+(b||0),0);
-        const avgT = last5t.length ? last5t.reduce((a,b)=>a+(b||0),0)/last5t.length : null;
-        weatherBySpecies[loc.id] = { precip14: Math.round(sumP*10)/10, tempAvg: avgT!==null? Math.round(avgT*10)/10 : null };
-      });
+    // Open-Meteos multi-lokasjons-endepunkt tar lat/lon som kommaseparerte
+    // lister i URL-en. Med mange auto-hentede steder (fort noen hundre i et
+    // område med tett rutenett) ble URL-en for lang og HELE kallet feilte
+    // stille (nettleserens/serverens URL-lengdegrense) — værdata forsvant da
+    // helt, selv om de fleste stedene i og for seg hadde fungert fint alene.
+    // Deler derfor opp i bolker.
+    const BATCH_SIZE = 100;
+    let anyOk = false;
+    for (let i = 0; i < locs.length; i += BATCH_SIZE) {
+      const batch = locs.slice(i, i + BATCH_SIZE);
+      try {
+        const lats = batch.map(l=>l.lat).join(',');
+        const lons = batch.map(l=>l.lon).join(',');
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&daily=precipitation_sum,temperature_2m_mean&past_days=14&forecast_days=1&timezone=Europe%2FOslo`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const arr = Array.isArray(data) ? data : [data];
+        arr.forEach((d,j) => {
+          const loc = batch[j]; if(!loc || !d || !d.daily) return;
+          const precipArr = d.daily.precipitation_sum || [];
+          const tempArr = d.daily.temperature_2m_mean || [];
+          const last14p = precipArr.slice(0,14);
+          const last5t = tempArr.slice(9,14);
+          const sumP = last14p.reduce((a,b)=>a+(b||0),0);
+          const avgT = last5t.length ? last5t.reduce((a,b)=>a+(b||0),0)/last5t.length : null;
+          weatherBySpecies[loc.id] = { precip14: Math.round(sumP*10)/10, tempAvg: avgT!==null? Math.round(avgT*10)/10 : null };
+        });
+        anyOk = true;
+      } catch (e) {
+        console.warn('Værdata feilet for en bolk med steder', e);
+      }
+    }
+    if (anyOk) {
       weatherReady = true;
       const vals = Object.values(weatherBySpecies);
       const avgPrecip = vals.reduce((a,b)=>a+(b.precip14||0),0) / (vals.length||1);
       box.innerHTML = `<span class="sp-wstatus">✓ live data hentet</span><br/>Snitt nedbør siste 14 dager (alle steder): <b>${Math.round(avgPrecip)} mm</b>.`;
-    } catch(e){
+    } else {
       weatherReady = false;
       box.innerHTML = `<span class="sp-wstatus">⚠ kunne ikke hente værdata</span><br/>Viser terrengscore uten tidsvurdering.`;
     }
@@ -792,13 +818,39 @@
   let markerLayer = null;
   let radiusLayer = null;
   let mapFittedOnce = false;
+  let markersById = {};
+
+  // Rikelig margin rundt Norge (inkl. Svalbard) + naboland. Uten en grense her
+  // kan man ved kraftig utzooming (naturlig med steder spredt helt opp mot
+  // 70°N) panorere forbi kartprojeksjonens øvre kant — Web Mercator dekker
+  // ikke polarområdene, så det viser seg som tomt, grått felt uten noe kart.
+  const MAP_BOUNDS = L.latLngBounds([53, -10], [82, 45]);
 
   function initMap(){
-    leafletMap = L.map('sp-leaflet-map', { scrollWheelZoom: true }).setView([60.5, 10.7], 6);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    leafletMap = L.map('sp-leaflet-map', {
+      scrollWheelZoom: true,
+      maxBounds: MAP_BOUNDS,
+      maxBoundsViscosity: 1.0,
+      minZoom: 4
+    }).setView([60.5, 10.7], 6);
+    const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 18,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-bidragsytere'
     }).addTo(leafletMap);
+    // Ved rask påfølgende panorering/zooming (f.eks. fitBounds rett etter
+    // mange steder lastes, eller flere raske klikk på zoom-knappen) avbryter
+    // nettleseren fliser som er under lasting. Leaflet prøver IKKE disse på
+    // nytt av seg selv — de blir stående tomme (grått) til brukeren
+    // tilfeldigvis panorerer akkurat den ruten på nytt. Prøver derfor
+    // avbrutte/feilede fliser på nytt automatisk et par ganger.
+    tileLayer.on('tileerror', (e) => {
+      const tile = e.tile;
+      const attempts = (parseInt(tile.dataset.retryCount || '0', 10)) + 1;
+      if (attempts <= 4) {
+        tile.dataset.retryCount = String(attempts);
+        setTimeout(() => { tile.src = tile.src; }, 400 * attempts);
+      }
+    });
     markerLayer = L.layerGroup().addTo(leafletMap);
     radiusLayer = L.layerGroup().addTo(leafletMap);
     leafletMap.on('click', (e) => {
@@ -833,10 +885,23 @@
     }, 60);
   }
 
+  // Motsatt vei av handleMapMarkerClick: klikk på "Vis i kart" på et kort i
+  // listen panorerer/zoomer kartet til akkurat det stedet og åpner popup-en,
+  // slik at du kan analysere naboterrenget uten å måtte lete deg fram manuelt.
+  function locateOnMap(locId){
+    const loc = allLocations().find(l => l.id === locId);
+    const marker = markersById[locId];
+    if (!loc || !leafletMap) return;
+    document.getElementById('sp-leaflet-map').scrollIntoView({ behavior:'smooth', block:'center' });
+    leafletMap.setView([loc.lat, loc.lon], Math.max(leafletMap.getZoom(), 13));
+    if (marker) setTimeout(() => marker.openPopup(), 350);
+  }
+
   function renderMap(scoredAll){
     if (!leafletMap) return;
     markerLayer.clearLayers();
     radiusLayer.clearLayers();
+    markersById = {};
 
     scoredAll.forEach(({ loc, res }) => {
       const color = res.isCut ? '#A23E2E' : (res.total>=65 ? '#5F7A3E' : res.total>=40 ? '#C8974A' : '#A23E2E');
@@ -851,6 +916,7 @@
       marker.bindPopup(`<b>${escapeHtml(loc.name)}</b><br/>${escapeHtml(loc.kommune)}, ${escapeHtml(loc.fylke)}<br/>Score: ${res.total}${res.isCut ? ' — flatehogd' : ''}`);
       marker.on('click', () => handleMapMarkerClick(loc));
       marker.addTo(markerLayer);
+      markersById[loc.id] = marker;
     });
 
     if (filterMode === 'radius' && radiusCenter) {
@@ -976,6 +1042,7 @@
         ${finds.length ? `<div class="sp-findlist">${finds.map(f => `<div class="sp-find-row"><span>${SPECIES.find(s=>s.id===f.speciesId)?.name || f.speciesId} — ${f.date}</span><span class="sp-dots">${[1,2,3,4,5].map(n=>`<span class="${n<=f.mengde?'filled':''}"></span>`).join('')}</span></div>`).join('')}</div>` : ''}
         <div class="sp-card-actions">
           <button class="sp-btn sp-primary" data-action="find" data-loc="${loc.id}">Registrer funn her</button>
+          <button class="sp-btn" data-action="locate" data-loc="${loc.id}">📍 Vis i kart</button>
           <button class="sp-btn sp-ghost-danger" data-action="cut" data-loc="${loc.id}">${userCuts.includes(loc.id)?'Fjern hogst-merking':'Merk som flatehogd'}</button>
         </div>
       </div>`;
@@ -1033,16 +1100,29 @@
     const areaLabel = filterMode === 'fylke' ? (fylkeFilter!=='alle' ? ' i ' + fylkeFilter : '')
       : filterMode === 'kommune' ? (kommuneFilter!=='alle' ? ' i ' + kommuneFilter : '')
       : (radiusCenter ? ` innen ${radiusKm} km` : '');
-    document.getElementById('sp-count').textContent = `${scoped.length} steder vist${areaLabel}`;
 
     const container = document.getElementById('sp-results');
     if (!scoped.length) {
+      document.getElementById('sp-count').textContent = `0 steder vist${areaLabel}`;
       container.innerHTML = `<div class="sp-empty">Ingen steder passerer filtrene dine akkurat nå${areaLabel}. ${filterMode==='radius' && !radiusCenter ? 'Klikk i kartet for å sette et senterpunkt.' : 'Prøv «Alle fylker/kommuner» eller juster radius.'}</div>`;
       return;
     }
 
-    const activeOnes = scoped.filter(s => !s.res.isCut);
+    // minScoreFilter tynner kun ut LISTEN (og kun blant anbefalte, ikke
+    // flatehogde) — kartet over viser alltid alle steder i området, uansett
+    // score, slik at man kan oppdage og klikke seg til dem der i stedet.
+    const activeOnes = scoped.filter(s => !s.res.isCut && s.res.total >= minScoreFilter);
+    const hiddenByScore = scoped.filter(s => !s.res.isCut && s.res.total < minScoreFilter).length;
     const cutOnes = scoped.filter(s => s.res.isCut);
+
+    document.getElementById('sp-count').textContent = `${activeOnes.length + cutOnes.length} av ${scoped.length} steder vist${areaLabel}`
+      + (hiddenByScore ? ` — ${hiddenByScore} skjult under score ${minScoreFilter}` : '');
+
+    if (!activeOnes.length && !cutOnes.length) {
+      container.innerHTML = `<div class="sp-empty">Ingen steder over valgt minimumsscore (${minScoreFilter})${areaLabel} — senk terskelen over, eller se kartet for alle ${scoped.length} steder i området.</div>`;
+      return;
+    }
+
     let html = activeOnes.map(({loc,res}) => cardHtml(loc,res)).join('');
     if (cutOnes.length) {
       html += `<div class="sp-divider-excl">flatehogd — ikke anbefalt</div>`;
@@ -1051,6 +1131,7 @@
     container.innerHTML = html;
 
     container.querySelectorAll('[data-action="find"]').forEach(btn => btn.addEventListener('click', () => openFindModal(btn.dataset.loc)));
+    container.querySelectorAll('[data-action="locate"]').forEach(btn => btn.addEventListener('click', () => locateOnMap(btn.dataset.loc)));
     container.querySelectorAll('[data-action="cut"]').forEach(btn => btn.addEventListener('click', async () => {
       const id = btn.dataset.loc;
       if (userCuts.includes(id)) userCuts = userCuts.filter(x => x !== id); else userCuts.push(id);
@@ -1254,6 +1335,11 @@
   document.querySelectorAll('#sp-mode-seg button').forEach(btn => btn.addEventListener('click', () => { filterMode = btn.dataset.mode; render(); }));
   document.getElementById('sp-radius-slider').addEventListener('input', (e) => { radiusKm = parseInt(e.target.value); render(); });
   document.getElementById('sp-radius-clear').addEventListener('click', () => { radiusCenter = null; render(); });
+  document.getElementById('sp-score-filter-slider').addEventListener('input', (e) => {
+    minScoreFilter = parseInt(e.target.value);
+    document.getElementById('sp-score-filter-label').textContent = minScoreFilter;
+    render();
+  });
 
   (async function init(){
     wireVersionInfo();

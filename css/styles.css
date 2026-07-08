@@ -93,6 +93,10 @@
   .sp-results-head h2 { font-family: 'Fraunces', serif; font-size: 19px; margin: 0; color: var(--pine-deep); }
   .sp-count { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--ink-soft); }
 
+  .sp-score-filter-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink-soft); margin-bottom: 14px; flex-wrap: wrap; }
+  .sp-score-filter-row input[type=range] { width: 140px; }
+  .sp-score-filter-hint { font-size: 11px; opacity: 0.8; }
+
   .sp-card { background: var(--paper-deep); border: 1px solid var(--line); border-radius: 4px; padding: 16px 18px; margin-bottom: 14px; position: relative; scroll-margin-top: 20px; }
   .sp-card.sp-excluded { opacity: 0.6; border-style: dashed; }
   .sp-card.sp-flash { animation: spflash 1.1s ease; }
