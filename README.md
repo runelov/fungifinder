@@ -48,6 +48,42 @@ Uten synk-oppsett fungerer appen fortsatt — den viser da bare et lite
 innebygd demo-datasett og lagrer personlige data i nettleserens
 `localStorage` på denne enheten alene.
 
+## Datakilder og vekting
+
+Terrengdata hentes av `fetch_area.py` i data-repoet (se README der for
+detaljer per kilde):
+
+| Kilde | Gir |
+|---|---|
+| Kartverket høgdeprofil | Høyde, terreng, stedsnavn, helning/himmelretning |
+| NIBIO SR16 | Treslag, skogalder, hogstår |
+| NIBIO Markfuktighet | Fuktighetsnivå |
+| NGU berggrunn | Kalkinnhold |
+| NVDB/OSM Overpass | Avstand til kjørbar vei |
+| Artsdatabanken Artskart | Kjente tidligere funn av arten i nærheten |
+| Open-Meteo (live, i appen) | Nedbør/temperatur siste 14 dager |
+| Dine egne funn | Din funnhistorikk på stedet |
+
+`scoreLocation()` i `js/app.js` vekter disse mot artens profil (0-100 poeng
+totalt, ukjent verdi teller alltid nøytralt/50%):
+
+| Faktor | Maks poeng |
+|---|---|
+| Treslag | 30 |
+| Fuktighet | 20 |
+| Berggrunn | 15 |
+| Skogalder | 15 |
+| Sesong | 10 |
+| Kjente funn i databasen | +8 |
+| Værvindu (nedbør/temp) | +12 / -6 |
+| Egen funnhistorikk | opptil +30 |
+| Sørvendt skråning (varmekjære arter) | +5 |
+| Adkomst (vei/parkering/stier) | +10 / -18 |
+| Ro/avstand fra folk (valgfri) | +14 / -8 |
+
+Treslag veier tyngst av terrengfaktorene (sterkeste mykorrhiza-indikator).
+Egen funnhistorikk kan trumfe alt annet.
+
 ## Sikkerhet
 
 - Tokenet lagres kun i `localStorage` i din nettleser — aldri i kode eller i
