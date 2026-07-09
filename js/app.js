@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.10.0';
+  const APP_VERSION = '0.11.0';
   const APP_BUILD_DATE = '2026-07-08';
 
   const SPECIES = [
@@ -101,6 +101,8 @@
   };
 
   let selectedSpecies = SPECIES[0].id;
+  let favoriteSpecies = []; // art-ID-er merket med ★ — se viewMode
+  let viewMode = 'single'; // 'single' (én valgt art) | 'favorites' (beste treff blant favoritter)
   let prioritizeQuiet = true;
   let hideHogst = false;
   // Skjuler kun LISTEN under en viss score — kartet fortsetter å vise alle
@@ -167,6 +169,7 @@
         userCuts = d.cuts || [];
         hogstOmrader = d.hogstOmrader || [];
         customLocations = d.customLocations || [];
+        favoriteSpecies = d.favoriteSpecies || [];
         setSyncStatus(`✓ Koblet til ${cfg.owner}/${cfg.repo}`);
         return;
       } catch (e) {
@@ -179,10 +182,11 @@
     userCuts = local?.cuts || [];
     hogstOmrader = local?.hogstOmrader || [];
     customLocations = local?.customLocations || [];
+    favoriteSpecies = local?.favoriteSpecies || [];
   }
 
   async function persistAll(){
-    const payload = { finds: userFinds, cuts: userCuts, hogstOmrader: hogstOmrader, customLocations: customLocations };
+    const payload = { finds: userFinds, cuts: userCuts, hogstOmrader: hogstOmrader, customLocations: customLocations, favoriteSpecies: favoriteSpecies };
     const cfg = window.FungiStore ? window.FungiStore.getConfig() : null;
     if (cfg && window.FungiStore.isConfigured()) {
       try {
@@ -199,6 +203,7 @@
   async function saveFinds(){ await persistAll(); }
   async function saveCuts(){ await persistAll(); }
   async function saveHogstOmrader(){ await persistAll(); }
+  async function saveFavorites(){ await persistAll(); }
   async function saveCustomLocations(){ await persistAll(); }
 
   function setSyncStatus(text){
@@ -654,6 +659,16 @@
     return userFinds.filter(f => f.locId === locId && (!speciesId || f.speciesId === speciesId));
   }
 
+  // Et funn vises normalt på sitt tilknyttede steds koordinater, men kan ha
+  // et eget lat/lon som overstyrer det — satt via "flytt til min posisjon" i
+  // Mine funn-lista, for å rette en feilplassert markør uten å måtte flytte
+  // (eller opprette et nytt) sted.
+  function findLatLon(find){
+    if (find.lat != null && find.lon != null) return { lat: find.lat, lon: find.lon };
+    const loc = allLocations().find(l => l.id === find.locId);
+    return loc ? { lat: loc.lat, lon: loc.lon } : null;
+  }
+
   function scoreLocation(species, loc){
     const cutRecent = loc.hogstAr !== null && loc.hogstAr !== undefined && (yearNow - loc.hogstAr) <= 3;
     const manuallyCut = userCuts.includes(loc.id) || isWithinHogstOmrade(loc);
@@ -725,6 +740,43 @@
 
     total = Math.max(0, Math.min(100, Math.round(total)));
     return { total, breakdown, isCut, weatherVerdict, weather: w, histNote, accessTags: acc.tags };
+  }
+
+  // Finner hvilke av dine ANDRE favoritter (utenom den som allerede vises)
+  // som også trolig passer på dette stedet, pluss et par gode matsopper som
+  // ikke er favoritter — "ting du kan snuble over i samme terreng".
+  function crossSpeciesTips(loc, primaryId){
+    const favHere = favoriteSpecies
+      .filter(id => id !== primaryId)
+      .map(id => SPECIES.find(s => s.id === id))
+      .filter(Boolean)
+      .map(sp => ({ species: sp, res: scoreLocation(sp, loc) }))
+      .filter(r => !r.res.isCut && r.res.total >= 55)
+      .sort((a,b) => b.res.total - a.res.total);
+    const excludeIds = new Set([primaryId, ...favoriteSpecies]);
+    const othersHere = SPECIES
+      .filter(s => !excludeIds.has(s.id))
+      .map(s => ({ species: s, res: scoreLocation(s, loc) }))
+      .filter(r => !r.res.isCut && r.res.total >= 65)
+      .sort((a,b) => b.res.total - a.res.total)
+      .slice(0, 3);
+    return { favHere, othersHere };
+  }
+
+  function crossSpeciesTipsHtml(loc, primaryId, opts){
+    opts = opts || {};
+    const { favHere, othersHere } = crossSpeciesTips(loc, primaryId);
+    let html = '';
+    // I favoritt-modus vises ALLE favoritter allerede i score-listen øverst på
+    // kortet — å gjenta dem her ville bare vært støy. Kun relevant i
+    // enkeltart-modus, der bare den valgte arten vises som standard.
+    if (!opts.hideFavorites && favHere.length) {
+      html += `<div class="sp-cross-tip">⭐ Blant dine andre favoritter passer trolig også: ${favHere.map(r => `${escapeHtml(r.species.name)} (${r.res.total})`).join(', ')}</div>`;
+    }
+    if (othersHere.length) {
+      html += `<div class="sp-cross-tip">💡 Andre gode matsopper å se etter her: ${othersHere.map(r => `${escapeHtml(r.species.name)} (${r.res.total})`).join(', ')}</div>`;
+    }
+    return html;
   }
 
   function locTexts(loc){
@@ -864,6 +916,8 @@
   let radiusLayer = null;
   let routeLayer = null;
   let hogstLayer = null;
+  let findsLayer = null;
+  let findMarkersById = {};
   let mapFittedOnce = false;
   let markersById = {};
   let routeKm = 5;
@@ -881,6 +935,34 @@
     document.body.classList.toggle('sp-map-fullscreen-active', mapFullscreen);
     document.getElementById('sp-map-fullscreen-toggle').textContent = mapFullscreen ? '✕ Lukk fullskjerm' : '⛶ Fullskjerm';
     setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 260);
+  }
+
+  // ---------- min posisjon (GPS, engangs) ----------
+  // Bevisst engangs (getCurrentPosition), ikke løpende sporing (watchPosition)
+  // — dekker "jeg har parkert, vis meg oversikten" og "fyll inn koordinatene
+  // for et funn jeg registrerer nå" uten batteribruk fra kontinuerlig sporing.
+  let myLocationMarker = null;
+
+  function useMyLocation(onSuccess){
+    if (!navigator.geolocation) {
+      alert('Nettleseren din støtter ikke posisjonsdeling.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => onSuccess(pos.coords.latitude, pos.coords.longitude),
+      (err) => alert('Kunne ikke hente posisjonen din: ' + err.message),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  function showMyLocationOnMap(lat, lon){
+    if (!leafletMap) return;
+    if (myLocationMarker) leafletMap.removeLayer(myLocationMarker);
+    myLocationMarker = L.circleMarker([lat, lon], {
+      radius: 9, color: '#fff', weight: 3, fillColor: '#2E6FE0', fillOpacity: 1
+    }).bindPopup('📍 Du er her').addTo(leafletMap);
+    leafletMap.setView([lat, lon], Math.max(leafletMap.getZoom(), 14));
+    myLocationMarker.openPopup();
   }
 
   // Rikelig margin rundt Norge (inkl. Svalbard) + naboland. Uten en grense her
@@ -937,13 +1019,14 @@
     radiusLayer = L.layerGroup().addTo(leafletMap);
     routeLayer = L.layerGroup().addTo(leafletMap);
     hogstLayer = L.layerGroup().addTo(leafletMap);
+    findsLayer = L.layerGroup().addTo(leafletMap);
 
     // Lag-kontroll: bytt bakgrunnskart (radioknapper) og skru målepunkter/
-    // rundtur/hogstfelt av/på (avkrysning) — praktisk når man vil se rent
-    // terreng for å merke seg egne funnsteder uten at prikkene er i veien.
+    // rundtur/hogstfelt/funn av/på (avkrysning) — praktisk når man vil se
+    // rent terreng for å merke seg egne funnsteder uten at prikkene er i veien.
     L.control.layers(
       { 'Topografisk (Kartverket)': topoLayer, 'Standard': standardLayer, 'Satellitt': satelliteLayer },
-      { 'Målepunkter': markerLayer, 'Foreslått rundtur': routeLayer, 'Mine hogstfelt': hogstLayer },
+      { 'Målepunkter': markerLayer, 'Foreslått rundtur': routeLayer, 'Mine hogstfelt': hogstLayer, 'Mine funn': findsLayer },
       { collapsed: true }
     ).addTo(leafletMap);
 
@@ -1241,8 +1324,25 @@
   // ---------- render ----------
   function renderSpeciesList(){
     const el = document.getElementById('sp-species-list');
-    el.innerHTML = SPECIES.map(s => `<button class="sp-species-btn ${s.id===selectedSpecies?'active':''}" data-id="${s.id}"><span>${s.name}<span class="sp-latin">${s.latin}</span></span></button>`).join('');
-    el.querySelectorAll('.sp-species-btn').forEach(btn => btn.addEventListener('click', () => { selectedSpecies = btn.dataset.id; clearRoute(); render(); }));
+    el.innerHTML = SPECIES.map(s => {
+      const isFav = favoriteSpecies.includes(s.id);
+      return `<button class="sp-species-btn ${s.id===selectedSpecies && viewMode==='single'?'active':''}" data-id="${s.id}">
+        <span>${s.name}<span class="sp-latin">${s.latin}</span></span>
+        <span class="sp-fav-star ${isFav?'active':''}" data-fav="${s.id}" title="${isFav?'Fjern fra favoritter':'Merk som favoritt'}">★</span>
+      </button>`;
+    }).join('');
+    el.querySelectorAll('.sp-species-btn').forEach(btn => btn.addEventListener('click', (e) => {
+      if (e.target.closest('.sp-fav-star')) return; // håndteres separat under
+      selectedSpecies = btn.dataset.id; viewMode = 'single'; clearRoute(); render();
+    }));
+    el.querySelectorAll('.sp-fav-star').forEach(star => star.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = star.dataset.fav;
+      if (favoriteSpecies.includes(id)) favoriteSpecies = favoriteSpecies.filter(x => x !== id);
+      else favoriteSpecies.push(id);
+      await saveFavorites();
+      render();
+    }));
   }
 
   function renderMineList(){
@@ -1338,6 +1438,62 @@
         <div class="sp-explain">${species_for_card().why(loc, t)}</div>
         <div class="sp-microtips-label">Sjekk spesielt i terrenget her</div>
         <ul class="sp-microtips">${terrainMicrotips(species_for_card(), loc).map(tip => `<li>${tip}</li>`).join('')}</ul>
+        ${crossSpeciesTipsHtml(loc, species_for_card().id)}
+        ${w ? `<div class="sp-breakdown">Vær nå: <span>${w.precip14} mm</span> nedbør siste 14 dager, snitt temp <span>${w.tempAvg ?? '–'}°C</span>. ${res.weatherVerdict || ''}</div>` : ''}
+        ${finds.length ? `<div class="sp-findlist">${finds.map(f => `<div class="sp-find-row"><span>${SPECIES.find(s=>s.id===f.speciesId)?.name || f.speciesId} — ${f.date}</span><span class="sp-dots">${[1,2,3,4,5].map(n=>`<span class="${n<=f.mengde?'filled':''}"></span>`).join('')}</span></div>`).join('')}</div>` : ''}
+        <div class="sp-card-actions">
+          <button class="sp-btn sp-primary" data-action="find" data-loc="${loc.id}">Registrer funn her</button>
+          <button class="sp-btn" data-action="locate" data-loc="${loc.id}">📍 Vis i kart</button>
+          <button class="sp-btn sp-ghost-danger" data-action="cut" data-loc="${loc.id}">${userCuts.includes(loc.id)?'Fjern hogst-merking':'Merk som flatehogd'}</button>
+        </div>
+      </div>`;
+  }
+
+  // Kort for "Mine favoritter"-modus: viser score for HVER favoritt (ikke
+  // bare én), og bruker den best-scorende favoritten som "primærart" for
+  // forklaringstekst/mikrotips — resten av kortet gjenbruker samme data som
+  // det vanlige kortet, bare hentet fra beste favoritt i stedet for
+  // selectedSpecies.
+  function cardHtmlFavorites(loc, favResults){
+    const t = locTexts(loc);
+    const finds = findsFor(loc.id);
+    const top = favResults[0];
+    const topSpecies = top.species, res = top.res;
+    const w = res.weather;
+    const parkWarn = res.accessTags.some(tg => tg.cls === 'warn' && tg.text.includes('parkering'));
+    return `
+      <div class="sp-card ${res.isCut ? 'sp-excluded' : ''}" data-loc="${loc.id}">
+        <div class="sp-card-top">
+          <div>
+            <div class="sp-card-name">${escapeHtml(loc.name)}</div>
+            <div class="sp-card-kommune">${escapeHtml(loc.kommune)}, ${escapeHtml(loc.fylke)} · ${loc.lat.toFixed(3)}, ${loc.lon.toFixed(3)}</div>
+          </div>
+        </div>
+        <div class="sp-fav-scorelist">
+          ${favResults.map(r => `<span class="sp-fav-score-chip ${r.res.isCut?'cut':''}">${escapeHtml(r.species.name)} <b>${r.res.total}</b></span>`).join('')}
+        </div>
+        <div class="sp-tags">
+          ${loc.custom ? `<span class="sp-tag custom">eget sted</span>` : ''}
+          ${loc.kilde==='auto-etl' ? `<span class="sp-tag good">auto-hentet</span>` : ''}
+          <span class="sp-tag">${t.treslagTekst}</span>
+          <span class="sp-tag">${t.fuktighetTekst} mark${loc.fuktighetIndex!=null ? ' (målt)' : ''}</span>
+          <span class="sp-tag">${t.berggrunnTekst}</span>
+          <span class="sp-tag">${t.alderTekst} skog</span>
+          ${loc.helningGrader!=null ? `<span class="sp-tag">${loc.helningGrader}° helning${loc.himmelretning ? ', ' + loc.himmelretning + '-vendt' : ''}</span>` : ''}
+          ${loc.hoydeMoh!=null ? `<span class="sp-tag">${Math.round(loc.hoydeMoh)} moh</span>` : ''}
+          ${res.accessTags.map(tg => `<span class="sp-tag ${tg.cls}">${tg.text}</span>`).join('')}
+          ${loc.hogstAr ? `<span class="sp-tag warn">flatehogd ${loc.hogstAr}</span>` : ''}
+          ${res.isCut ? `<span class="sp-tag warn">ekskludert fra anbefaling</span>` : ''}
+        </div>
+        <div class="sp-access-box">
+          <div>🚗 <b>Parkering:</b> ${escapeHtml(loc.parkeringNotat) || 'ikke oppgitt'}${parkWarn ? ' <span class="sp-access-warn">— bekreft selv at det ikke er privat grunn</span>' : ''}</div>
+          <div>🥾 <b>Sti/skogsbilvei i terrenget:</b> ${loc.stier==='ja'?'ja':loc.stier==='nei'?'nei, ingen kjent sti':'ukjent'}${loc.avstandParkeringM ? ` · ca ${loc.avstandParkeringM} m å gå fra parkering` : ''}</div>
+        </div>
+        ${res.histNote ? `<div class="sp-hist-note">★ ${res.histNote}</div>` : ''}
+        <div class="sp-explain"><b>${escapeHtml(topSpecies.name)}:</b> ${topSpecies.why(loc, t)}</div>
+        <div class="sp-microtips-label">Sjekk spesielt i terrenget her (for ${escapeHtml(topSpecies.name)})</div>
+        <ul class="sp-microtips">${terrainMicrotips(topSpecies, loc).map(tip => `<li>${tip}</li>`).join('')}</ul>
+        ${crossSpeciesTipsHtml(loc, topSpecies.id, { hideFavorites: true })}
         ${w ? `<div class="sp-breakdown">Vær nå: <span>${w.precip14} mm</span> nedbør siste 14 dager, snitt temp <span>${w.tempAvg ?? '–'}°C</span>. ${res.weatherVerdict || ''}</div>` : ''}
         ${finds.length ? `<div class="sp-findlist">${finds.map(f => `<div class="sp-find-row"><span>${SPECIES.find(s=>s.id===f.speciesId)?.name || f.speciesId} — ${f.date}</span><span class="sp-dots">${[1,2,3,4,5].map(n=>`<span class="${n<=f.mengde?'filled':''}"></span>`).join('')}</span></div>`).join('')}</div>` : ''}
         <div class="sp-card-actions">
@@ -1354,34 +1510,65 @@
   function render(){
     renderSpeciesList();
     renderMineList();
+    renderMyFindsList();
     renderFilterControls();
     document.getElementById('sp-toggle-quiet').classList.toggle('on', prioritizeQuiet);
     document.getElementById('sp-toggle-hogst').classList.toggle('on', hideHogst);
 
-    const species = SPECIES.find(s => s.id === selectedSpecies);
-    _currentSpecies = species;
-    document.getElementById('sp-results-title').textContent = `Forslag for ${species.name}`;
-
-    const monthNames = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
-    const timing = seasonTiming(species);
-    document.getElementById('sp-species-info').innerHTML = `
-      <div class="sp-species-info-top">
-        <div class="sp-si-name">${species.name}<em>${species.latin}</em></div>
-        <div class="sp-si-season">typisk sesong: ${monthNames[species.season[0]-1]}–${monthNames[species.season[1]-1]}</div>
-      </div>
-      <div class="sp-timing-row">
-        <span class="sp-timing-badge sp-timing-${timing.status}">${timing.label}</span>
-        <span class="sp-timing-detail">${timing.detail}</span>
-      </div>
-      <div class="sp-timing-bar"><div class="sp-timing-bar-marker" style="left:${timing.pct}%"></div></div>
-      <div class="sp-species-info-body">${species.fieldTips}</div>
-      <div class="sp-lookalike"><b>⚠ Forvekslingsfare:</b> ${species.lookalike}</div>
-    `;
+    document.querySelectorAll('#sp-viewmode-seg button').forEach(b => b.classList.toggle('active', b.dataset.viewmode === viewMode));
+    document.getElementById('sp-fav-count').textContent = favoriteSpecies.length;
 
     const locsAll = allLocations();
-    let scoredAll = locsAll.map(loc => ({ loc, res: scoreLocation(species, loc) }));
+    let scoredAll;
+
+    if (viewMode === 'favorites') {
+      _currentSpecies = null;
+      document.getElementById('sp-results-title').textContent = 'Forslag for dine favoritter';
+      const favNames = favoriteSpecies.map(id => SPECIES.find(s => s.id === id)?.name).filter(Boolean);
+      document.getElementById('sp-species-info').innerHTML = favNames.length
+        ? `<div class="sp-species-info-top"><div class="sp-si-name">Dine favoritter</div></div>
+           <div class="sp-species-info-body">${favNames.join(', ')} — hvert sted under vises med score for hver av disse, sortert på beste treff.</div>`
+        : `<div class="sp-species-info-body">Ingen favoritter valgt ennå — klikk ★ på artene i lista til venstre for å legge dem til.</div>`;
+
+      // Hvert sted får score for ALLE favoritter (favResults), sortert best
+      // først — res/isCut/total (brukt av kart, sortering, score-filter)
+      // gjenspeiler alltid den best-scorende favoritten på stedet.
+      scoredAll = locsAll.map(loc => {
+        const favResults = favoriteSpecies
+          .map(id => SPECIES.find(s => s.id === id))
+          .filter(Boolean)
+          .map(sp => ({ species: sp, res: scoreLocation(sp, loc) }))
+          .sort((a,b) => b.res.total - a.res.total);
+        const best = favResults[0] || { res: { total: 0, isCut: false, breakdown: [], accessTags: [], histNote: null, weather: null, weatherVerdict: null } };
+        return { loc, res: best.res, favResults };
+      });
+    } else {
+      const species = SPECIES.find(s => s.id === selectedSpecies);
+      _currentSpecies = species;
+      document.getElementById('sp-results-title').textContent = `Forslag for ${species.name}`;
+
+      const monthNames = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+      const timing = seasonTiming(species);
+      document.getElementById('sp-species-info').innerHTML = `
+        <div class="sp-species-info-top">
+          <div class="sp-si-name">${species.name}<em>${species.latin}</em></div>
+          <div class="sp-si-season">typisk sesong: ${monthNames[species.season[0]-1]}–${monthNames[species.season[1]-1]}</div>
+        </div>
+        <div class="sp-timing-row">
+          <span class="sp-timing-badge sp-timing-${timing.status}">${timing.label}</span>
+          <span class="sp-timing-detail">${timing.detail}</span>
+        </div>
+        <div class="sp-timing-bar"><div class="sp-timing-bar-marker" style="left:${timing.pct}%"></div></div>
+        <div class="sp-species-info-body">${species.fieldTips}</div>
+        <div class="sp-lookalike"><b>⚠ Forvekslingsfare:</b> ${species.lookalike}</div>
+      `;
+
+      scoredAll = locsAll.map(loc => ({ loc, res: scoreLocation(species, loc) }));
+    }
+
     renderMap(scoredAll);
     renderHogstZones();
+    renderFindsLayer();
 
     let scoped = scoredAll.filter(s => {
       if (filterMode === 'fylke') return fylkeFilter === 'alle' || s.loc.fylke === fylkeFilter;
@@ -1403,6 +1590,11 @@
       : (radiusCenter ? ` innen ${radiusKm} km` : '');
 
     const container = document.getElementById('sp-results');
+    if (viewMode === 'favorites' && !favoriteSpecies.length) {
+      document.getElementById('sp-count').textContent = '';
+      container.innerHTML = `<div class="sp-empty">Ingen favoritter valgt ennå. Klikk ★ på en eller flere arter i lista til venstre for å komme i gang.</div>`;
+      return;
+    }
     if (!scoped.length) {
       document.getElementById('sp-count').textContent = `0 steder vist${areaLabel}`;
       container.innerHTML = `<div class="sp-empty">Ingen steder passerer filtrene dine akkurat nå${areaLabel}. ${filterMode==='radius' && !radiusCenter ? 'Klikk i kartet for å sette et senterpunkt.' : 'Prøv «Alle fylker/kommuner» eller juster radius.'}</div>`;
@@ -1424,10 +1616,13 @@
       return;
     }
 
-    let html = activeOnes.map(({loc,res}) => cardHtml(loc,res)).join('');
+    const renderCard = viewMode === 'favorites'
+      ? (s) => cardHtmlFavorites(s.loc, s.favResults)
+      : (s) => cardHtml(s.loc, s.res);
+    let html = activeOnes.map(renderCard).join('');
     if (cutOnes.length) {
       html += `<div class="sp-divider-excl">flatehogd — ikke anbefalt</div>`;
-      html += cutOnes.map(({loc,res}) => cardHtml(loc,res)).join('');
+      html += cutOnes.map(renderCard).join('');
     }
     container.innerHTML = html;
 
@@ -1441,25 +1636,33 @@
   }
 
   // ---------- find modal ----------
+  // opts.editingFind: gitt et eksisterende funn i stedet for locId, redigerer
+  // denne funnet på plass (art/mengde/dato/notat) i stedet for å opprette et
+  // nytt — brukt av "Mine funn"-lista og av rediger-knappen i funn-popupen i
+  // kartet.
   function openFindModal(locId, opts){
     opts = opts || {};
-    const loc = allLocations().find(l => l.id === locId);
-    let mengde = 3;
+    const editingFind = opts.editingFind || null;
+    const loc = allLocations().find(l => l.id === (editingFind ? editingFind.locId : locId));
+    let mengde = editingFind ? editingFind.mengde : 3;
+    const todayStr = new Date().toISOString().slice(0,10);
     const slot = document.getElementById('sp-modal-slot');
     slot.innerHTML = `
       <div class="sp-modal-backdrop" id="sp-modal-backdrop">
         <div class="sp-modal">
-          <h4>${opts.title || ('Registrer funn — ' + escapeHtml(loc.name))}</h4>
+          <h4>${opts.title || (editingFind ? 'Rediger funn — ' + escapeHtml(loc ? loc.name : '') : 'Registrer funn — ' + escapeHtml(loc.name))}</h4>
           ${opts.sub ? `<div class="sp-modal-sub">${opts.sub}</div>` : ''}
           <label>Sopptype</label>
-          <select id="sp-find-species">${SPECIES.map(s => `<option value="${s.id}" ${s.id===selectedSpecies?'selected':''}>${s.name}</option>`).join('')}</select>
+          <select id="sp-find-species">${SPECIES.map(s => `<option value="${s.id}" ${s.id===(editingFind?editingFind.speciesId:selectedSpecies)?'selected':''}>${s.name}</option>`).join('')}</select>
           <label>Mengde funnet</label>
-          <div class="sp-scale" id="sp-find-scale">${[1,2,3,4,5].map(n => `<button data-n="${n}" class="${n===3?'sel':''}">${n}</button>`).join('')}</div>
+          <div class="sp-scale" id="sp-find-scale">${[1,2,3,4,5].map(n => `<button data-n="${n}" class="${n===mengde?'sel':''}">${n}</button>`).join('')}</div>
+          <label>Dato</label>
+          <input type="date" id="sp-find-date" value="${editingFind ? editingFind.date : todayStr}"/>
           <label>Notat (valgfritt)</label>
-          <textarea id="sp-find-note" rows="2" placeholder="F.eks. nordvendt skråning nær bekken"></textarea>
+          <textarea id="sp-find-note" rows="2" placeholder="F.eks. nordvendt skråning nær bekken">${editingFind ? escapeHtml(editingFind.note || '') : ''}</textarea>
           <div class="sp-modal-actions">
             <button class="sp-btn" id="sp-find-cancel">${opts.skipLabel || 'Avbryt'}</button>
-            <button class="sp-btn sp-primary" id="sp-find-save">Lagre funn</button>
+            <button class="sp-btn sp-primary" id="sp-find-save">${editingFind ? 'Lagre endringer' : 'Lagre funn'}</button>
           </div>
         </div>
       </div>`;
@@ -1473,7 +1676,15 @@
     document.getElementById('sp-find-save').addEventListener('click', async () => {
       const speciesId = document.getElementById('sp-find-species').value;
       const note = document.getElementById('sp-find-note').value;
-      userFinds.push({ id:'f_'+Date.now(), locId, speciesId, mengde, note, date: new Date().toISOString().slice(0,10) });
+      const date = document.getElementById('sp-find-date').value || todayStr;
+      if (editingFind) {
+        editingFind.speciesId = speciesId;
+        editingFind.mengde = mengde;
+        editingFind.note = note;
+        editingFind.date = date;
+      } else {
+        userFinds.push({ id:'f_'+Date.now(), locId, speciesId, mengde, note, date });
+      }
       await saveFinds();
       slot.innerHTML = '';
       render();
@@ -1497,6 +1708,75 @@
       });
       circle.addTo(hogstLayer);
     });
+  }
+
+  // ---------- Mine funn: kartlag + global liste ----------
+  function renderFindsLayer(){
+    if (!findsLayer) return;
+    findsLayer.clearLayers();
+    findMarkersById = {};
+    userFinds.forEach(f => {
+      const pos = findLatLon(f);
+      if (!pos) return;
+      const sp = SPECIES.find(s => s.id === f.speciesId);
+      const marker = L.circleMarker([pos.lat, pos.lon], {
+        radius: 7, color: '#fff', weight: 2, fillColor: '#8C4A20', fillOpacity: 0.9
+      });
+      marker.bindPopup(`<b>${escapeHtml(sp ? sp.name : f.speciesId)}</b><br/>${f.date} · mengde ${f.mengde}/5${f.note ? '<br/>' + escapeHtml(f.note) : ''}<br/><button data-edit-find-popup="${f.id}" class="sp-btn" style="margin-top:6px;">✏️ Rediger</button>`);
+      marker.on('popupopen', (e) => {
+        const btn = e.popup._contentNode.querySelector('[data-edit-find-popup]');
+        if (btn) btn.addEventListener('click', () => openFindModal(null, { editingFind: userFinds.find(x => x.id === f.id) }));
+      });
+      marker.addTo(findsLayer);
+      findMarkersById[f.id] = marker;
+    });
+  }
+
+  function locateFindOnMap(findId){
+    const find = userFinds.find(f => f.id === findId);
+    const pos = find && findLatLon(find);
+    if (!pos || !leafletMap) return;
+    if (findsLayer && !leafletMap.hasLayer(findsLayer)) leafletMap.addLayer(findsLayer);
+    document.getElementById('sp-leaflet-map').scrollIntoView({ behavior:'smooth', block:'center' });
+    leafletMap.setView([pos.lat, pos.lon], Math.max(leafletMap.getZoom(), 14));
+    const marker = findMarkersById[findId];
+    if (marker) setTimeout(() => marker.openPopup(), 350);
+  }
+
+  function renderMyFindsList(){
+    const el = document.getElementById('sp-myfinds-list');
+    if (!userFinds.length) { el.innerHTML = `<div class="sp-empty-mine">Ingen funn registrert ennå.</div>`; return; }
+    const sorted = [...userFinds].sort((a,b) => (b.date||'').localeCompare(a.date||''));
+    el.innerHTML = sorted.map(f => {
+      const sp = SPECIES.find(s => s.id === f.speciesId);
+      const loc = allLocations().find(l => l.id === f.locId);
+      return `<div class="sp-mine-row">
+        <span>${escapeHtml(sp ? sp.name : f.speciesId)} <span style="opacity:.6">— ${escapeHtml(loc ? loc.name : 'ukjent sted')} · ${f.date}</span></span>
+        <span class="sp-mine-row-actions">
+          <button class="sp-locate" data-move-find="${f.id}" title="Flytt til min posisjon">📍</button>
+          <button class="sp-locate" data-edit-find="${f.id}" title="Rediger">✏️</button>
+          <button class="sp-remove" data-remove-find="${f.id}" title="Fjern">✕</button>
+        </span>
+      </div>`;
+    }).join('');
+    el.querySelectorAll('[data-move-find]').forEach(btn => btn.addEventListener('click', () => {
+      const find = userFinds.find(f => f.id === btn.dataset.moveFind);
+      if (!find) return;
+      useMyLocation(async (lat, lon) => {
+        find.lat = lat; find.lon = lon;
+        await saveFinds();
+        render();
+      });
+    }));
+    el.querySelectorAll('[data-edit-find]').forEach(btn => btn.addEventListener('click', () => {
+      const find = userFinds.find(f => f.id === btn.dataset.editFind);
+      if (find) openFindModal(null, { editingFind: find });
+    }));
+    el.querySelectorAll('[data-remove-find]').forEach(btn => btn.addEventListener('click', async () => {
+      userFinds = userFinds.filter(f => f.id !== btn.dataset.removeFind);
+      await saveFinds();
+      render();
+    }));
   }
 
   // Modal som åpnes når man klikker i kartet mens "Merk hogstfelt i kart" er
@@ -1585,10 +1865,10 @@
               <datalist id="loc-kommune-list">${komms.map(k=>`<option value="${escapeHtml(k)}">`).join('')}</datalist>
             </div>
           </div>
-          <label>Koordinater (valgfritt)</label>
+          <label>Koordinater (valgfritt) <button type="button" class="sp-mini-btn" id="loc-use-my-position">📍 Bruk min posisjon</button></label>
           <div class="sp-2col">
-            <input type="number" step="0.001" id="loc-lat" placeholder="Breddegrad" value="${prefill.lat ?? ''}"/>
-            <input type="number" step="0.001" id="loc-lon" placeholder="Lengdegrad" value="${prefill.lon ?? ''}"/>
+            <input type="number" step="0.00001" id="loc-lat" placeholder="Breddegrad" value="${prefill.lat ?? ''}"/>
+            <input type="number" step="0.00001" id="loc-lon" placeholder="Lengdegrad" value="${prefill.lon ?? ''}"/>
           </div>
 
           <label>Treslag (kryss av det du kjenner igjen)</label>
@@ -1649,6 +1929,12 @@
       </div>`;
     document.getElementById('loc-cancel').addEventListener('click', () => slot.innerHTML = '');
     document.getElementById('sp-modal-backdrop').addEventListener('click', (e) => { if(e.target.id==='sp-modal-backdrop') slot.innerHTML=''; });
+    document.getElementById('loc-use-my-position').addEventListener('click', () => {
+      useMyLocation((lat, lon) => {
+        document.getElementById('loc-lat').value = lat.toFixed(5);
+        document.getElementById('loc-lon').value = lon.toFixed(5);
+      });
+    });
     document.getElementById('loc-save').addEventListener('click', async () => {
       const name = document.getElementById('loc-name').value.trim() || 'Uten navn';
       const fylke = document.getElementById('loc-fylke').value.trim() || 'Ukjent fylke';
@@ -1717,12 +2003,14 @@
   });
   document.getElementById('sp-add-place').addEventListener('click', () => openAddLocationModal({}));
   document.getElementById('sp-map-fullscreen-toggle').addEventListener('click', () => toggleMapFullscreen());
+  document.getElementById('sp-my-location-btn').addEventListener('click', () => useMyLocation(showMyLocationOnMap));
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && mapFullscreen) toggleMapFullscreen(); });
   document.getElementById('sp-mark-hogst').addEventListener('click', () => {
     markingHogstMode = !markingHogstMode;
     updateMarkHogstButton();
   });
   document.querySelectorAll('#sp-mode-seg button').forEach(btn => btn.addEventListener('click', () => { filterMode = btn.dataset.mode; clearRoute(); render(); }));
+  document.querySelectorAll('#sp-viewmode-seg button').forEach(btn => btn.addEventListener('click', () => { viewMode = btn.dataset.viewmode; clearRoute(); render(); }));
   document.getElementById('sp-radius-slider').addEventListener('input', (e) => { radiusKm = parseInt(e.target.value); clearRoute(); render(); });
   document.getElementById('sp-radius-clear').addEventListener('click', () => { radiusCenter = null; clearRoute(); render(); });
   document.getElementById('sp-route-km-slider').addEventListener('input', (e) => {

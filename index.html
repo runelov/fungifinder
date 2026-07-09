@@ -46,6 +46,10 @@
       <div>
         <div class="sp-panel">
           <h3>Velg sopp</h3>
+          <div class="sp-seg" id="sp-viewmode-seg">
+            <button data-viewmode="single" class="active">Én art</button>
+            <button data-viewmode="favorites">Mine favoritter (<span id="sp-fav-count">0</span>)</button>
+          </div>
           <div class="sp-species-list" id="sp-species-list"></div>
         </div>
 
@@ -96,6 +100,11 @@
         </div>
 
         <div class="sp-panel">
+          <h3>Mine funn</h3>
+          <div id="sp-myfinds-list" class="sp-mine-list"></div>
+        </div>
+
+        <div class="sp-panel">
           <h3>Vær siste 14 dager</h3>
           <div class="sp-weather-box" id="sp-weather-box"><span class="sp-wstatus">henter værdata…</span></div>
         </div>
@@ -105,6 +114,7 @@
         <div class="sp-panel sp-map-panel" id="sp-map-panel">
           <div class="sp-map-topline">
             <h3>Område</h3>
+            <button class="sp-mini-btn" id="sp-my-location-btn" title="Vis min posisjon i kartet">📍 Min posisjon</button>
             <button class="sp-mini-btn" id="sp-map-fullscreen-toggle" title="Vis kartet i fullskjerm">⛶ Fullskjerm</button>
             <div class="sp-filter-controls">
               <div class="sp-seg" id="sp-mode-seg">
