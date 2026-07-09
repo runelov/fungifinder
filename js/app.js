@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.8.0';
+  const APP_VERSION = '0.9.0';
   const APP_BUILD_DATE = '2026-07-08';
 
   const SPECIES = [
@@ -335,30 +335,50 @@
     return null;
   }
 
-  async function estimateAreaKm2(){
-    if (filterMode === 'radius') return Math.PI * radiusKm * radiusKm;
-    const name = filterMode === 'fylke' ? fylkeFilter : kommuneFilter;
+  // Henter (og cacher) bounding box for et fylke/kommune-navn via Nominatim.
+  // Delt av areal-estimatet (Hent-data-panelet) og kart-zoom ved valg, slik
+  // at vi ikke gjør to separate Nominatim-kall for samme navn.
+  async function fetchAreaBbox(mode, name){
     if (!name || name === 'alle') return null;
-    if (bboxAreaCache[name] !== undefined) return bboxAreaCache[name];
+    const key = mode + ':' + name;
+    if (bboxAreaCache[key] !== undefined) return bboxAreaCache[key].bbox;
     try {
-      const q = filterMode === 'fylke' ? `${name} fylke, Norge` : `${name}, Norge`;
+      const q = mode === 'fylke' ? `${name} fylke, Norge` : `${name}, Norge`;
       const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=jsonv2&limit=1`, {
         headers: { 'Accept-Language': 'no' }
       });
       const json = await res.json();
-      if (!json.length) { bboxAreaCache[name] = null; return null; }
+      if (!json.length) { bboxAreaCache[key] = { bbox: null }; return null; }
       const bb = json[0].boundingbox.map(parseFloat); // [south, north, west, east]
-      const latKm = (bb[1] - bb[0]) * 111.32;
-      const midLat = (bb[0] + bb[1]) / 2;
-      const lonKm = (bb[3] - bb[2]) * 111.32 * Math.cos(midLat * Math.PI/180);
-      const area = Math.abs(latKm * lonKm);
-      bboxAreaCache[name] = area;
-      return area;
+      bboxAreaCache[key] = { bbox: bb };
+      return bb;
     } catch (e) {
-      console.warn('Kunne ikke estimere areal via Nominatim', e);
-      bboxAreaCache[name] = null;
+      console.warn('Kunne ikke hente bbox via Nominatim', e);
+      bboxAreaCache[key] = { bbox: null };
       return null;
     }
+  }
+
+  async function estimateAreaKm2(){
+    if (filterMode === 'radius') return Math.PI * radiusKm * radiusKm;
+    const name = filterMode === 'fylke' ? fylkeFilter : kommuneFilter;
+    const bb = await fetchAreaBbox(filterMode, name);
+    if (!bb) return null;
+    const latKm = (bb[1] - bb[0]) * 111.32;
+    const midLat = (bb[0] + bb[1]) / 2;
+    const lonKm = (bb[3] - bb[2]) * 111.32 * Math.cos(midLat * Math.PI/180);
+    return Math.abs(latKm * lonKm);
+  }
+
+  // Zoomer kartet til valgt fylke/kommune sin bounding box. Radius-modus har
+  // allerede sitt eget senter/zoom-flow (klikk i kartet), så den rører vi ikke.
+  async function zoomToAreaSelection(){
+    if (!leafletMap || filterMode === 'radius') return;
+    const name = filterMode === 'fylke' ? fylkeFilter : kommuneFilter;
+    if (!name || name === 'alle') return;
+    const bb = await fetchAreaBbox(filterMode, name);
+    if (!bb) return;
+    leafletMap.fitBounds([[bb[0], bb[2]], [bb[1], bb[3]]], { maxZoom: 12, padding: [20, 20] });
   }
 
   function describeRunStatus(run){
@@ -933,7 +953,15 @@
     }
     setTimeout(() => {
       const card = document.querySelector(`.sp-card[data-loc="${loc.id}"]`);
-      if (card) { card.scrollIntoView({behavior:'smooth', block:'center'}); card.classList.add('sp-flash'); setTimeout(()=>card.classList.remove('sp-flash'), 1200); }
+      if (card) {
+        card.scrollIntoView({behavior:'smooth', block:'center'}); card.classList.add('sp-flash'); setTimeout(()=>card.classList.remove('sp-flash'), 1200);
+      } else {
+        // Ikke noe kort å scrolle til — typisk fordi "Skjul flatehogde steder"
+        // er aktivt og filtrerte det bort. Vis info i kartet i stedet for at
+        // klikket tilsynelatende ikke gjør noe.
+        const marker = markersById[loc.id];
+        if (marker) marker.openPopup();
+      }
     }, 60);
   }
 
@@ -944,6 +972,10 @@
     const loc = allLocations().find(l => l.id === locId);
     const marker = markersById[locId];
     if (!loc || !leafletMap) return;
+    // Markøren finnes i markerLayer uansett, men er usynlig (og openPopup()
+    // virker ikke) hvis laget er skrudd av via "Målepunkter"-avkrysningen —
+    // skru det på igjen, ellers skjer det tilsynelatende ingenting.
+    if (markerLayer && !leafletMap.hasLayer(markerLayer)) leafletMap.addLayer(markerLayer);
     document.getElementById('sp-leaflet-map').scrollIntoView({ behavior:'smooth', block:'center' });
     leafletMap.setView([loc.lat, loc.lon], Math.max(leafletMap.getZoom(), 13));
     if (marker) setTimeout(() => marker.openPopup(), 350);
@@ -1637,11 +1669,12 @@
   // ---------- wiring ----------
   document.getElementById('sp-toggle-quiet').addEventListener('click', () => { prioritizeQuiet = !prioritizeQuiet; render(); });
   document.getElementById('sp-toggle-hogst').addEventListener('click', () => { hideHogst = !hideHogst; render(); });
-  document.getElementById('sp-fylke-filter').addEventListener('change', (e) => { fylkeFilter = e.target.value; clearRoute(); render(); });
+  document.getElementById('sp-fylke-filter').addEventListener('change', (e) => { fylkeFilter = e.target.value; clearRoute(); zoomToAreaSelection(); render(); });
   document.getElementById('sp-kommune-filter-input').addEventListener('change', (e) => {
     const val = e.target.value.trim();
     kommuneFilter = val === '' ? 'alle' : val;
     clearRoute();
+    zoomToAreaSelection();
     render();
   });
   document.getElementById('sp-kommune-filter-input').addEventListener('keydown', (e) => {
