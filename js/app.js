@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.11.1';
-  const APP_BUILD_DATE = '2026-07-08';
+  const APP_VERSION = '0.12.0';
+  const APP_BUILD_DATE = '2026-07-09';
 
   const SPECIES = [
     { id:'kantarell', name:'Kantarell', latin:'Cantharellus cibarius', season:[7,10],
@@ -123,6 +123,7 @@
   let markingHogstMode = false;
   let customLocations = [];
   let fetchedAreas = [];
+  let artsfunn = []; // ekte Artsdatabanken-observasjoner — se loadArtsfunn()
   let gridKm = 1.5;
   let kommuneRegister = []; // {kommunenavn, fylkesnavn} — hentet fra Kartverkets Kommuneinfo-API
   let kommuneNarrowFylke = 'alle';
@@ -271,6 +272,7 @@
       setSyncStatus(`Kobler til … (branch: ${branch})`);
       await loadLocations();
       await loadFetchedAreas();
+      await loadArtsfunn();
       await loadStorage();
       render();
     });
@@ -314,6 +316,23 @@
       }
     }
     fetchedAreas = [];
+  }
+
+  // Ekte Artsdatabanken-observasjoner (art/koordinat/dato), hentet av
+  // fetch_area.py og akkumulert i data/artsfunn.json — se
+  // fetch_artskart_observations_for_fylke() i data-repoet.
+  async function loadArtsfunn(){
+    const cfg = window.FungiStore ? window.FungiStore.getConfig() : null;
+    if (cfg && window.FungiStore.isConfigured()) {
+      try {
+        const result = await window.FungiStore.loadFile('data/artsfunn.json');
+        artsfunn = Array.isArray(result.data) ? result.data : [];
+        return;
+      } catch (e) {
+        console.warn('Kunne ikke laste artsfunn.json.', e);
+      }
+    }
+    artsfunn = [];
   }
 
   // ---------- on-demand henting av terrengdata ----------
@@ -693,7 +712,20 @@
     const seasonPts = inSeason ? 10 : 0;
     total += seasonPts; breakdown.push([inSeason?'I sesong nå':'Utenfor typisk sesong', seasonPts]);
 
-    if (loc.kjenteFunn && loc.kjenteFunn.includes(species.id)) { total += 8; breakdown.push(['Tidligere kjente funn i nærheten (database)', 8]); }
+    // kjenteFunnDetaljer (art/dato/avstandM per Artskart-observasjon) gir en
+    // tetthetsbevisst bonus — flere kjente funn, og spesielt nære funn, teller
+    // mer enn ett enkelt gammelt funn langt unna. Eldre steder som kun har
+    // det gamle boolske kjenteFunn-feltet (fra før artsfunn-oppgraderingen
+    // 2026-07-09) faller tilbake til den enkle, faste bonusen.
+    const funnDetaljer = (loc.kjenteFunnDetaljer || []).filter(f => f.art === species.id);
+    if (funnDetaljer.length) {
+      const naerFunn = funnDetaljer.some(f => f.avstandM < 300);
+      const densityScore = Math.min(15, funnDetaljer.length * 3 + (naerFunn ? 4 : 0));
+      total += densityScore;
+      breakdown.push([`${funnDetaljer.length} kjente Artsdatabanken-funn i nærheten${naerFunn ? ' (inkl. et svært nært)' : ''}`, densityScore]);
+    } else if (loc.kjenteFunn && loc.kjenteFunn.includes(species.id)) {
+      total += 8; breakdown.push(['Tidligere kjente funn i nærheten (database)', 8]);
+    }
 
     let roScore = 0;
     if (prioritizeQuiet) {
@@ -777,6 +809,16 @@
       html += `<div class="sp-cross-tip">💡 Andre gode matsopper å se etter her: ${othersHere.map(r => `${escapeHtml(r.species.name)} (${r.res.total})`).join(', ')}</div>`;
     }
     return html;
+  }
+
+  // Ekte Artsdatabanken-funn av DENNE arten nær stedet — antall og
+  // nærmeste/nyeste, hentet fra kjenteFunnDetaljer (se scoreLocation()).
+  function knownFindsHtml(loc, speciesId){
+    const detaljer = (loc.kjenteFunnDetaljer || []).filter(f => f.art === speciesId);
+    if (!detaljer.length) return '';
+    const sp = SPECIES.find(s => s.id === speciesId);
+    const parts = detaljer.slice(0, 3).map(f => `${f.avstandM} m unna (${escapeHtml(f.dato || 'ukjent dato')})`);
+    return `<div class="sp-known-finds">🔎 ${detaljer.length} kjent${detaljer.length > 1 ? 'e' : ''} Artsdatabanken-funn av ${escapeHtml(sp ? sp.name.toLowerCase() : speciesId)} her: ${parts.join(', ')}</div>`;
   }
 
   function locTexts(loc){
@@ -917,6 +959,7 @@
   let routeLayer = null;
   let hogstLayer = null;
   let findsLayer = null;
+  let artskartLayer = null;
   let findMarkersById = {};
   let mapFittedOnce = false;
   let markersById = {};
@@ -1020,13 +1063,14 @@
     routeLayer = L.layerGroup().addTo(leafletMap);
     hogstLayer = L.layerGroup().addTo(leafletMap);
     findsLayer = L.layerGroup().addTo(leafletMap);
+    artskartLayer = L.layerGroup().addTo(leafletMap);
 
     // Lag-kontroll: bytt bakgrunnskart (radioknapper) og skru målepunkter/
     // rundtur/hogstfelt/funn av/på (avkrysning) — praktisk når man vil se
     // rent terreng for å merke seg egne funnsteder uten at prikkene er i veien.
     L.control.layers(
       { 'Topografisk (Kartverket)': topoLayer, 'Standard': standardLayer, 'Satellitt': satelliteLayer },
-      { 'Målepunkter': markerLayer, 'Foreslått rundtur': routeLayer, 'Mine hogstfelt': hogstLayer, 'Mine funn': findsLayer },
+      { 'Målepunkter': markerLayer, 'Foreslått rundtur': routeLayer, 'Mine hogstfelt': hogstLayer, 'Mine funn': findsLayer, 'Artsdatabanken-funn': artskartLayer },
       { collapsed: true }
     ).addTo(leafletMap);
 
@@ -1497,6 +1541,7 @@
           <div>🥾 <b>Sti/skogsbilvei i terrenget:</b> ${loc.stier==='ja'?'ja':loc.stier==='nei'?'nei, ingen kjent sti':'ukjent'}${loc.avstandParkeringM ? ` · ca ${loc.avstandParkeringM} m å gå fra parkering` : ''}</div>
         </div>
         ${res.histNote ? `<div class="sp-hist-note">★ ${res.histNote}</div>` : ''}
+        ${knownFindsHtml(loc, species_for_card().id)}
         <div class="sp-explain">${species_for_card().why(loc, t)}</div>
         <div class="sp-microtips-label">Sjekk spesielt i terrenget her</div>
         <ul class="sp-microtips">${terrainMicrotips(species_for_card(), loc).map(tip => `<li>${tip}</li>`).join('')}</ul>
@@ -1552,6 +1597,7 @@
           <div>🥾 <b>Sti/skogsbilvei i terrenget:</b> ${loc.stier==='ja'?'ja':loc.stier==='nei'?'nei, ingen kjent sti':'ukjent'}${loc.avstandParkeringM ? ` · ca ${loc.avstandParkeringM} m å gå fra parkering` : ''}</div>
         </div>
         ${res.histNote ? `<div class="sp-hist-note">★ ${res.histNote}</div>` : ''}
+        ${knownFindsHtml(loc, topSpecies.id)}
         <div class="sp-explain"><b>${escapeHtml(topSpecies.name)}:</b> ${topSpecies.why(loc, t)}</div>
         <div class="sp-microtips-label">Sjekk spesielt i terrenget her (for ${escapeHtml(topSpecies.name)})</div>
         <ul class="sp-microtips">${terrainMicrotips(topSpecies, loc).map(tip => `<li>${tip}</li>`).join('')}</ul>
@@ -1640,6 +1686,7 @@
     });
 
     if (hideHogst) scoped = scoped.filter(s => !s.res.isCut);
+    renderArtskartLayer(scoped);
     scoped.sort((a,b) => {
       if (a.res.isCut !== b.res.isCut) return a.res.isCut ? 1 : -1;
       return b.res.total - a.res.total;
@@ -1803,6 +1850,35 @@
     leafletMap.setView([pos.lat, pos.lon], Math.max(leafletMap.getZoom(), 14));
     const marker = findMarkersById[findId];
     if (marker) setTimeout(() => marker.openPopup(), 350);
+  }
+
+  // Ekte Artsdatabanken-observasjoner nær det som faktisk vises (scopedLocs) —
+  // artsfunn.json kan inneholde tusenvis av rader for et helt fylke, så vi
+  // begrenser til punkter innenfor ~5 km av et sted i gjeldende filter, med
+  // et grovt gradsjekk-filter før den dyrere haversine-beregningen (samme
+  // mønster som nearby_artskart_finds i fetch_area.py), og et hardt tak på
+  // antall markører for å unngå at kartet fryser ved svært store datasett.
+  function renderArtskartLayer(scopedLocs){
+    if (!artskartLayer) return;
+    artskartLayer.clearLayers();
+    if (!scopedLocs.length || !artsfunn.length) return;
+    const nearby = [];
+    outer:
+    for (const o of artsfunn) {
+      for (const s of scopedLocs) {
+        if (Math.abs(o.lat - s.loc.lat) > 0.05 || Math.abs(o.lon - s.loc.lon) > 0.1) continue;
+        if (haversineKm(o.lat, o.lon, s.loc.lat, s.loc.lon) <= 5) { nearby.push(o); continue outer; }
+      }
+      if (nearby.length >= 300) break;
+    }
+    nearby.forEach(o => {
+      const sp = SPECIES.find(s => s.id === o.art);
+      const marker = L.circleMarker([o.lat, o.lon], {
+        radius: 5, color: '#fff', weight: 1.5, fillColor: '#4C7BE1', fillOpacity: 0.85
+      });
+      marker.bindPopup(`<b>${escapeHtml(sp ? sp.name : o.art)}</b><br/>${escapeHtml(o.dato || 'ukjent dato')}${o.url ? `<br/><a href="${escapeHtml(o.url)}" target="_blank" rel="noopener">Se på Artskart →</a>` : ''}`);
+      marker.addTo(artskartLayer);
+    });
   }
 
   function renderMyFindsList(){
@@ -2096,6 +2172,7 @@
     initMap();
     await loadLocations();
     await loadFetchedAreas();
+    await loadArtsfunn();
     await loadStorage();
     loadKommuneRegister().then(() => renderFilterControls()); // ikke-blokkerende, oppdaterer UI når klar
     render();
