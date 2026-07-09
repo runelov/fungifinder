@@ -148,6 +148,7 @@
   .sp-route-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink-soft); flex-wrap: wrap; }
   .sp-route-row input[type=range] { width: 120px; }
   .sp-route-summary { font-size: 12.5px; color: var(--ink); margin-top: 10px; line-height: 1.5; }
+  .sp-route-why { font-size: 12.5px; color: var(--ink); background: rgba(108,122,82,0.1); border-left: 2px solid var(--gold); padding: 6px 10px; margin: 8px 0; border-radius: 0 3px 3px 0; }
   .sp-route-icon { background: var(--russet-deep); color: #fff; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); font-family: 'JetBrains Mono', monospace; }
   .sp-route-icon.sp-route-start { background: var(--pine-deep); }
 

@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.11.0';
+  const APP_VERSION = '0.11.1';
   const APP_BUILD_DATE = '2026-07-08';
 
   const SPECIES = [
@@ -1148,6 +1148,60 @@
   // er en rekkefølge på rette linjer, IKKE snappet til faktiske stier — bruk
   // det topografiske kartlaget til å legge din egen linje mellom stoppene.
 
+  // Poengsetter ett sted for turforslag-formål — bruker beste favoritt i
+  // favoritt-modus (samme prinsipp som cardHtmlFavorites), ellers den valgte
+  // enkeltarten. Sikrer at "Foreslå tur" faktisk følger favorittene dine når
+  // du står i den modusen, i stedet for alltid å bruke selectedSpecies.
+  function scoreForRoute(loc){
+    if (viewMode === 'favorites' && favoriteSpecies.length) {
+      const results = favoriteSpecies
+        .map(id => SPECIES.find(s => s.id === id))
+        .filter(Boolean)
+        .map(sp => ({ species: sp, res: scoreLocation(sp, loc) }))
+        .sort((a,b) => b.res.total - a.res.total);
+      return results[0];
+    }
+    const sp = SPECIES.find(s => s.id === selectedSpecies);
+    return { species: sp, res: scoreLocation(sp, loc) };
+  }
+
+  // Kort tekst om HVORFOR ruten er valgt og hva man bør se etter — aggregerer
+  // treslag/fuktighet/berggrunn/helning på tvers av stoppene, pluss konkrete
+  // mikrotips for den mest relevante arten (beste favoritt, eller valgt art).
+  function describeRouteTerrain(stops){
+    if (!stops.length) return '';
+    const treslagCount = {}, fuktCount = {};
+    let sorSkrenter = 0, rikBerggrunn = 0;
+    stops.forEach(s => {
+      const loc = s.loc;
+      (Array.isArray(loc.treslag) ? loc.treslag : [loc.treslag]).forEach(t => { treslagCount[t] = (treslagCount[t]||0) + 1; });
+      fuktCount[loc.fuktighet] = (fuktCount[loc.fuktighet]||0) + 1;
+      if (loc.himmelretning && ['S','SØ','SV'].includes(loc.himmelretning) && loc.helningGrader >= 3) sorSkrenter++;
+      if (loc.berggrunn === 'rik' || loc.berggrunn === 'moderat') rikBerggrunn++;
+    });
+    const topTreslag = Object.entries(treslagCount).sort((a,b) => b[1]-a[1])[0]?.[0];
+    const topFukt = Object.entries(fuktCount).sort((a,b) => b[1]-a[1])[0]?.[0];
+
+    const primarySpecies = viewMode === 'favorites'
+      ? SPECIES.find(s => s.id === favoriteSpecies[0])
+      : SPECIES.find(s => s.id === selectedSpecies);
+    const speciesLabel = viewMode === 'favorites'
+      ? (favoriteSpecies.map(id => SPECIES.find(s => s.id === id)?.name).filter(Boolean).join('/') || 'favorittene dine')
+      : (primarySpecies ? primarySpecies.name.toLowerCase() : '');
+
+    let text = `Ruten går hovedsakelig gjennom ${escapeHtml(TXT.treslag[topTreslag] || topTreslag || 'ukjent')}-dominert skog med ${escapeHtml(TXT.fuktighet[topFukt] || topFukt || 'ukjent')} bunnvegetasjon`;
+    if (rikBerggrunn >= Math.ceil(stops.length / 2)) text += ', på grunn med moderat til rikt kalkinnhold';
+    text += ` — gode forhold for ${escapeHtml(speciesLabel)}.`;
+    if (sorSkrenter > 0) {
+      text += ` ${sorSkrenter} av ${stops.length} stopp ligger i sørvendte skråninger — sjekk disse ekstra nøye på varme, tørre dager.`;
+    }
+    if (primarySpecies) {
+      const tips = terrainMicrotips(primarySpecies, stops[0].loc).slice(0, 2);
+      if (tips.length) text += ` Se etter: ${tips.join(' ')}`;
+    }
+    return text;
+  }
+
   function clusterIntoZones(scoredPoints, maxZones, minZoneDistanceKm){
     const sorted = [...scoredPoints].sort((a,b) => b.res.total - a.res.total);
     const zones = [];
@@ -1273,8 +1327,15 @@
     summary.textContent = 'Beregner forslag …';
     document.getElementById('sp-route-clear').style.display = 'none';
 
-    const species = SPECIES.find(s => s.id === selectedSpecies);
-    const scoredAll = allLocations().map(loc => ({ loc, res: scoreLocation(species, loc) }));
+    if (viewMode === 'favorites' && !favoriteSpecies.length) {
+      summary.textContent = 'Ingen favoritter valgt — merk minst én art med ★, eller bytt til enkeltart-modus.';
+      return;
+    }
+
+    const scoredAll = allLocations().map(loc => {
+      const r = scoreForRoute(loc);
+      return { loc, res: r.res };
+    });
     const scoped = scoredAll.filter(s => {
       if (s.res.isCut) return false;
       if (filterMode === 'fylke') return fylkeFilter === 'alle' || s.loc.fylke === fylkeFilter;
@@ -1315,7 +1376,8 @@
     const estMinutes = Math.round((totalKm / 3.2) * 60); // ~3,2 km/t i skogsterreng, uten stopptid
     summary.innerHTML = `
       <b>${stops.length} stopp</b>, ca <b>${totalKm.toFixed(1)} km</b> rundtur (~${estMinutes} min gange, uten tid til leting).<br/>
-      Start/parkering: ${escapeHtml(startPoint.name || 'ukjent')}${startPoint.kilde === 'parkering' ? ' (fra OpenStreetMap)' : ''}<br/>
+      Start/parkering: ${escapeHtml(startPoint.name || 'ukjent')}${startPoint.kilde === 'parkering' ? ' (fra OpenStreetMap)' : ''}
+      <div class="sp-route-why">${describeRouteTerrain(stops)}</div>
       <span style="font-size:11px;opacity:0.8;">Rett linje mellom stoppene, ikke snappet til faktiske stier — bruk det topografiske kartlaget til å legge din egen linje mellom dem.</span>
     `;
     document.getElementById('sp-route-clear').style.display = '';
