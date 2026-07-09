@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.7.0';
+  const APP_VERSION = '0.8.0';
   const APP_BUILD_DATE = '2026-07-08';
 
   const SPECIES = [
@@ -116,6 +116,9 @@
   let weatherReady = false;
   let userFinds = [];
   let userCuts = [];
+  let hogstOmrader = []; // [{id, lat, lon, radiusM, dato}] — egne merkede flatehogd-OMRÅDER,
+                          // uavhengig av om det finnes et eksisterende målepunkt i dem (se scoreLocation)
+  let markingHogstMode = false;
   let customLocations = [];
   let fetchedAreas = [];
   let gridKm = 1.5;
@@ -138,6 +141,14 @@
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   }
 
+  // Sjekker om et sted faller innenfor et av dine egne merkede flatehogd-
+  // OMRÅDER (sirkler, se openHogstOmradeModal) — uavhengig av om stedet i
+  // seg selv har blitt merket enkeltvis via userCuts. Løser at et hogstfelt
+  // ofte ikke treffer noe eksisterende rutenettpunkt nøyaktig.
+  function isWithinHogstOmrade(loc){
+    return hogstOmrader.some(z => haversineKm(z.lat, z.lon, loc.lat, loc.lon) * 1000 <= z.radiusM);
+  }
+
   // ---------- storage (GitHub-som-database i privat data-repo, med lokal fallback) ----------
   let personalSha = null; // sha til personal.json på GitHub, trengs for å oppdatere
 
@@ -154,6 +165,7 @@
         const d = result.data || {};
         userFinds = d.finds || [];
         userCuts = d.cuts || [];
+        hogstOmrader = d.hogstOmrader || [];
         customLocations = d.customLocations || [];
         setSyncStatus(`✓ Koblet til ${cfg.owner}/${cfg.repo}`);
         return;
@@ -165,11 +177,12 @@
     const local = window.FungiStore ? window.FungiStore.loadLocal('personal') : null;
     userFinds = local?.finds || [];
     userCuts = local?.cuts || [];
+    hogstOmrader = local?.hogstOmrader || [];
     customLocations = local?.customLocations || [];
   }
 
   async function persistAll(){
-    const payload = { finds: userFinds, cuts: userCuts, customLocations: customLocations };
+    const payload = { finds: userFinds, cuts: userCuts, hogstOmrader: hogstOmrader, customLocations: customLocations };
     const cfg = window.FungiStore ? window.FungiStore.getConfig() : null;
     if (cfg && window.FungiStore.isConfigured()) {
       try {
@@ -185,6 +198,7 @@
   }
   async function saveFinds(){ await persistAll(); }
   async function saveCuts(){ await persistAll(); }
+  async function saveHogstOmrader(){ await persistAll(); }
   async function saveCustomLocations(){ await persistAll(); }
 
   function setSyncStatus(text){
@@ -611,7 +625,7 @@
 
   function scoreLocation(species, loc){
     const cutRecent = loc.hogstAr !== null && loc.hogstAr !== undefined && (yearNow - loc.hogstAr) <= 3;
-    const manuallyCut = userCuts.includes(loc.id);
+    const manuallyCut = userCuts.includes(loc.id) || isWithinHogstOmrade(loc);
     const isCut = cutRecent || manuallyCut;
 
     const breakdown = [];
@@ -818,6 +832,7 @@
   let markerLayer = null;
   let radiusLayer = null;
   let routeLayer = null;
+  let hogstLayer = null;
   let mapFittedOnce = false;
   let markersById = {};
   let routeKm = 5;
@@ -876,18 +891,21 @@
     markerLayer = L.layerGroup().addTo(leafletMap);
     radiusLayer = L.layerGroup().addTo(leafletMap);
     routeLayer = L.layerGroup().addTo(leafletMap);
+    hogstLayer = L.layerGroup().addTo(leafletMap);
 
     // Lag-kontroll: bytt bakgrunnskart (radioknapper) og skru målepunkter/
-    // rundtur av/på (avkrysning) — praktisk når man vil se rent terreng for
-    // å merke seg egne funnsteder uten at prikkene er i veien.
+    // rundtur/hogstfelt av/på (avkrysning) — praktisk når man vil se rent
+    // terreng for å merke seg egne funnsteder uten at prikkene er i veien.
     L.control.layers(
       { 'Topografisk (Kartverket)': topoLayer, 'Standard': standardLayer, 'Satellitt': satelliteLayer },
-      { 'Målepunkter': markerLayer, 'Foreslått rundtur': routeLayer },
+      { 'Målepunkter': markerLayer, 'Foreslått rundtur': routeLayer, 'Mine hogstfelt': hogstLayer },
       { collapsed: true }
     ).addTo(leafletMap);
 
     leafletMap.on('click', (e) => {
-      if (filterMode === 'radius') {
+      if (markingHogstMode) {
+        openHogstOmradeModal(e.latlng.lat, e.latlng.lng);
+      } else if (filterMode === 'radius') {
         radiusCenter = { lat: e.latlng.lat, lon: e.latlng.lng };
         clearRoute();
         render();
@@ -1173,7 +1191,15 @@
   function renderMineList(){
     const el = document.getElementById('sp-mine-list');
     if (!customLocations.length) { el.innerHTML = `<div class="sp-empty-mine">Ingen egne steder lagt til ennå.</div>`; return; }
-    el.innerHTML = customLocations.map(l => `<div class="sp-mine-row"><span>${escapeHtml(l.name)} <span style="opacity:.6">(${escapeHtml(l.kommune)})</span></span><button data-id="${l.id}" title="Fjern">✕</button></div>`).join('');
+    el.innerHTML = customLocations.map(l => `
+      <div class="sp-mine-row">
+        <span>${escapeHtml(l.name)} <span style="opacity:.6">(${escapeHtml(l.kommune)})</span></span>
+        <span class="sp-mine-row-actions">
+          <button class="sp-locate" data-locate="${l.id}" title="Vis i kart">📍</button>
+          <button class="sp-remove" data-id="${l.id}" title="Fjern">✕</button>
+        </span>
+      </div>`).join('');
+    el.querySelectorAll('button[data-locate]').forEach(btn => btn.addEventListener('click', () => locateOnMap(btn.dataset.locate)));
     el.querySelectorAll('button[data-id]').forEach(btn => btn.addEventListener('click', async () => {
       const id = btn.dataset.id;
       customLocations = customLocations.filter(l => l.id !== id);
@@ -1298,6 +1324,7 @@
     const locsAll = allLocations();
     let scoredAll = locsAll.map(loc => ({ loc, res: scoreLocation(species, loc) }));
     renderMap(scoredAll);
+    renderHogstZones();
 
     let scoped = scoredAll.filter(s => {
       if (filterMode === 'fylke') return fylkeFilter === 'alle' || s.loc.fylke === fylkeFilter;
@@ -1394,6 +1421,86 @@
       slot.innerHTML = '';
       render();
     });
+  }
+
+  // ---------- flatehogd-OMRÅDER (sirkler, ikke bundet til ett enkelt målepunkt) ----------
+  function renderHogstZones(){
+    if (!hogstLayer) return;
+    hogstLayer.clearLayers();
+    hogstOmrader.forEach(z => {
+      const circle = L.circle([z.lat, z.lon], { radius: z.radiusM, color: '#A23E2E', weight: 2, fillColor: '#A23E2E', fillOpacity: 0.2 });
+      circle.bindPopup(`<b>Flatehogd-område</b><br/>Merket ${escapeHtml(z.dato || '')}, radius ${z.radiusM} m<br/><button data-remove-hogst="${z.id}" class="sp-btn sp-ghost-danger" style="margin-top:6px;">Fjern</button>`);
+      circle.on('popupopen', (e) => {
+        const btn = e.popup._contentNode.querySelector('[data-remove-hogst]');
+        if (btn) btn.addEventListener('click', async () => {
+          hogstOmrader = hogstOmrader.filter(h => h.id !== z.id);
+          await saveHogstOmrader();
+          render();
+        });
+      });
+      circle.addTo(hogstLayer);
+    });
+  }
+
+  // Modal som åpnes når man klikker i kartet mens "Merk hogstfelt i kart" er
+  // aktiv. Viser en levende forhåndsvisning av sirkelen mens man justerer
+  // radius, slik at man ser akkurat hvilket areal som blir merket FØR man
+  // lagrer — alt innenfor sirkelen regnes som flatehogd i vurderingen,
+  // uavhengig av om det finnes et eksisterende målepunkt der.
+  function openHogstOmradeModal(lat, lon){
+    const slot = document.getElementById('sp-modal-slot');
+    let radiusM = 100;
+    const todayStr = new Date().toISOString().slice(0,10);
+    slot.innerHTML = `
+      <div class="sp-modal-backdrop" id="sp-modal-backdrop">
+        <div class="sp-modal">
+          <h4>Merk flatehogd-område</h4>
+          <div class="sp-modal-sub">Alt innenfor sirkelen (nåværende og fremtidig hentede steder) regnes som flatehogd i vurderingen — praktisk når hogstfeltet ikke treffer noe eksisterende målepunkt.</div>
+          <label>Radius: <span id="sp-hogst-radius-label">100 m</span></label>
+          <input type="range" id="sp-hogst-radius-slider" min="20" max="500" step="10" value="100"/>
+          <label>Dato (anslått)</label>
+          <input type="date" id="sp-hogst-date" value="${todayStr}"/>
+          <div class="sp-modal-actions">
+            <button class="sp-btn" id="sp-hogst-cancel">Avbryt</button>
+            <button class="sp-btn sp-primary" id="sp-hogst-save">Lagre område</button>
+          </div>
+        </div>
+      </div>`;
+
+    const previewCircle = L.circle([lat, lon], { radius: radiusM, color: '#A23E2E', weight: 2, fillColor: '#A23E2E', fillOpacity: 0.25 }).addTo(leafletMap);
+
+    document.getElementById('sp-hogst-radius-slider').addEventListener('input', (e) => {
+      radiusM = parseInt(e.target.value);
+      document.getElementById('sp-hogst-radius-label').textContent = radiusM + ' m';
+      previewCircle.setRadius(radiusM);
+    });
+
+    function closeModal(){
+      slot.innerHTML = '';
+      leafletMap.removeLayer(previewCircle);
+      markingHogstMode = false;
+      updateMarkHogstButton();
+    }
+
+    document.getElementById('sp-hogst-cancel').addEventListener('click', closeModal);
+    document.getElementById('sp-modal-backdrop').addEventListener('click', (e) => { if (e.target.id === 'sp-modal-backdrop') closeModal(); });
+    document.getElementById('sp-hogst-save').addEventListener('click', async () => {
+      const dato = document.getElementById('sp-hogst-date').value || todayStr;
+      hogstOmrader.push({ id: 'h_' + Date.now(), lat, lon, radiusM, dato });
+      leafletMap.removeLayer(previewCircle);
+      slot.innerHTML = '';
+      markingHogstMode = false;
+      updateMarkHogstButton();
+      await saveHogstOmrader();
+      render();
+    });
+  }
+
+  function updateMarkHogstButton(){
+    const btn = document.getElementById('sp-mark-hogst');
+    if (!btn) return;
+    btn.textContent = markingHogstMode ? 'Klikk i kartet for å plassere senter (klikk her for å avbryte)' : '🪓 Merk hogstfelt i kart';
+    btn.classList.toggle('active', markingHogstMode);
   }
 
   // ---------- add custom location modal ----------
@@ -1551,6 +1658,10 @@
     render();
   });
   document.getElementById('sp-add-place').addEventListener('click', () => openAddLocationModal({}));
+  document.getElementById('sp-mark-hogst').addEventListener('click', () => {
+    markingHogstMode = !markingHogstMode;
+    updateMarkHogstButton();
+  });
   document.querySelectorAll('#sp-mode-seg button').forEach(btn => btn.addEventListener('click', () => { filterMode = btn.dataset.mode; clearRoute(); render(); }));
   document.getElementById('sp-radius-slider').addEventListener('input', (e) => { radiusKm = parseInt(e.target.value); clearRoute(); render(); });
   document.getElementById('sp-radius-clear').addEventListener('click', () => { radiusCenter = null; clearRoute(); render(); });

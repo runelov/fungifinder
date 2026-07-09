@@ -65,9 +65,14 @@
 
   .sp-mine-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
   .sp-mine-row { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; background: rgba(179,96,42,0.08); border: 1px solid rgba(179,96,42,0.25); border-radius: 3px; padding: 5px 8px; }
-  .sp-mine-row button { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px; }
+  .sp-mine-row-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .sp-mine-row-actions button { background: none; border: none; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+  .sp-mine-row-actions button.sp-remove { color: var(--danger); font-size: 15px; }
   .sp-add-btn { width: 100%; background: var(--russet); color: #fff; border: none; border-radius: 3px; padding: 9px; font-weight: 600; font-size: 13px; cursor: pointer; }
   .sp-add-btn:hover { background: var(--russet-deep); }
+  .sp-mark-hogst-btn { width: 100%; margin-top: 8px; background: transparent; border: 1px dashed var(--danger); color: var(--danger); border-radius: 3px; padding: 8px; font-weight: 600; font-size: 12.5px; cursor: pointer; }
+  .sp-mark-hogst-btn:hover { background: rgba(162,62,46,0.08); }
+  .sp-mark-hogst-btn.active { background: var(--danger); color: #fff; border-style: solid; }
   .sp-empty-mine { font-size: 12px; color: var(--ink-soft); margin-bottom: 8px; }
 
   .sp-map-panel { margin-bottom: 18px; }
@@ -154,7 +159,8 @@
   .sp-modal h4 { font-family: 'Fraunces', serif; margin: 0 0 4px; color: var(--pine-deep); }
   .sp-modal .sp-modal-sub { font-size: 12px; color: var(--ink-soft); margin-bottom: 8px; }
   .sp-modal label { display: block; font-size: 12px; color: var(--ink-soft); margin: 10px 0 4px; }
-  .sp-modal select, .sp-modal textarea, .sp-modal input[type=text], .sp-modal input[type=number] { width: 100%; padding: 7px 9px; border-radius: 3px; border: 1px solid var(--line); background: #fff; font-family: 'Source Sans 3', sans-serif; font-size: 13px; }
+  .sp-modal select, .sp-modal textarea, .sp-modal input[type=text], .sp-modal input[type=number], .sp-modal input[type=date] { width: 100%; padding: 7px 9px; border-radius: 3px; border: 1px solid var(--line); background: #fff; font-family: 'Source Sans 3', sans-serif; font-size: 13px; }
+  .sp-modal input[type=range] { width: 100%; }
   .sp-scale { display: flex; gap: 6px; }
   .sp-scale button { flex: 1; padding: 8px 0; border-radius: 3px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-family: 'JetBrains Mono', monospace; }
   .sp-scale button.sel { background: var(--russet); color: #fff; border-color: var(--russet-deep); }
