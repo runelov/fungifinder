@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.9.0';
+  const APP_VERSION = '0.10.0';
   const APP_BUILD_DATE = '2026-07-08';
 
   const SPECIES = [
@@ -524,7 +524,18 @@
               progress.textContent = 'GitHub-jobben er ferdig kjørt hos GitHub. Henter oppdatert data til nettleseren din …';
               await loadLocations();
               await loadFetchedAreas();
-              const match = findFetchedAreaMatch();
+              let match = findFetchedAreaMatch();
+              // GitHubs Contents API kan i sjeldne tilfeller ha en kort forsinkelse
+              // (eventual consistency) før den reflekterer en commit som akkurat
+              // landet — det ga tidligere en forvirrende "ingen terrengdata hentet"
+              // rett etter en faktisk vellykket jobb, uten at brukeren gjorde noe
+              // galt (f.eks. bare byttet art). Prøv på nytt et par ganger med kort
+              // mellomrom før vi gir opp og viser "ingen terrengdata".
+              for (let retry = 0; retry < 4 && !match; retry++) {
+                await new Promise(r => setTimeout(r, 1500));
+                await loadFetchedAreas();
+                match = findFetchedAreaMatch();
+              }
               const detail = match ? ` ${match.pointsAdded} nye steder lagt til (av ${match.pointsChecked} punkter sjekket).` : '';
               progress.textContent = `✓ Ferdig!${detail} Oppdaterer visningen …`;
               fetchInProgress = false;
@@ -857,6 +868,20 @@
   let markersById = {};
   let routeKm = 5;
   let suggestedRoute = null; // { startPoint, stops, totalKm } — se buildRoute()
+  let mapFullscreen = false;
+
+  // Kartet var for lite til feltbruk (særlig mobil). Fullskjerm gjør panelet
+  // til et fast overlay og lar CSS gi kartet det meste av skjermhøyden —
+  // Leaflet må fortelles eksplisitt at containeren endret størrelse
+  // (invalidateSize), ellers blir fliser feilplassert/tomme utenfor det
+  // opprinnelige, mindre området.
+  function toggleMapFullscreen(){
+    mapFullscreen = !mapFullscreen;
+    document.getElementById('sp-map-panel').classList.toggle('sp-map-fullscreen', mapFullscreen);
+    document.body.classList.toggle('sp-map-fullscreen-active', mapFullscreen);
+    document.getElementById('sp-map-fullscreen-toggle').textContent = mapFullscreen ? '✕ Lukk fullskjerm' : '⛶ Fullskjerm';
+    setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 260);
+  }
 
   // Rikelig margin rundt Norge (inkl. Svalbard) + naboland. Uten en grense her
   // kan man ved kraftig utzooming (naturlig med steder spredt helt opp mot
@@ -1691,6 +1716,8 @@
     render();
   });
   document.getElementById('sp-add-place').addEventListener('click', () => openAddLocationModal({}));
+  document.getElementById('sp-map-fullscreen-toggle').addEventListener('click', () => toggleMapFullscreen());
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && mapFullscreen) toggleMapFullscreen(); });
   document.getElementById('sp-mark-hogst').addEventListener('click', () => {
     markingHogstMode = !markingHogstMode;
     updateMarkHogstButton();
