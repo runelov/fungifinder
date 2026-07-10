@@ -1171,7 +1171,7 @@
         clearRoute();
         render();
       } else {
-        openAddLocationModal({ lat: Math.round(e.latlng.lat*1000)/1000, lon: Math.round(e.latlng.lng*1000)/1000 });
+        openFindModal(null, { lat: e.latlng.lat, lon: e.latlng.lng });
       }
     });
   }
@@ -1558,28 +1558,6 @@
     }));
   }
 
-  function renderMineList(){
-    const el = document.getElementById('sp-mine-list');
-    if (!customLocations.length) { el.innerHTML = `<div class="sp-empty-mine">Ingen egne steder lagt til ennå.</div>`; return; }
-    el.innerHTML = customLocations.map(l => `
-      <div class="sp-mine-row">
-        <span>${escapeHtml(l.name)} <span style="opacity:.6">(${escapeHtml(l.kommune)})</span></span>
-        <span class="sp-mine-row-actions">
-          <button class="sp-locate" data-locate="${l.id}" title="Vis i kart">📍</button>
-          <button class="sp-remove" data-id="${l.id}" title="Fjern">✕</button>
-        </span>
-      </div>`).join('');
-    el.querySelectorAll('button[data-locate]').forEach(btn => btn.addEventListener('click', () => locateOnMap(btn.dataset.locate)));
-    el.querySelectorAll('button[data-id]').forEach(btn => btn.addEventListener('click', async () => {
-      const id = btn.dataset.id;
-      customLocations = customLocations.filter(l => l.id !== id);
-      userFinds = userFinds.filter(f => f.locId !== id);
-      userCuts = userCuts.filter(x => x !== id);
-      await saveCustomLocations(); await saveFinds(); await saveCuts();
-      render();
-    }));
-  }
-
   function renderFilterControls(){
     document.querySelectorAll('#sp-mode-seg button').forEach(b => b.classList.toggle('active', b.dataset.mode === filterMode));
     document.getElementById('sp-fylke-filter').style.display = filterMode === 'fylke' ? '' : 'none';
@@ -1724,7 +1702,6 @@
 
   function render(){
     renderSpeciesList();
-    renderMineList();
     renderMyFindsList();
     renderFilterControls();
     document.getElementById('sp-toggle-quiet').classList.toggle('on', prioritizeQuiet);
@@ -1857,9 +1834,79 @@
   // denne funnet på plass (art/mengde/dato/notat) i stedet for å opprette et
   // nytt — brukt av "Mine funn"-lista og av rediger-knappen i funn-popupen i
   // kartet.
+  // Snap-avstand for å knytte et nytt funn til et allerede beriket sted i
+  // stedet for å opprette (og trigge berikelse av) et nytt — se
+  // resolveOrCreateLocationForFind. 250 m er romslig nok for vanlig
+  // GPS-unøyaktighet i skog, men tett nok til at reelt ulike steder ikke
+  // slås sammen.
+  const FIND_LOCATION_SNAP_KM = 0.25;
+
+  // Knytter et funn til nærmeste allerede kjente/berikede sted innenfor
+  // FIND_LOCATION_SNAP_KM (ingen ny berikelse nødvendig — akkurat som å
+  // trykke "Registrer funn her" på et eksisterende kort), eller oppretter et
+  // minimalt "ukjent"-sted (scorer likevel greit via egen funnhistorikk/vær/
+  // sesong, se samtalen 2026-07-11) som appen straks etterpå ber
+  // enrich-point.yml fylle inn ekte terrengdata for i bakgrunnen.
+  function resolveOrCreateLocationForFind(lat, lon){
+    const nearby = allLocations().find(l => haversineKm(lat, lon, l.lat, l.lon) <= FIND_LOCATION_SNAP_KM);
+    if (nearby) return { locId: nearby.id, isNew: false };
+    const id = 'c_' + Date.now();
+    customLocations.push({
+      id, name: 'Nytt funn ' + new Date().toISOString().slice(0, 10),
+      fylke: null, kommune: null, lat, lon,
+      treslag: ['ukjent'], skogalder: 'ukjent', fuktighet: 'ukjent', berggrunn: 'ukjent',
+      avstandVeiM: null, befolkning: 'ukjent', hogstAr: null,
+      kjenteFunn: [], kjenteFunnDetaljer: [], custom: true,
+      kilde: 'find-pending', enrichStatus: 'pending',
+      kjorbarVei: 'ukjent', parkeringNotat: null, stier: 'ukjent', avstandParkeringM: null,
+    });
+    return { locId: id, isNew: true };
+  }
+
+  // Trigger enrich-point.yml (se fungifinder-db) for ETT nyopprettet sted —
+  // kalles KUN etter at personal.json faktisk er lagret (se onSave i
+  // openFindModal), ellers kan jobben starte og sjekke ut filen før stedet
+  // er pushet, og finne ingenting å berike.
+  async function triggerPointEnrichment(locationId, lat, lon){
+    if (!window.FungiStore || !window.FungiStore.isConfigured()) return; // ingen synk koblet til — stedet blir værende "ukjent", men scorer likevel
+    const dispatchedAt = new Date(Date.now() - 5000).toISOString();
+    try {
+      await window.FungiStore.triggerWorkflow('enrich-point.yml', { locationId, lat: String(lat), lon: String(lon) });
+      pollEnrichStatus(locationId, dispatchedAt);
+    } catch (e) {
+      console.warn('Kunne ikke starte berikelse for ' + locationId, e);
+    }
+  }
+
+  // Enkel, uavhengig poll-løkke (egen lukking per kall, ikke en delt
+  // global timer som fetchPollTimer) — flere funn kan trigge berikelse av
+  // ulike steder samtidig uten å kollidere med hverandre.
+  function pollEnrichStatus(locationId, dispatchedAt, attempts){
+    attempts = attempts || 0;
+    const maxAttempts = 30; // ~15 min ved 30 sek mellomrom
+    setTimeout(async () => {
+      try {
+        const run = await window.FungiStore.getLatestRun('enrich-point.yml', dispatchedAt);
+        if (run && run.status === 'completed') {
+          if (run.conclusion === 'success') {
+            await loadStorage();
+            render();
+          } else {
+            console.warn(`Berikelse feilet for ${locationId} (${run.conclusion}) — stedet blir værende "ukjent", men teller uansett i vurderingen.`);
+          }
+          return;
+        }
+      } catch (e) { console.warn('Feil under polling av berikelse', e); }
+      if (attempts < maxAttempts) pollEnrichStatus(locationId, dispatchedAt, attempts + 1);
+    }, 30000);
+  }
+
   function openFindModal(locId, opts){
     opts = opts || {};
     const editingFind = opts.editingFind || null;
+    const needsPosition = !editingFind && !locId;
+    let pendingLat = needsPosition ? (opts.lat ?? null) : null;
+    let pendingLon = needsPosition ? (opts.lon ?? null) : null;
     const loc = allLocations().find(l => l.id === (editingFind ? editingFind.locId : locId));
     let mengde = editingFind ? editingFind.mengde : 3;
     const todayStr = new Date().toISOString().slice(0,10);
@@ -1867,12 +1914,18 @@
     slot.innerHTML = `
       <div class="sp-modal-backdrop" id="sp-modal-backdrop">
         <div class="sp-modal">
-          <h4>${opts.title || (editingFind ? 'Rediger funn — ' + escapeHtml(loc ? loc.name : '') : 'Registrer funn — ' + escapeHtml(loc.name))}</h4>
+          <h4>${opts.title || (editingFind ? 'Rediger funn — ' + escapeHtml(loc ? loc.name : '') : (loc ? 'Registrer funn — ' + escapeHtml(loc.name) : 'Registrer nytt funn'))}</h4>
           ${opts.sub ? `<div class="sp-modal-sub">${opts.sub}</div>` : ''}
           <label>Sopptype</label>
           <select id="sp-find-species">${SPECIES.map(s => `<option value="${s.id}" ${s.id===(editingFind?editingFind.speciesId:selectedSpecies)?'selected':''}>${s.name}</option>`).join('')}</select>
           <label>Mengde funnet</label>
           <div class="sp-scale" id="sp-find-scale">${[1,2,3,4,5].map(n => `<button data-n="${n}" class="${n===mengde?'sel':''}">${n}</button>`).join('')}</div>
+          ${needsPosition ? `
+          <label>Posisjon</label>
+          <div class="sp-2col">
+            <button type="button" class="sp-mini-btn" id="sp-find-use-my-position">📍 Bruk min posisjon</button>
+            <span id="sp-find-position-display" style="align-self:center;font-size:12.5px;color:var(--ink-soft);">${pendingLat!=null ? pendingLat.toFixed(5)+', '+pendingLon.toFixed(5) : 'Ikke satt — bruk knappen, eller lukk og klikk i kartet der du fant den'}</span>
+          </div>` : ''}
           <label>Dato</label>
           <input type="date" id="sp-find-date" value="${editingFind ? editingFind.date : todayStr}"/>
           <label>Notat (valgfritt)</label>
@@ -1890,19 +1943,40 @@
     }));
     document.getElementById('sp-find-cancel').addEventListener('click', () => { slot.innerHTML=''; render(); });
     document.getElementById('sp-modal-backdrop').addEventListener('click', (e) => { if(e.target.id==='sp-modal-backdrop'){ slot.innerHTML=''; render(); } });
+    if (needsPosition) {
+      document.getElementById('sp-find-use-my-position').addEventListener('click', () => {
+        useMyLocation((lat, lon) => {
+          pendingLat = lat; pendingLon = lon;
+          document.getElementById('sp-find-position-display').textContent = lat.toFixed(5) + ', ' + lon.toFixed(5);
+        });
+      });
+    }
     document.getElementById('sp-find-save').addEventListener('click', async () => {
       const speciesId = document.getElementById('sp-find-species').value;
       const note = document.getElementById('sp-find-note').value;
       const date = document.getElementById('sp-find-date').value || todayStr;
+      let newlyCreatedLocation = null;
+
       if (editingFind) {
         editingFind.speciesId = speciesId;
         editingFind.mengde = mengde;
         editingFind.note = note;
         editingFind.date = date;
       } else {
-        userFinds.push({ id:'f_'+Date.now(), locId, speciesId, mengde, note, date });
+        let targetLocId = locId;
+        if (needsPosition) {
+          if (pendingLat == null || pendingLon == null) {
+            alert('Velg posisjon først — bruk «Bruk min posisjon», eller lukk og klikk i kartet der du fant den.');
+            return;
+          }
+          const resolved = resolveOrCreateLocationForFind(pendingLat, pendingLon);
+          targetLocId = resolved.locId;
+          if (resolved.isNew) newlyCreatedLocation = { id: resolved.locId, lat: pendingLat, lon: pendingLon };
+        }
+        userFinds.push({ id:'f_'+Date.now(), locId: targetLocId, speciesId, mengde, note, date });
       }
       await saveFinds();
+      if (newlyCreatedLocation) triggerPointEnrichment(newlyCreatedLocation.id, newlyCreatedLocation.lat, newlyCreatedLocation.lon);
       slot.innerHTML = '';
       render();
     });
@@ -2012,15 +2086,18 @@
     el.innerHTML = sorted.map(f => {
       const sp = SPECIES.find(s => s.id === f.speciesId);
       const loc = allLocations().find(l => l.id === f.locId);
+      const pending = loc && loc.enrichStatus === 'pending';
       return `<div class="sp-mine-row">
-        <span>${escapeHtml(sp ? sp.name : f.speciesId)} <span style="opacity:.6">— ${escapeHtml(loc ? loc.name : 'ukjent sted')} · ${f.date}</span></span>
+        <span>${escapeHtml(sp ? sp.name : f.speciesId)} <span style="opacity:.6">— ${escapeHtml(loc ? loc.name : 'ukjent sted')} · ${f.date}</span>${pending ? ' <span class="sp-tag" title="Terrengdata hentes i bakgrunnen — funnet teller allerede i vurderingen">⏳ beriker …</span>' : ''}</span>
         <span class="sp-mine-row-actions">
+          <button class="sp-locate" data-view-find="${f.id}" title="Vis i kart">🔍</button>
           <button class="sp-locate" data-move-find="${f.id}" title="Flytt til min posisjon">📍</button>
           <button class="sp-locate" data-edit-find="${f.id}" title="Rediger">✏️</button>
           <button class="sp-remove" data-remove-find="${f.id}" title="Fjern">✕</button>
         </span>
       </div>`;
     }).join('');
+    el.querySelectorAll('[data-view-find]').forEach(btn => btn.addEventListener('click', () => locateFindOnMap(btn.dataset.viewFind)));
     el.querySelectorAll('[data-move-find]').forEach(btn => btn.addEventListener('click', () => {
       const find = userFinds.find(f => f.id === btn.dataset.moveFind);
       if (!find) return;
@@ -2035,7 +2112,18 @@
       if (find) openFindModal(null, { editingFind: find });
     }));
     el.querySelectorAll('[data-remove-find]').forEach(btn => btn.addEventListener('click', async () => {
+      const removed = userFinds.find(f => f.id === btn.dataset.removeFind);
       userFinds = userFinds.filter(f => f.id !== btn.dataset.removeFind);
+      // Rydder bort et sted som kun ble opprettet FOR dette funnet (se
+      // resolveOrCreateLocationForFind) hvis det ikke lenger har noen funn
+      // igjen — ellers blir det et foreldreløst sted uten noen UI igjen til
+      // å administrere det, nå som "Steder"-fanen er fjernet.
+      if (removed) {
+        const loc = customLocations.find(l => l.id === removed.locId);
+        if (loc && (loc.kilde === 'find-pending' || loc.kilde === 'find-enrichment') && !userFinds.some(f => f.locId === loc.id)) {
+          customLocations = customLocations.filter(l => l.id !== loc.id);
+        }
+      }
       await saveFinds();
       render();
     }));
@@ -2102,143 +2190,6 @@
     btn.classList.toggle('active', markingHogstMode);
   }
 
-  // ---------- add custom location modal ----------
-  function openAddLocationModal(prefill){
-    prefill = prefill || {};
-    const fylker = fylkeList();
-    const komms = kommuneList();
-    const slot = document.getElementById('sp-modal-slot');
-    slot.innerHTML = `
-      <div class="sp-modal-backdrop" id="sp-modal-backdrop">
-        <div class="sp-modal">
-          <h4>Legg til eget sted</h4>
-          <div class="sp-modal-sub">Fyll ut det du vet — resten kan stå som «ukjent». Egen funnhistorikk teller uansett tungt i vurderingen.</div>
-          <label>Navn på stedet</label>
-          <input type="text" id="loc-name" placeholder="F.eks. Granskogen bak hytta"/>
-          <div class="sp-2col">
-            <div>
-              <label>Fylke</label>
-              <input type="text" id="loc-fylke" list="loc-fylke-list" placeholder="Velg eller skriv inn"/>
-              <datalist id="loc-fylke-list">${fylker.map(f=>`<option value="${escapeHtml(f)}">`).join('')}</datalist>
-            </div>
-            <div>
-              <label>Kommune</label>
-              <input type="text" id="loc-kommune" list="loc-kommune-list" placeholder="Velg eller skriv inn" value="${escapeHtml(prefill.kommune||'')}"/>
-              <datalist id="loc-kommune-list">${komms.map(k=>`<option value="${escapeHtml(k)}">`).join('')}</datalist>
-            </div>
-          </div>
-          <label>Koordinater (valgfritt) <button type="button" class="sp-mini-btn" id="loc-use-my-position">📍 Bruk min posisjon</button></label>
-          <div class="sp-2col">
-            <input type="number" step="0.00001" id="loc-lat" placeholder="Breddegrad" value="${prefill.lat ?? ''}"/>
-            <input type="number" step="0.00001" id="loc-lon" placeholder="Lengdegrad" value="${prefill.lon ?? ''}"/>
-          </div>
-
-          <label>Treslag (kryss av det du kjenner igjen)</label>
-          <div class="sp-checkgrid">
-            <label><input type="checkbox" value="gran"/> Gran</label>
-            <label><input type="checkbox" value="furu"/> Furu</label>
-            <label><input type="checkbox" value="bjork"/> Bjørk</label>
-            <label><input type="checkbox" value="apen"/> Åpen mark</label>
-          </div>
-
-          <div class="sp-2col">
-            <div>
-              <label>Fuktighet</label>
-              <select id="loc-fukt"><option value="ukjent">Ukjent</option><option value="tørr">Tørr</option><option value="frisk">Frisk</option><option value="fuktig">Fuktig</option></select>
-            </div>
-            <div>
-              <label>Berggrunn</label>
-              <select id="loc-berg"><option value="ukjent">Ukjent</option><option value="fattig">Kalkfattig</option><option value="moderat">Moderat kalk</option><option value="rik">Kalkrik</option></select>
-            </div>
-          </div>
-          <div class="sp-2col">
-            <div>
-              <label>Skogalder</label>
-              <select id="loc-alder"><option value="ukjent">Ukjent</option><option value="ung">Ung</option><option value="middels">Middels</option><option value="gammel">Gammel</option><option value="apen">Åpen mark</option></select>
-            </div>
-            <div>
-              <label>Ferdsel/befolkning i nærheten</label>
-              <select id="loc-bef"><option value="ukjent">Ukjent</option><option value="lav">Lite folk</option><option value="middels">Moderat</option><option value="hoy">Mye ferdsel</option></select>
-            </div>
-          </div>
-
-          <hr/>
-          <label>Kjørbar vei helt til et parkeringspunkt?</label>
-          <select id="loc-vei"><option value="ukjent">Ukjent</option><option value="ja">Ja</option><option value="nei">Nei</option></select>
-          <label>Notat om parkering</label>
-          <input type="text" id="loc-parkering" placeholder="F.eks. grusplass ved skogsbilvei, IKKE privat gårdstun"/>
-          <div class="sp-2col">
-            <div>
-              <label>Stier/skogsbilveier i terrenget?</label>
-              <select id="loc-stier"><option value="ukjent">Ukjent</option><option value="ja">Ja</option><option value="nei">Nei</option></select>
-            </div>
-            <div>
-              <label>Gangavstand fra parkering (m)</label>
-              <input type="number" id="loc-gangavstand" placeholder="F.eks. 500"/>
-            </div>
-          </div>
-
-          <div class="sp-hogd-row">
-            <input type="checkbox" id="loc-hogd"/>
-            <label for="loc-hogd">Dette stedet er dessverre flatehogd nå (vis merket/ekskludert)</label>
-          </div>
-
-          <div class="sp-modal-actions">
-            <button class="sp-btn" id="loc-cancel">Avbryt</button>
-            <button class="sp-btn sp-primary" id="loc-save">Lagre sted</button>
-          </div>
-        </div>
-      </div>`;
-    document.getElementById('loc-cancel').addEventListener('click', () => slot.innerHTML = '');
-    document.getElementById('sp-modal-backdrop').addEventListener('click', (e) => { if(e.target.id==='sp-modal-backdrop') slot.innerHTML=''; });
-    document.getElementById('loc-use-my-position').addEventListener('click', () => {
-      useMyLocation((lat, lon) => {
-        document.getElementById('loc-lat').value = lat.toFixed(5);
-        document.getElementById('loc-lon').value = lon.toFixed(5);
-      });
-    });
-    document.getElementById('loc-save').addEventListener('click', async () => {
-      const name = document.getElementById('loc-name').value.trim() || 'Uten navn';
-      const fylke = document.getElementById('loc-fylke').value.trim() || 'Ukjent fylke';
-      const kommune = document.getElementById('loc-kommune').value.trim() || 'Ukjent kommune';
-      const latVal = parseFloat(document.getElementById('loc-lat').value);
-      const lonVal = parseFloat(document.getElementById('loc-lon').value);
-      const b = mapCenterFallback();
-      const lat = isNaN(latVal) ? b.lat : latVal;
-      const lon = isNaN(lonVal) ? b.lon : lonVal;
-      const treslag = Array.from(document.querySelectorAll('.sp-checkgrid input:checked')).map(c=>c.value);
-      const fuktighet = document.getElementById('loc-fukt').value;
-      const berggrunn = document.getElementById('loc-berg').value;
-      const skogalder = document.getElementById('loc-alder').value;
-      const befolkning = document.getElementById('loc-bef').value;
-      const hogd = document.getElementById('loc-hogd').checked;
-      const kjorbarVei = document.getElementById('loc-vei').value;
-      const parkeringNotat = document.getElementById('loc-parkering').value.trim() || null;
-      const stier = document.getElementById('loc-stier').value;
-      const gangVal = parseInt(document.getElementById('loc-gangavstand').value);
-      const avstandParkeringM = isNaN(gangVal) ? null : gangVal;
-
-      const newLoc = {
-        id: 'c_' + Date.now(), name, fylke, kommune, lat, lon,
-        treslag: treslag.length ? treslag : ['ukjent'],
-        skogalder, fuktighet, berggrunn,
-        avstandVeiM: null, befolkning,
-        hogstAr: hogd ? yearNow : null,
-        kjenteFunn: [], custom: true,
-        kjorbarVei, parkeringNotat, stier, avstandParkeringM
-      };
-      customLocations.push(newLoc);
-      await saveCustomLocations();
-      slot.innerHTML = '';
-      render();
-      openFindModal(newLoc.id, {
-        title: 'Logg din erfaring — ' + escapeHtml(name),
-        sub: 'Registrer sopp du vet har vokst her tidligere. Du kan legge til flere senere via kortet.',
-        skipLabel: 'Hopp over for nå'
-      });
-    });
-  }
-
   // ---------- wiring ----------
   document.getElementById('sp-toggle-quiet').addEventListener('click', () => { prioritizeQuiet = !prioritizeQuiet; render(); });
   document.getElementById('sp-toggle-hogst').addEventListener('click', () => { hideHogst = !hideHogst; render(); });
@@ -2264,7 +2215,7 @@
     clearRoute();
     render();
   });
-  document.getElementById('sp-add-place').addEventListener('click', () => openAddLocationModal({}));
+  document.getElementById('sp-add-place').addEventListener('click', () => openFindModal(null, {}));
   document.getElementById('sp-map-fullscreen-toggle').addEventListener('click', () => toggleMapFullscreen());
   document.getElementById('sp-my-location-btn').addEventListener('click', () => useMyLocation(showMyLocationOnMap));
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && mapFullscreen) toggleMapFullscreen(); });
