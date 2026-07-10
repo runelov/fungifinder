@@ -65,7 +65,23 @@ async function loadFile(path){
   if (res.status === 404) return { data: null, sha: null };
   if (!res.ok) throw new Error(`GitHub API-feil ved henting av ${path} (${res.status}): ${await res.text()}`);
   const json = await res.json();
-  const content = base64ToUtf8(json.content.replace(/\n/g, ''));
+  let contentB64 = json.content;
+  if (!contentB64 || json.encoding === 'none') {
+    // Contents API inlines base64-innhold kun for filer under 1 MB — for
+    // større filer (encoding: "none", tom content) må vi hente rått via
+    // Git Data API sitt blob-endepunkt, som støtter opptil 100 MB.
+    const blobRes = await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/git/blobs/${json.sha}`, {
+      headers: {
+        'Authorization': `Bearer ${cfg.token}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28'
+      }
+    });
+    if (!blobRes.ok) throw new Error(`GitHub API-feil ved henting av blob for ${path} (${blobRes.status}): ${await blobRes.text()}`);
+    const blobJson = await blobRes.json();
+    contentB64 = blobJson.content;
+  }
+  const content = base64ToUtf8(contentB64.replace(/\n/g, ''));
   return { data: JSON.parse(content), sha: json.sha };
 }
 
