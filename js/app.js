@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.13.0';
-  const APP_BUILD_DATE = '2026-07-10';
+  const APP_VERSION = '0.14.0';
+  const APP_BUILD_DATE = '2026-07-11';
 
   const SPECIES = [
     { id:'kantarell', name:'Kantarell', latin:'Cantharellus cibarius', season:[7,10],
