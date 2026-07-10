@@ -1941,11 +1941,12 @@
   }
 
   // Ekte Artsdatabanken-observasjoner nær det som faktisk vises (scopedLocs) —
-  // artsfunn.json kan inneholde tusenvis av rader for et helt fylke, så vi
   // begrenser til punkter innenfor ~5 km av et sted i gjeldende filter, med
   // et grovt gradsjekk-filter før den dyrere haversine-beregningen (samme
-  // mønster som nearby_artskart_finds i fetch_area.py), og et hardt tak på
-  // antall markører for å unngå at kartet fryser ved svært store datasett.
+  // mønster som nearby_artskart_finds i fetch_area.py). Tidligere hardt tak
+  // på 300 markører er fjernet 2026-07-10 — med kun 12 kandidatarter er det
+  // reelle datasettet håndterbart (noen hundre unike treff selv nasjonalt),
+  // og taket kuttet reelt innhold selv innenfor ett enkelt fylke.
   function renderArtskartLayer(scopedLocs){
     if (!artskartLayer) return;
     artskartLayer.clearLayers();
@@ -1957,7 +1958,6 @@
         if (Math.abs(o.lat - s.loc.lat) > 0.05 || Math.abs(o.lon - s.loc.lon) > 0.1) continue;
         if (haversineKm(o.lat, o.lon, s.loc.lat, s.loc.lon) <= 5) { nearby.push(o); continue outer; }
       }
-      if (nearby.length >= 300) break;
     }
     nearby.forEach(o => {
       const sp = SPECIES.find(s => s.id === o.art);
