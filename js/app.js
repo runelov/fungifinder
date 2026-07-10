@@ -141,6 +141,11 @@
 
   function allLocations(){ return BASE_LOCATIONS.concat(customLocations); }
 
+  // Art(er) som er aktive i "Velg sopp" akkurat nå — brukes til å begrense
+  // Artsdatabanken-laget og Mine funn-laget i kartet til det du faktisk ser
+  // på, i stedet for å alltid vise funn for alle 12 kandidatartene.
+  function activeSpeciesIds(){ return viewMode === 'favorites' ? favoriteSpecies : [selectedSpecies]; }
+
   function haversineKm(lat1, lon1, lat2, lon2){
     const R = 6371;
     const dLat = (lat2-lat1) * Math.PI/180;
@@ -1911,11 +1916,16 @@
   }
 
   // ---------- Mine funn: kartlag + global liste ----------
+  // Kartlaget filtreres til aktiv(e) art(er) (se activeSpeciesIds()), slik at
+  // det følger samme logikk som Artsdatabanken-laget. Sidepanel-lista
+  // (renderMyFindsList) viser bevisst ALLE funn uansett artsvalg — den er en
+  // logg/administrasjonsvisning, ikke en utforsknings-visning.
   function renderFindsLayer(){
     if (!findsLayer) return;
     findsLayer.clearLayers();
     findMarkersById = {};
-    userFinds.forEach(f => {
+    const activeIds = new Set(activeSpeciesIds());
+    userFinds.filter(f => activeIds.has(f.speciesId)).forEach(f => {
       const pos = findLatLon(f);
       if (!pos) return;
       const sp = SPECIES.find(s => s.id === f.speciesId);
@@ -1949,14 +1959,18 @@
   // mønster som nearby_artskart_finds i fetch_area.py). Tidligere hardt tak
   // på 300 markører er fjernet 2026-07-10 — med kun 12 kandidatarter er det
   // reelle datasettet håndterbart (noen hundre unike treff selv nasjonalt),
-  // og taket kuttet reelt innhold selv innenfor ett enkelt fylke.
+  // og taket kuttet reelt innhold selv innenfor ett enkelt fylke. Filtreres
+  // også på aktiv(e) art(er) — se activeSpeciesIds() — slik at laget viser
+  // funn for den valgte arten (eller favorittene), ikke alle 12 samtidig.
   function renderArtskartLayer(scopedLocs){
     if (!artskartLayer) return;
     artskartLayer.clearLayers();
     if (!scopedLocs.length || !artsfunn.length) return;
+    const activeIds = new Set(activeSpeciesIds());
     const nearby = [];
     outer:
     for (const o of artsfunn) {
+      if (!activeIds.has(o.art)) continue;
       for (const s of scopedLocs) {
         if (Math.abs(o.lat - s.loc.lat) > 0.05 || Math.abs(o.lon - s.loc.lon) > 0.1) continue;
         if (haversineKm(o.lat, o.lon, s.loc.lat, s.loc.lon) <= 5) { nearby.push(o); continue outer; }
