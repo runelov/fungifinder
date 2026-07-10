@@ -1061,6 +1061,7 @@
   let hogstLayer = null;
   let findsLayer = null;
   let artskartLayer = null;
+  let artskartMoveDebounce = null; // se moveend-lytteren i initMap()
   let findMarkersById = {};
   let mapFittedOnce = false;
   let markersById = {};
@@ -1185,6 +1186,17 @@
       } else {
         openFindModal(null, { lat: e.latlng.lat, lon: e.latlng.lng });
       }
+    });
+
+    // Artskart-laget er bundet til det synlige kartutsnittet (se
+    // renderArtskartLayer) — må derfor oppdateres når du panorerer/zoomer,
+    // ikke bare ved filter-/artsbytte. 'moveend' dekker begge deler i
+    // Leaflet (zooming trigger også moveend). Debounces 300ms slik at et
+    // helt drag ikke filtrerer gjennom artsfunn (30 000+ oppføringer) for
+    // hver eneste mellomposisjon.
+    leafletMap.on('moveend', () => {
+      clearTimeout(artskartMoveDebounce);
+      artskartMoveDebounce = setTimeout(renderArtskartLayer, 300);
     });
   }
 
@@ -1693,7 +1705,7 @@
     });
 
     if (hideHogst) scoped = scoped.filter(s => !s.res.isCut);
-    renderArtskartLayer(scoped);
+    renderArtskartLayer();
     scoped.sort((a,b) => {
       if (a.res.isCut !== b.res.isCut) return a.res.isCut ? 1 : -1;
       return b.res.total - a.res.total;
@@ -2000,35 +2012,37 @@
     if (marker) setTimeout(() => marker.openPopup(), 350);
   }
 
-  // Ekte Artsdatabanken-observasjoner nær det som faktisk vises (scopedLocs) —
-  // begrenser til punkter innenfor ~5 km av et sted i gjeldende filter, med
-  // et grovt gradsjekk-filter før den dyrere haversine-beregningen (samme
-  // mønster som nearby_artskart_finds i fetch_area.py). Tidligere hardt tak
-  // på 300 markører er fjernet 2026-07-10 — med kun 12 kandidatarter er det
-  // reelle datasettet håndterbart (noen hundre unike treff selv nasjonalt),
-  // og taket kuttet reelt innhold selv innenfor ett enkelt fylke. Filtreres
-  // også på aktiv(e) art(er) — se activeSpeciesIds() — slik at laget viser
-  // funn for den valgte arten (eller favorittene), ikke alle 12 samtidig.
-  function renderArtskartLayer(scopedLocs){
-    if (!artskartLayer) return;
+  // Ekte Artsdatabanken-observasjoner innenfor det SYNLIGE kartutsnittet —
+  // RETTET 2026-07-11: viste tidligere kun funn nær et allerede
+  // terrenganalysert sted (innenfor ~5 km av en scopedLoc), uavhengig av hvor
+  // i kartet man faktisk så. Etter at seed-artskart-jobben hentet data for
+  // alle 15 fylker (se fungifinder-db) ligger det nå observasjoner overalt i
+  // artsfunn.json, ikke bare rundt analyserte punkter — så dette laget viste
+  // stille bort det meste av dataene appen faktisk har. Bruker nå
+  // leafletMap.getBounds() i stedet, og kalles på nytt ved panorering/zooming
+  // (se moveend-lytteren i initMap()), slik at det du ser i kartet faktisk
+  // oppdateres når du navigerer deg rundt.
+  // Filtreres fortsatt på aktiv(e) art(er) — se activeSpeciesIds() — slik at
+  // laget viser funn for den valgte arten (eller favorittene), ikke alle 12
+  // samtidig.
+  function renderArtskartLayer(){
+    if (!artskartLayer || !leafletMap) return;
     artskartLayer.clearLayers();
-    if (!scopedLocs.length || !artsfunn.length) return;
+    if (!artsfunn.length) return;
     const activeIds = new Set(activeSpeciesIds());
     // "Vis kun ferske funn"-toggel: filtrerer på o.dato (faktisk observasjonsdato),
     // ikke trackDateTime (kun en synk-metadata, ofte år etter selve funnet) — se parseNorskDato.
     const recentCutoff = artskartOnlyRecent ? new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) : null;
+    const bounds = leafletMap.getBounds();
     const nearby = [];
-    outer:
     for (const o of artsfunn) {
       if (!activeIds.has(o.art)) continue;
       if (recentCutoff) {
         const dt = parseNorskDato(o.dato);
         if (!dt || dt < recentCutoff) continue;
       }
-      for (const s of scopedLocs) {
-        if (Math.abs(o.lat - s.loc.lat) > 0.05 || Math.abs(o.lon - s.loc.lon) > 0.1) continue;
-        if (haversineKm(o.lat, o.lon, s.loc.lat, s.loc.lon) <= 5) { nearby.push(o); continue outer; }
-      }
+      if (!bounds.contains([o.lat, o.lon])) continue;
+      nearby.push(o);
     }
     nearby.forEach(o => {
       const sp = SPECIES.find(s => s.id === o.art);
