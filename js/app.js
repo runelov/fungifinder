@@ -9,61 +9,71 @@
       weather:{ minNedbor14:15, idealNedbor14:35, minTempAvg:8 },
       why:(loc,t)=>`Blandingsskog med ${t.treslagTekst} og ${t.fuktighetTekst} bunn i mosedekket, ${t.alderTekst} skog — nøyaktig kombinasjonen kantarell liker best.`,
       fieldTips:'Gul-oransje traktformet hatt med bølget kant. Under hatten er det <b>lave, grove, gaffelgrenede ribber</b> som løper langt ned på stilken — ikke tynne, skarpe gjeller. Kjøttet er hvitt-gult gjennomgående, og lukten minner om modne aprikoser.',
-      lookalike:'Falsk kantarell (Hygrophoropsis aurantiaca) ligner, men har tynne, skarpe, ekte gjeller (ikke butte ribber) og er mørkere oransje. Ikke farlig, men smaker dårlig — sjekk gjellene nøye.' },
+      lookalike:'Falsk kantarell (Hygrophoropsis aurantiaca) ligner, men har tynne, skarpe, ekte gjeller (ikke butte ribber) og er mørkere oransje. Ikke farlig, men smaker dårlig — sjekk gjellene nøye.',
+      image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/2007-07-14_Cantharellus_cibarius_cropped.jpg/500px-2007-07-14_Cantharellus_cibarius_cropped.jpg', artist:'Andreas Kunze', license:'CC BY-SA 4.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2007-07-14_Cantharellus_cibarius_cropped.jpg' } },
     { id:'traktkantarell', name:'Traktkantarell', latin:'Craterellus tubaeformis', season:[8,11],
       treslag:['gran'], skogalder:['middels','gammel'], fuktighet:['fuktig'], berggrunn:['fattig','moderat'],
       weather:{ minNedbor14:20, idealNedbor14:45, minTempAvg:4 },
       why:(loc,t)=>`Fuktig, mosekledd granskog — traktkantarellens favorittmiljø. Tåler kjøligere vær enn kantarell.`,
       fieldTips:'Liten, gråbrun-gulbrun sopp med <b>trakt-/pipeformet hatt</b> og hul stilk. Undersiden har lave, grålilla-gule ribber. Vokser ofte i <b>tette forekomster</b> i tykt mosedekke.',
-      lookalike:'Få farlige forvekslingsarter. Skilles fra svart trompetsopp på farge (gulbrun, ikke gråsvart) og fra rørsopper ved at det ikke er noe rørlag under hatten.' },
+      lookalike:'Få farlige forvekslingsarter. Skilles fra svart trompetsopp på farge (gulbrun, ikke gråsvart) og fra rørsopper ved at det ikke er noe rørlag under hatten.',
+      image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/2011-07-12_Craterellus_tubaeformis_71471.jpg/500px-2011-07-12_Craterellus_tubaeformis_71471.jpg', artist:'Mushroom Observer-bruker', license:'CC BY-SA 3.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2011-07-12_Craterellus_tubaeformis_71471.jpg' } },
     { id:'trompetsopp', name:'Svart trompetsopp', latin:'Craterellus cornucopioides', season:[8,10],
       treslag:['bjork','gran'], skogalder:['gammel'], fuktighet:['fuktig'], berggrunn:['moderat','rik'],
       weather:{ minNedbor14:20, idealNedbor14:40, minTempAvg:6 },
       why:(loc,t)=>`Fuktig løv-/blandingsskog på ${t.berggrunnTekst} grunn — trompetsoppens foretrukne miljø, ofte sammen med hassel eller bøk/eik.`,
       fieldTips:'Gråsvart, traktformet og helt hul gjennom hele soppen, uten tydelige gjeller eller ribber (helt glatt eller svakt rynket underside). Ligner et lite, mørkt horn. Vokser ofte i store, skjulte klynger under løv.',
-      lookalike:'Svært distinkt art med få forvekslingsfarer — hovedutfordringen er å få øye på den i skyggen mellom løv og mørk jord.' },
+      lookalike:'Svært distinkt art med få forvekslingsfarer — hovedutfordringen er å få øye på den i skyggen mellom løv og mørk jord.',
+      image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/2011-11-20_Craterellus_cornucopioides_%28L.%29_Pers_183522_cropped.jpg/500px-2011-11-20_Craterellus_cornucopioides_%28L.%29_Pers_183522_cropped.jpg', artist:'John Kirkpatrick (Mushroom Observer)', license:'CC BY-SA 3.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2011-11-20_Craterellus_cornucopioides_(L.)_Pers_183522_cropped.jpg' } },
     { id:'steinsopp', name:'Steinsopp', latin:'Boletus edulis', season:[8,10],
       treslag:['gran','furu','bjork'], skogalder:['gammel'], fuktighet:['tørr','frisk'], berggrunn:['fattig','moderat'],
       weather:{ minNedbor14:20, idealNedbor14:40, minTempAvg:10 },
       why:(loc,t)=>`Eldre ${t.treslagTekst}-skog med blåbærlyng og ${t.fuktighetTekst} mark. Steinsopp trenger et varmt spell etterfulgt av regn.`,
       fieldTips:'Rørsopp: under hatten er det et <b>svampaktig rørlag</b>, aldri gjeller. Stilken er tykk, kølleformet, med fint hvitt <b>nettmønster</b> øverst. Kjøttet forblir hvitt og blir <b>ikke blått eller rødt</b> ved kutt.',
-      lookalike:'Ingen rørsopper i Norge er giftige, men galleboletus (Tylopilus felleus) ligner og smaker svært bittert — sjekk at nettmønsteret er hvitt (ikke mørkt) og smak en liten bit rått (bitter = kast).' },
+      lookalike:'Ingen rørsopper i Norge er giftige, men galleboletus (Tylopilus felleus) ligner og smaker svært bittert — sjekk at nettmønsteret er hvitt (ikke mørkt) og smak en liten bit rått (bitter = kast).',
+      image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Boletus_edulis1.jpg/500px-Boletus_edulis1.jpg', artist:'Tocekas', license:'CC BY-SA 3.0', sourcePage:'https://commons.wikimedia.org/wiki/File:Boletus_edulis1.jpg' } },
     { id:'rodskrubb', name:'Rødskrubb / Brunskrubb', latin:'Leccinum versipelle / scabrum', season:[7,10],
       treslag:['bjork'], skogalder:['middels','gammel'], fuktighet:['frisk','fuktig'], berggrunn:['fattig','moderat'],
       weather:{ minNedbor14:15, idealNedbor14:35, minTempAvg:8 },
       why:(loc,t)=>`Bjørkeinnslag i ${t.treslagTekst}-skog — disse rørsoppene lever i mykorrhiza spesifikt med bjørk.`,
       fieldTips:'Rørsopp med tynn, rank stilk dekket av mørke, skjellete flekker («skrubb»-mønster). Hatten er oransje-rød (rødskrubb) eller gråbrun (brunskrubb). Kjøttet kan mørkne noe ved kutt, men ikke blått/rødt kraftig.',
-      lookalike:'Ingen farlige forvekslingsarter blant rørsopper i Norge. Vokser alltid nær bjørk — finner du den langt fra bjørk, sjekk artsbestemmelsen ekstra nøye.' },
+      lookalike:'Ingen farlige forvekslingsarter blant rørsopper i Norge. Vokser alltid nær bjørk — finner du den langt fra bjørk, sjekk artsbestemmelsen ekstra nøye.',
+      image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/2006-09-02_Leccinum_versipelle.jpg/500px-2006-09-02_Leccinum_versipelle.jpg', artist:'Andreas Kunze', license:'CC BY-SA 3.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2006-09-02_Leccinum_versipelle.jpg' } },
     { id:'matriske', name:'Furumatriske', latin:'Lactarius deliciosus', season:[8,10],
       treslag:['furu'], skogalder:['middels','gammel'], fuktighet:['tørr','frisk'], berggrunn:['moderat','rik'],
       weather:{ minNedbor14:15, idealNedbor14:30, minTempAvg:8 },
       why:(loc,t)=>`Furudominert skog på ${t.berggrunnTekst} grunn. Matriske trenger furu som partner og sandholdig, veldrenert jord.`,
       fieldTips:'Kutt i lamellene: ekte matriske gir en <b>gulrotoransje melkesaft</b> som gradvis blir <b>grønnlig</b> ved oksidering. Hatten har ofte konsentriske, mørkere ringer. Vokser nesten utelukkende under furu.',
-      lookalike:'⚠ De fleste alvorlige soppforgiftninger i Norge skjer fordi folk forveksler spiss giftslørsopp med matriske. Sjekk ALLTID melkesaften: ekte matriske "blør" tydelig gulrotoransje når du kutter i den — giftslørsopp gjør ikke det. Er du i tvil, la soppen stå.' },
+      lookalike:'⚠ De fleste alvorlige soppforgiftninger i Norge skjer fordi folk forveksler spiss giftslørsopp med matriske. Sjekk ALLTID melkesaften: ekte matriske "blør" tydelig gulrotoransje når du kutter i den — giftslørsopp gjør ikke det. Er du i tvil, la soppen stå.',
+      image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/2009-09-28_Lactarius_deliciosus.jpg/500px-2009-09-28_Lactarius_deliciosus.jpg', artist:'furtwangl', license:'CC BY 2.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2009-09-28_Lactarius_deliciosus.jpg' } },
     { id:'piggsopp', name:'Piggsopp (lys)', latin:'Hydnum repandum', season:[8,10],
       treslag:['gran','bjork','furu'], skogalder:['middels','gammel'], fuktighet:['frisk'], berggrunn:['fattig','moderat'],
       weather:{ minNedbor14:15, idealNedbor14:30, minTempAvg:8 },
       why:(loc,t)=>`Blandingsskog med ${t.treslagTekst} gir gode vertstrær for piggsopp, mindre kravstor enn kantarell.`,
       fieldTips:'Under hatten: i stedet for gjeller/rør har piggsopp <b>myke, hengende pigger</b>. Kremhvit-lys oransje, tykt kjøtt. Mild i smak.',
-      lookalike:'Bruk kun lyse piggsopper med lys hatt og lyse pigger. Mørkhattede piggsopper (bitterpiggsopp) er ikke farlige, men smaker svært bittert — kjenn etter på farge og smak en liten bit rått.' },
+      lookalike:'Bruk kun lyse piggsopper med lys hatt og lyse pigger. Mørkhattede piggsopper (bitterpiggsopp) er ikke farlige, men smaker svært bittert — kjenn etter på farge og smak en liten bit rått.',
+      image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/7/72/2012-08-29_Hydnum_repandum_L_256175.jpg/500px-2012-08-29_Hydnum_repandum_L_256175.jpg', artist:'Alan Rockefeller (Mushroom Observer)', license:'CC BY-SA 3.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2012-08-29_Hydnum_repandum_L_256175.jpg' } },
     { id:'faresopp', name:'Fåresopp', latin:'Albatrellus ovinus', season:[7,9],
       treslag:['gran'], skogalder:['gammel'], fuktighet:['frisk'], berggrunn:['fattig','moderat'],
       weather:{ minNedbor14:15, idealNedbor14:30, minTempAvg:8 },
       why:(loc,t)=>`Gammel granskog med mose — fåresopp vokser direkte i bakken, ofte i ring, nær gran.`,
       fieldTips:'Lys, kremhvit poresopp som vokser <b>på bakken</b> (ikke på trær), ofte flere sammenvokste hatter. Fine porer under hatten, ikke gjeller. Fast, hvitt kjøtt.',
-      lookalike:'Lyse poresopper som vokser på bakken i Norge har ingen farlige forvekslingsarter — hovedregelen er lys farge og bakkevekst (ikke å forveksle med kjuker som vokser på trestammer).' },
+      lookalike:'Lyse poresopper som vokser på bakken i Norge har ingen farlige forvekslingsarter — hovedregelen er lys farge og bakkevekst (ikke å forveksle med kjuker som vokser på trestammer).',
+      image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Albatrellus_ovinus_1.jpg/500px-Albatrellus_ovinus_1.jpg', artist:'Karelj', license:'Public domain', sourcePage:'https://commons.wikimedia.org/wiki/File:Albatrellus_ovinus_1.jpg' } },
     { id:'parasollsopp', name:'Parasollsopp (stor)', latin:'Macrolepiota procera', season:[7,10],
       treslag:['apen','bjork'], skogalder:['apen','middels'], fuktighet:['frisk'], berggrunn:['moderat','rik'],
       weather:{ minNedbor14:10, idealNedbor14:25, minTempAvg:8 },
       why:(loc,t)=>`Åpne skogkanter og lysninger på ${t.berggrunnTekst} grunn — store parasollsopper trives i gress- og feltsjikt i overgangssoner.`,
       fieldTips:'Stor sopp (kan bli 20-40 cm høy) med lang, slank stilk som har et tydelig <b>slangeskinn-mønster</b> og en løs, bevegelig <b>dobbeltring</b>. Hatten er brun-skjellete og parasollformet når utsprunget.',
-      lookalike:'⚠ Bruk kun STORE eksemplarer med tydelig slangemønster på stilken og fri, bevegelig ring — små, brune paraplysopper (Lepiota-arter) kan være dødelig giftige og ligner unge parasollsopper. Er soppen liten, la den stå.' },
+      lookalike:'⚠ Bruk kun STORE eksemplarer med tydelig slangemønster på stilken og fri, bevegelig ring — små, brune paraplysopper (Lepiota-arter) kan være dødelig giftige og ligner unge parasollsopper. Er soppen liten, la den stå.',
+      image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/1_-_Macrolepiota_procera_%28St%C5%AFl%29.JPG/500px-1_-_Macrolepiota_procera_%28St%C5%AFl%29.JPG', artist:'Fredy.00', license:'Public domain', sourcePage:'https://commons.wikimedia.org/wiki/File:1_-_Macrolepiota_procera_(St%C5%AFl).JPG' } },
     { id:'sjampinjong', name:'Markjordbær-sjampinjong', latin:'Agaricus campestris', season:[7,10],
       treslag:['apen'], skogalder:['apen'], fuktighet:['frisk'], berggrunn:['moderat','rik'],
       weather:{ minNedbor14:10, idealNedbor14:25, minTempAvg:8 },
       why:(loc,t)=>`Åpen beitemark/eng på ${t.berggrunnTekst} grunn — sjampinjong vokser i gress, liker kalkholdig jord.`,
       fieldTips:'Sjekk tre ting: <b>rosa gjeller</b> som mørkner til sjokoladebrune, en løs <b>ring på stilken</b>, og kjøtt som <b>ikke blir gult</b> ved trykk.',
-      lookalike:'⚠ Unge, hvite fluesopp-knapper kan i sjeldne tilfeller minne om sjampinjong før hatten er utsprunget. Sjekk ALLTID gjellefargen (rosa/brun hos sjampinjong, aldri hvit) og grav opp foten — ekte sjampinjong har ingen "eggeskall" (volva) ved roten.' },
+      lookalike:'⚠ Unge, hvite fluesopp-knapper kan i sjeldne tilfeller minne om sjampinjong før hatten er utsprunget. Sjekk ALLTID gjellefargen (rosa/brun hos sjampinjong, aldri hvit) og grav opp foten — ekte sjampinjong har ingen "eggeskall" (volva) ved roten.',
+      image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/2010-08-07_Agaricus_campestris.jpg/500px-2010-08-07_Agaricus_campestris.jpg', artist:'Andreas Kunze', license:'CC BY-SA 3.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2010-08-07_Agaricus_campestris.jpg' } },
     { id:'furuknippesopp', name:'Furuknippesopp', latin:'Lyophyllum shimeji', season:[9,10],
       treslag:['furu'], skogalder:['gammel'], fuktighet:['tørr'], berggrunn:['fattig'],
       // Kontinentalt lavlandshabitat (sandfuru-moer på Østlandet) — i
@@ -73,14 +83,16 @@
       weather:{ minNedbor14:15, idealNedbor14:30, minTempAvg:6 },
       why:(loc,t)=>`Gammel, tørr furuskog på ${t.berggrunnTekst} sandgrunn — det sjeldne, kontinentale furumo-habitatet furuknippesopp krever.`,
       fieldTips:'Vokser i tette knipper direkte i sandholdig skogbunn i gammel, lysåpen furuskog, ofte med reinlav og blåbærlyng i bunnsjiktet. Gråbrun, fast hatt og hvitt kjøtt med en karakteristisk, litt melaktig-nøttete lukt. Regnes som en delikatesse i Japan (der kalt "shimeji"), men er svært sjelden i Norge og finnes stort sett i kontinentale furumoer på Østlandet.',
-      lookalike:'⚠ Tilhører slekten knippesopp (Lyophyllum), som har flere likeartede sopper — vær nøye med artsbestemmelsen og bruk soppkontroll ved usikkerhet. Arten er dessuten sjelden/rødlistet i Norge: vis varsomhet og ikke tøm hele forekomsten om du finner den.' },
+      lookalike:'⚠ Tilhører slekten knippesopp (Lyophyllum), som har flere likeartede sopper — vær nøye med artsbestemmelsen og bruk soppkontroll ved usikkerhet. Arten er dessuten sjelden/rødlistet i Norge: vis varsomhet og ikke tøm hele forekomsten om du finner den.',
+      image:{ url:'https://upload.wikimedia.org/wikipedia/commons/7/7b/Honshimeji.jpg', artist:'トリュフ (Toryufu)', license:'Public domain', sourcePage:'https://commons.wikimedia.org/wiki/File:Honshimeji.jpg' } },
     { id:'kransmusserong', name:'Kransmusserong', latin:'Tricholoma matsutake', season:[9,10],
       treslag:['furu'], skogalder:['gammel'], fuktighet:['tørr'], berggrunn:['fattig'],
       hoydeMoh:{ ideal:400, max:600 },
       weather:{ minNedbor14:15, idealNedbor14:30, minTempAvg:6 },
       why:(loc,t)=>`Sandholdig, gammel furuskog — kransmusserongens svært spesifikke voksested, best kjent fra furumoer på Østlandet (bl.a. rundt Elverum).`,
       fieldTips:'Kraftig, hvit-brun sopp med tydelig ring på stilken og en kraftig, kanelaktig/krydret duft som skiller den fra det meste annet. Vokser gjerne delvis nedgravd i sandjord under gammel furu, ofte i mose eller reinlav. Internasjonalt kjent som matsutake — en ettertraktet delikatesse i Japan.',
-      lookalike:'⚠ Slekten musseronger/riddersopp (Tricholoma) inneholder også giftige arter (bl.a. tigermusserong, som gir kraftige mageplager) — sjekk ring, lukt og voksested nøye, og bruk soppkontroll ved usikkerhet. Kransmusserong er svært ettertraktet og forholdsvis sjelden i Norge — vis varsomhet og plukk med måte.' }
+      lookalike:'⚠ Slekten musseronger/riddersopp (Tricholoma) inneholder også giftige arter (bl.a. tigermusserong, som gir kraftige mageplager) — sjekk ring, lukt og voksested nøye, og bruk soppkontroll ved usikkerhet. Kransmusserong er svært ettertraktet og forholdsvis sjelden i Norge — vis varsomhet og plukk med måte.',
+      image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/2010-08-06_Tricholoma_matsutake_%28S._Ito_%26_S._Imai%29_Singer_97084.jpg/500px-2010-08-06_Tricholoma_matsutake_%28S._Ito_%26_S._Imai%29_Singer_97084.jpg', artist:'Ryane Snow (Mushroom Observer)', license:'CC BY-SA 3.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2010-08-06_Tricholoma_matsutake_(S._Ito_%26_S._Imai)_Singer_97084.jpg' } }
   ];
 
   // Nødfallback: brukes KUN hvis det private data-repoet ikke er konfigurert
@@ -255,7 +267,7 @@
   }
 
   function wireCollapsibles(){
-    ['sp-notice', 'sp-safety'].forEach(id => {
+    ['sp-notice', 'sp-safety', 'sp-preferences'].forEach(id => {
       const el = document.getElementById(id);
       const key = 'fungifinder-collapse-' + id;
       const saved = localStorage.getItem(key);
@@ -1604,7 +1616,7 @@
             <div class="sp-card-name">${escapeHtml(loc.name)}</div>
             <div class="sp-card-kommune">${escapeHtml(loc.kommune)}, ${escapeHtml(loc.fylke)} · ${loc.lat.toFixed(3)}, ${loc.lon.toFixed(3)}</div>
           </div>
-          <div class="sp-gauge-wrap">${gaugeSvg(res.total)}<div class="sp-gauge-label">score</div></div>
+          <div class="sp-gauge-wrap" data-score-loc="${loc.id}" data-score-species="${species_for_card().id}" title="Klikk for å se score-beregningen">${gaugeSvg(res.total)}<div class="sp-gauge-label">score</div></div>
         </div>
         <div class="sp-tags">
           ${loc.custom ? `<span class="sp-tag custom">eget sted</span>` : ''}
@@ -1662,7 +1674,7 @@
           </div>
         </div>
         <div class="sp-fav-scorelist">
-          ${favResults.map(r => `<span class="sp-fav-score-chip ${r.res.isCut?'cut':''}">${escapeHtml(r.species.name)} <b>${r.res.total}</b></span>`).join('')}
+          ${favResults.map(r => `<span class="sp-fav-score-chip ${r.res.isCut?'cut':''}" data-score-loc="${loc.id}" data-score-species="${r.species.id}" title="Klikk for å se score-beregningen">${escapeHtml(r.species.name)} <b>${r.res.total}</b></span>`).join('')}
         </div>
         <div class="sp-tags">
           ${loc.custom ? `<span class="sp-tag custom">eget sted</span>` : ''}
@@ -1743,6 +1755,11 @@
       const monthNames = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
       const timing = seasonTiming(species);
       document.getElementById('sp-species-info').innerHTML = `
+        ${species.image ? `
+        <div class="sp-species-photo">
+          <img src="${escapeHtml(species.image.url)}" alt="${escapeHtml(species.name)}" loading="lazy"/>
+          <div class="sp-species-photo-credit">Foto: <a href="${escapeHtml(species.image.sourcePage)}" target="_blank" rel="noopener">${escapeHtml(species.image.artist)}</a>, ${escapeHtml(species.image.license)}, Wikimedia Commons</div>
+        </div>` : ''}
         <div class="sp-species-info-top">
           <div class="sp-si-name">${species.name}<em>${species.latin}</em></div>
           <div class="sp-si-season">typisk sesong: ${monthNames[species.season[0]-1]}–${monthNames[species.season[1]-1]}</div>
@@ -1827,6 +1844,45 @@
       if (userCuts.includes(id)) userCuts = userCuts.filter(x => x !== id); else userCuts.push(id);
       await saveCuts(); render();
     }));
+    container.querySelectorAll('[data-score-loc]').forEach(el => el.addEventListener('click', () => {
+      openScoreBreakdownModal(el.dataset.scoreLoc, el.dataset.scoreSpecies);
+    }));
+  }
+
+  // scoreLocation() beregner allerede en full breakdown (tekst+poeng per
+  // faktor) hver eneste gang den kjøres, men den ble tidligere kastet bort —
+  // ingenting i UI-et viste den. Regner den ut på nytt her i stedet for å
+  // lagre den fra render() (samme species+loc gir samme resultat siden
+  // scoreLocation kun leser fra allerede lastet global state).
+  function openScoreBreakdownModal(locId, speciesId){
+    const loc = allLocations().find(l => l.id === locId);
+    const species = SPECIES.find(s => s.id === speciesId);
+    if (!loc || !species) return;
+    const res = scoreLocation(species, loc);
+    const slot = document.getElementById('sp-modal-slot');
+    slot.innerHTML = `
+      <div class="sp-modal-backdrop" id="sp-modal-backdrop">
+        <div class="sp-modal">
+          <h4>Score-beregning — ${escapeHtml(species.name)}</h4>
+          <div class="sp-modal-sub">${escapeHtml(loc.name)}, ${escapeHtml(loc.kommune || 'ukjent kommune')}</div>
+          <div class="sp-score-breakdown">
+            ${res.breakdown.map(([label, pts]) => `
+              <div class="sp-score-breakdown-row">
+                <span>${escapeHtml(label)}</span>
+                <span class="${pts > 0 ? 'sp-score-pos' : pts < 0 ? 'sp-score-neg' : 'sp-score-neutral'}">${pts > 0 ? '+' : ''}${pts}</span>
+              </div>`).join('')}
+            <div class="sp-score-breakdown-row sp-score-breakdown-total">
+              <span>Total</span>
+              <span>${res.total}</span>
+            </div>
+          </div>
+          <div class="sp-modal-actions">
+            <button class="sp-btn sp-primary" id="sp-score-modal-close">Lukk</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('sp-score-modal-close').addEventListener('click', () => { slot.innerHTML = ''; });
+    document.getElementById('sp-modal-backdrop').addEventListener('click', (e) => { if (e.target.id === 'sp-modal-backdrop') slot.innerHTML = ''; });
   }
 
   // ---------- find modal ----------

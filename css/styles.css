@@ -85,6 +85,9 @@
   .sp-weather-box .sp-wstatus { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--moss); }
 
   .sp-mine-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  /* Uten dette dytter en lang funn-logg resten av venstrekolonnen (Vær m.m.)
+     langt ned — se samtalen 2026-07-11. Egen scroll i stedet for ubegrenset vekst. */
+  #sp-myfinds-list { max-height: 320px; overflow-y: auto; }
   .sp-mine-row { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; background: rgba(179,96,42,0.08); border: 1px solid rgba(179,96,42,0.25); border-radius: 3px; padding: 5px 8px; }
   .sp-mine-row-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .sp-mine-row-actions button { background: none; border: none; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
@@ -158,7 +161,7 @@
   .sp-card-name { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 600; color: var(--pine-deep); }
   .sp-card-kommune { font-size: 12px; color: var(--ink-soft); font-family: 'JetBrains Mono', monospace; }
 
-  .sp-gauge-wrap { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+  .sp-gauge-wrap { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; cursor: pointer; }
   .sp-gauge-label { font-size: 9.5px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
 
   .sp-divider-excl { text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--danger); margin: 18px 0 10px; opacity: 0.75; }
@@ -178,7 +181,7 @@
   .sp-cross-tip { font-size: 12px; color: var(--ink-soft); margin-bottom: 6px; }
 
   .sp-fav-scorelist { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-  .sp-fav-score-chip { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; padding: 3px 9px; border-radius: 20px; background: rgba(200,151,74,0.2); color: var(--russet-deep); border: 1px solid rgba(200,151,74,0.45); }
+  .sp-fav-score-chip { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; padding: 3px 9px; border-radius: 20px; background: rgba(200,151,74,0.2); color: var(--russet-deep); border: 1px solid rgba(200,151,74,0.45); cursor: pointer; }
   .sp-fav-score-chip.cut { background: rgba(162,62,46,0.1); color: var(--danger); border-color: rgba(162,62,46,0.3); text-decoration: line-through; opacity: 0.7; }
   .sp-fav-score-chip b { font-weight: 700; }
 
@@ -221,9 +224,22 @@
   .sp-hogd-row label { margin: 0; font-size: 12.5px; color: var(--danger); font-weight: 600; }
   .sp-modal hr { border: none; border-top: 1px dashed var(--line); margin: 14px 0; }
 
+  .sp-score-breakdown { margin-top: 12px; font-size: 13px; }
+  .sp-score-breakdown-row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+  .sp-score-breakdown-row span:first-child { color: var(--ink); }
+  .sp-score-breakdown-row span:last-child { font-family: 'JetBrains Mono', monospace; font-weight: 600; flex-shrink: 0; }
+  .sp-score-pos { color: var(--pine-deep); }
+  .sp-score-neg { color: var(--danger); }
+  .sp-score-neutral { color: var(--ink-soft); }
+  .sp-score-breakdown-total { border-bottom: none; border-top: 2px solid var(--ink); margin-top: 4px; padding-top: 8px; font-weight: 700; font-family: 'Fraunces', serif; }
+
   .sp-empty { text-align: center; padding: 40px 20px; color: var(--ink-soft); font-size: 13.5px; }
 
   .sp-species-info { margin-bottom: 18px; border-left: 3px solid var(--russet); }
+  .sp-species-photo { margin: -16px -16px 12px; }
+  .sp-species-photo img { width: 100%; max-height: 170px; object-fit: cover; display: block; border-radius: 4px 4px 0 0; }
+  .sp-species-photo-credit { font-size: 10px; color: var(--ink-soft); text-align: right; padding: 3px 10px 0 0; }
+  .sp-species-photo-credit a { color: inherit; }
   .sp-species-info-top { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
   .sp-species-info-top .sp-si-name { font-family: 'Fraunces', serif; font-size: 17px; font-weight: 600; color: var(--pine-deep); }
   .sp-species-info-top .sp-si-name em { font-style: italic; font-weight: 400; font-size: 13px; color: var(--ink-soft); margin-left: 6px; }
@@ -261,6 +277,12 @@
   .sp-collapsible.sp-notice summary { font-size: 12.5px; }
   .sp-collapsible.sp-safety { background: #F3E3DA; border: 1.5px solid var(--danger); border-radius: 4px; padding: 14px 16px; }
   .sp-collapsible.sp-safety summary h4 { color: var(--danger); font-family: 'Fraunces', serif; font-size: 15px; }
+  /* Preferanser/Config flyttet ut av den alltid-synlige venstrekolonnen og inn
+     hit — inspirert av MyCrate sin sammenleggbare "Setup & Sync"-plassering i
+     toppen i stedet for en fast sidepanel-fane (se samtalen 2026-07-11). */
+  .sp-collapsible.sp-preferences { background: var(--paper-deep); border: 1px solid var(--line); border-radius: 4px; padding: 14px 16px; }
+  .sp-collapsible.sp-preferences summary b { font-family: 'Fraunces', serif; font-size: 14.5px; color: var(--pine-deep); }
+  .sp-collapsible.sp-preferences .sp-tab-bar { margin-top: 4px; }
 
   .sp-tab-bar { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
   .sp-tab-btn { background: none; border: none; padding: 7px 12px; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: 'Source Sans 3', sans-serif; }

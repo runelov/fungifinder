@@ -42,6 +42,50 @@
       </div>
     </details>
 
+    <details class="sp-collapsible sp-preferences sp-tabbed-panel" id="sp-preferences">
+      <summary><b>⚙ Preferanser &amp; Config</b> <span class="sp-collapse-hint">(klikk for å skjule/vise)</span></summary>
+      <div class="sp-collapsible-body">
+        <div class="sp-tab-bar" id="sp-tab-bar">
+          <button class="sp-tab-btn active" data-tab="preferences">Preferanser</button>
+          <button class="sp-tab-btn" data-tab="config">Config</button>
+        </div>
+
+        <div class="sp-tab-content" data-tab-content="preferences">
+          <div class="sp-slider-row">
+            <span>Vektlegg lav befolkningstetthet</span>
+            <button class="sp-toggle on" id="sp-toggle-quiet"></button>
+          </div>
+          <div class="sp-slider-row">
+            <span>Skjul flatehogde steder fra lista (i stedet for å vise nederst, grået ut)</span>
+            <button class="sp-toggle" id="sp-toggle-hogst"></button>
+          </div>
+          <div class="sp-slider-row">
+            <span>Vis kun ferske Artsdatabanken-funn i kartlaget (siste år)</span>
+            <button class="sp-toggle" id="sp-toggle-artskart-recent"></button>
+          </div>
+        </div>
+
+        <div class="sp-tab-content" data-tab-content="config" style="display:none;">
+          <div id="sp-sync-status" style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">Ikke koblet til — viser kun eksempeldata.</div>
+          <div id="sp-sync-form">
+            <label style="display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:3px;">Privat data-repo (eier/repo)</label>
+            <input type="text" id="sync-repo" placeholder="brukernavn/fungifinder-data" style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;font-size:12.5px;"/>
+            <label style="display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:3px;">Sti til terrengdata</label>
+            <input type="text" id="sync-locations-path" placeholder="data/locations.json" style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;font-size:12.5px;"/>
+            <label style="display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:3px;">Sti til personlige data</label>
+            <input type="text" id="sync-personal-path" placeholder="data/personal.json" style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;font-size:12.5px;"/>
+            <label style="display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:3px;">Personal access token (fine-grained, kun dette repoet — Contents + Actions)</label>
+            <input type="password" id="sync-token" placeholder="github_pat_..." style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:8px;font-size:12.5px;"/>
+            <div style="display:flex;gap:6px;">
+              <button class="sp-btn sp-primary" id="sync-connect" style="flex:1;">Koble til</button>
+              <button class="sp-btn" id="sync-disconnect">Koble fra</button>
+            </div>
+          </div>
+          <div class="sp-config-version" id="sp-config-version"></div>
+        </div>
+      </div>
+    </details>
+
     <div class="sp-layout">
       <div>
         <div class="sp-panel">
@@ -54,47 +98,6 @@
         </div>
 
         <div class="sp-panel sp-species-info" id="sp-species-info"></div>
-
-        <div class="sp-panel sp-tabbed-panel">
-          <div class="sp-tab-bar" id="sp-tab-bar">
-            <button class="sp-tab-btn active" data-tab="preferences">Preferanser</button>
-            <button class="sp-tab-btn" data-tab="config">Config</button>
-          </div>
-
-          <div class="sp-tab-content" data-tab-content="preferences">
-            <div class="sp-slider-row">
-              <span>Vektlegg lav befolkningstetthet</span>
-              <button class="sp-toggle on" id="sp-toggle-quiet"></button>
-            </div>
-            <div class="sp-slider-row">
-              <span>Skjul flatehogde steder fra lista (i stedet for å vise nederst, grået ut)</span>
-              <button class="sp-toggle" id="sp-toggle-hogst"></button>
-            </div>
-            <div class="sp-slider-row">
-              <span>Vis kun ferske Artsdatabanken-funn i kartlaget (siste år)</span>
-              <button class="sp-toggle" id="sp-toggle-artskart-recent"></button>
-            </div>
-          </div>
-
-          <div class="sp-tab-content" data-tab-content="config" style="display:none;">
-            <div id="sp-sync-status" style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">Ikke koblet til — viser kun eksempeldata.</div>
-            <div id="sp-sync-form">
-              <label style="display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:3px;">Privat data-repo (eier/repo)</label>
-              <input type="text" id="sync-repo" placeholder="brukernavn/fungifinder-data" style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;font-size:12.5px;"/>
-              <label style="display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:3px;">Sti til terrengdata</label>
-              <input type="text" id="sync-locations-path" placeholder="data/locations.json" style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;font-size:12.5px;"/>
-              <label style="display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:3px;">Sti til personlige data</label>
-              <input type="text" id="sync-personal-path" placeholder="data/personal.json" style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;font-size:12.5px;"/>
-              <label style="display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:3px;">Personal access token (fine-grained, kun dette repoet — Contents + Actions)</label>
-              <input type="password" id="sync-token" placeholder="github_pat_..." style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:8px;font-size:12.5px;"/>
-              <div style="display:flex;gap:6px;">
-                <button class="sp-btn sp-primary" id="sync-connect" style="flex:1;">Koble til</button>
-                <button class="sp-btn" id="sync-disconnect">Koble fra</button>
-              </div>
-            </div>
-            <div class="sp-config-version" id="sp-config-version"></div>
-          </div>
-        </div>
 
         <div class="sp-panel">
           <h3>Mine funn</h3>
