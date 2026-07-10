@@ -223,13 +223,16 @@
   }
 
   function wireTabs(){
-    const buttons = document.querySelectorAll('#sp-tab-bar .sp-tab-btn');
-    buttons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        buttons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        document.querySelectorAll('.sp-tabbed-panel .sp-tab-content').forEach(c => {
-          c.style.display = (c.dataset.tabContent === btn.dataset.tab) ? '' : 'none';
+    document.querySelectorAll('.sp-tabbed-panel').forEach(panel => {
+      const buttons = panel.querySelectorAll('.sp-tab-btn');
+      const contents = panel.querySelectorAll('.sp-tab-content');
+      buttons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          buttons.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          contents.forEach(c => {
+            c.style.display = (c.dataset.tabContent === btn.dataset.tab) ? '' : 'none';
+          });
         });
       });
     });

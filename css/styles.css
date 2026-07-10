@@ -57,7 +57,7 @@
   .sp-species-btn { text-align: left; background: transparent; border: 1px solid transparent; border-radius: 3px; padding: 8px 10px; cursor: pointer; font-size: 14px; color: var(--ink); display: flex; justify-content: space-between; align-items: center; transition: background 0.15s; font-family: 'Source Sans 3', sans-serif; width: 100%; }
   .sp-species-btn:hover { background: rgba(52,67,44,0.08); }
   .sp-species-btn.active { background: var(--pine); color: var(--paper); border-color: var(--pine-deep); }
-  .sp-species-btn .sp-latin { font-style: italic; font-size: 11px; opacity: 0.7; display: block; }
+  .sp-species-btn .sp-latin { font-style: italic; font-size: 11px; opacity: 0.7; display: none; }
   .sp-fav-star { font-size: 15px; color: rgba(85,96,74,0.35); cursor: pointer; padding: 0 2px; flex-shrink: 0; }
   .sp-fav-star:hover { color: var(--gold); }
   .sp-fav-star.active { color: var(--gold); }
@@ -65,16 +65,14 @@
   .sp-species-btn.active .sp-fav-star.active { color: var(--gold); }
   #sp-viewmode-seg { margin-bottom: 10px; }
 
-  /* Soppvelgeren tok for mye vertikal plass på mobil som en høy, éncolonne
-     liste (12 arter × ~55px ≈ 660px før man i det hele tatt når kartet).
-     Gjør den til en horisontalt scrollbar rad med kompakte pills i stedet —
-     latinsk navn skjules siden det uansett vises i art-infoboksen under.
-     MÅ stå ETTER basisregelen over — ellers taper media-varianten mot den
-     senere, ubetingede regelen ved lik spesifisitet (kildeorden avgjør). */
+  /* Soppvelgeren tok for mye vertikal plass som en høy, éncolonne liste
+     (12 arter × ~55px ≈ 660px før man i det hele tatt når kartet) — latinsk
+     navn er derfor skjult i basisregelen over (vises uansett i art-
+     infoboksen under når en art er valgt). På mobil gjøres lista i tillegg
+     om til en horisontalt scrollbar rad med kompakte pills. */
   @media (max-width: 760px) {
     .sp-species-list { flex-direction: row; flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding-bottom: 6px; -webkit-overflow-scrolling: touch; }
     .sp-species-btn { flex: 0 0 auto; width: auto; padding: 7px 12px; }
-    .sp-species-btn .sp-latin { display: none; }
   }
 
   .sp-slider-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; margin-bottom: 8px; gap: 10px; }
