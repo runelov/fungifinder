@@ -110,6 +110,7 @@
   let viewMode = 'single'; // 'single' (én valgt art) | 'favorites' (beste treff blant favoritter)
   let prioritizeQuiet = true;
   let hideHogst = false;
+  let artskartOnlyRecent = false; // vis kun Artsdatabanken-funn siste år i kartlaget — se renderArtskartLayer
   // Skjuler kun LISTEN under en viss score — kartet fortsetter å vise alle
   // steder i området (fargekodet etter score) slik at man kan oppdage og
   // klikke seg til lavere-scorende punkter der uten å måtte senke terskelen.
@@ -152,6 +153,16 @@
     const dLon = (lon2-lon1) * Math.PI/180;
     const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  // Artskart-observasjoners "dato"-felt er CollectedDate på norsk format
+  // (DD.MM.YYYY) — IKKE samme som trackDateTime (kun en synk-metadata for når
+  // posten sist ble verifisert av Artsdatabanken, ofte år etter selve funnet).
+  // Brukes av "vis kun ferske funn"-toggelen i renderArtskartLayer.
+  function parseNorskDato(s){
+    const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(s || '');
+    if (!m) return null;
+    return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
   }
 
   // Sjekker om et sted faller innenfor et av dine egne merkede flatehogd-
@@ -1718,6 +1729,7 @@
     renderFilterControls();
     document.getElementById('sp-toggle-quiet').classList.toggle('on', prioritizeQuiet);
     document.getElementById('sp-toggle-hogst').classList.toggle('on', hideHogst);
+    document.getElementById('sp-toggle-artskart-recent').classList.toggle('on', artskartOnlyRecent);
 
     document.querySelectorAll('#sp-viewmode-seg button').forEach(b => b.classList.toggle('active', b.dataset.viewmode === viewMode));
     document.getElementById('sp-fav-count').textContent = favoriteSpecies.length;
@@ -1967,10 +1979,17 @@
     artskartLayer.clearLayers();
     if (!scopedLocs.length || !artsfunn.length) return;
     const activeIds = new Set(activeSpeciesIds());
+    // "Vis kun ferske funn"-toggel: filtrerer på o.dato (faktisk observasjonsdato),
+    // ikke trackDateTime (kun en synk-metadata, ofte år etter selve funnet) — se parseNorskDato.
+    const recentCutoff = artskartOnlyRecent ? new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) : null;
     const nearby = [];
     outer:
     for (const o of artsfunn) {
       if (!activeIds.has(o.art)) continue;
+      if (recentCutoff) {
+        const dt = parseNorskDato(o.dato);
+        if (!dt || dt < recentCutoff) continue;
+      }
       for (const s of scopedLocs) {
         if (Math.abs(o.lat - s.loc.lat) > 0.05 || Math.abs(o.lon - s.loc.lon) > 0.1) continue;
         if (haversineKm(o.lat, o.lon, s.loc.lat, s.loc.lon) <= 5) { nearby.push(o); continue outer; }
@@ -2223,6 +2242,7 @@
   // ---------- wiring ----------
   document.getElementById('sp-toggle-quiet').addEventListener('click', () => { prioritizeQuiet = !prioritizeQuiet; render(); });
   document.getElementById('sp-toggle-hogst').addEventListener('click', () => { hideHogst = !hideHogst; render(); });
+  document.getElementById('sp-toggle-artskart-recent').addEventListener('click', () => { artskartOnlyRecent = !artskartOnlyRecent; render(); });
   document.getElementById('sp-fylke-filter').addEventListener('change', (e) => { fylkeFilter = e.target.value; clearRoute(); zoomToAreaSelection(); render(); });
   document.getElementById('sp-kommune-filter-input').addEventListener('change', (e) => {
     const val = e.target.value.trim();
