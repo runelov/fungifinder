@@ -1064,8 +1064,8 @@
   let findMarkersById = {};
   let mapFittedOnce = false;
   let markersById = {};
-  let routeKm = 5;
-  let suggestedRoute = null; // { startPoint, stops, totalKm } — se buildRoute()
+  let areaCount = 5;
+  let suggestedRoute = null; // { areas: [{anchor, members, radiusM}] } — se suggestAreas()
   let mapFullscreen = false;
 
   // Kartet var for lite til feltbruk (særlig mobil). Fullskjerm gjør panelet
@@ -1171,7 +1171,7 @@
     // rent terreng for å merke seg egne funnsteder uten at prikkene er i veien.
     L.control.layers(
       { 'Topografisk (Kartverket)': topoLayer, 'Standard': standardLayer, 'Satellitt': satelliteLayer },
-      { 'Målepunkter': markerLayer, 'Foreslått rundtur': routeLayer, 'Mine hogstfelt': hogstLayer, 'Mine funn': findsLayer, 'Artsdatabanken-funn': artskartLayer },
+      { 'Målepunkter': markerLayer, 'Foreslåtte områder': routeLayer, 'Mine hogstfelt': hogstLayer, 'Mine funn': findsLayer, 'Artsdatabanken-funn': artskartLayer },
       { collapsed: true }
     ).addTo(leafletMap);
 
@@ -1310,14 +1310,15 @@
     return { species: sp, res: scoreLocation(sp, loc) };
   }
 
-  // Kort tekst om HVORFOR ruten er valgt og hva man bør se etter — aggregerer
-  // treslag/fuktighet/berggrunn/helning på tvers av stoppene, pluss konkrete
-  // mikrotips for den mest relevante arten (beste favoritt, eller valgt art).
-  function describeRouteTerrain(stops){
-    if (!stops.length) return '';
+  // Kort tekst om HVORFOR et område er foreslått og hva man bør se etter —
+  // aggregerer treslag/fuktighet/berggrunn/helning på tvers av de kjente
+  // punktene i området, pluss konkrete mikrotips for den mest relevante
+  // arten (beste favoritt, eller valgt art).
+  function describeRouteTerrain(members){
+    if (!members.length) return '';
     const treslagCount = {}, fuktCount = {};
     let sorSkrenter = 0, rikBerggrunn = 0;
-    stops.forEach(s => {
+    members.forEach(s => {
       const loc = s.loc;
       (Array.isArray(loc.treslag) ? loc.treslag : [loc.treslag]).forEach(t => { treslagCount[t] = (treslagCount[t]||0) + 1; });
       fuktCount[loc.fuktighet] = (fuktCount[loc.fuktighet]||0) + 1;
@@ -1334,14 +1335,14 @@
       ? (favoriteSpecies.map(id => SPECIES.find(s => s.id === id)?.name).filter(Boolean).join('/') || 'favorittene dine')
       : (primarySpecies ? primarySpecies.name.toLowerCase() : '');
 
-    let text = `Ruten går hovedsakelig gjennom ${escapeHtml(TXT.treslag[topTreslag] || topTreslag || 'ukjent')}-dominert skog med ${escapeHtml(TXT.fuktighet[topFukt] || topFukt || 'ukjent')} bunnvegetasjon`;
-    if (rikBerggrunn >= Math.ceil(stops.length / 2)) text += ', på grunn med moderat til rikt kalkinnhold';
+    let text = `Området preges hovedsakelig av ${escapeHtml(TXT.treslag[topTreslag] || topTreslag || 'ukjent')}-dominert skog med ${escapeHtml(TXT.fuktighet[topFukt] || topFukt || 'ukjent')} bunnvegetasjon`;
+    if (rikBerggrunn >= Math.ceil(members.length / 2)) text += ', på grunn med moderat til rikt kalkinnhold';
     text += ` — gode forhold for ${escapeHtml(speciesLabel)}.`;
     if (sorSkrenter > 0) {
-      text += ` ${sorSkrenter} av ${stops.length} stopp ligger i sørvendte skråninger — sjekk disse ekstra nøye på varme, tørre dager.`;
+      text += ` ${sorSkrenter} av ${members.length} kjente punkter i området ligger i sørvendte skråninger — sjekk disse ekstra nøye på varme, tørre dager.`;
     }
     if (primarySpecies) {
-      const tips = terrainMicrotips(primarySpecies, stops[0].loc).slice(0, 2);
+      const tips = terrainMicrotips(primarySpecies, members[0].loc).slice(0, 2);
       if (tips.length) text += ` Se etter: ${tips.join(' ')}`;
     }
     return text;
@@ -1358,82 +1359,11 @@
     return zones;
   }
 
-  async function findNearbyParking(centerLat, centerLon, radiusM){
-    const query = `[out:json][timeout:15];(node["amenity"="parking"](around:${radiusM},${centerLat},${centerLon});way["amenity"="parking"](around:${radiusM},${centerLat},${centerLon}););out center;`;
-    try {
-      const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(query) });
-      const data = await res.json();
-      return (data.elements || [])
-        .map(el => {
-          const c = el.center || el;
-          return { lat: c.lat, lon: c.lon, name: (el.tags && el.tags.name) || 'Parkeringsplass' };
-        })
-        .filter(p => p.lat != null && p.lon != null);
-    } catch (e) {
-      console.warn('Parkeringssøk (Overpass) feilet', e);
-      return [];
-    }
-  }
-
-  function nearestPoint(from, candidates){
-    let best = null, bestDist = Infinity;
-    for (const c of candidates) {
-      const d = haversineKm(from.lat, from.lon, c.lat, c.lon);
-      if (d < bestDist) { bestDist = d; best = c; }
-    }
-    return best ? { ...best, distKm: bestDist } : null;
-  }
-
-  function loopDistanceKm(startPoint, order){
-    if (!order.length) return 0;
-    let d = haversineKm(startPoint.lat, startPoint.lon, order[0].loc.lat, order[0].loc.lon);
-    for (let i = 0; i < order.length - 1; i++) {
-      d += haversineKm(order[i].loc.lat, order[i].loc.lon, order[i+1].loc.lat, order[i+1].loc.lon);
-    }
-    d += haversineKm(order[order.length-1].loc.lat, order[order.length-1].loc.lon, startPoint.lat, startPoint.lon);
-    return d;
-  }
-
-  // Grådig innsetting (klassisk tilnærming for "orienteering problem": maksimer
-  // poeng innenfor et avstandsbudsjett) etterfulgt av en enkel 2-opt-forbedring.
-  // Soner er få nok (typisk <12) til at begge stegene er billige å kjøre i nettleseren.
-  function buildRoute(startPoint, zones, maxKm){
-    let route = [];
-    let remaining = [...zones];
-    let currentKm = 0;
-
-    while (remaining.length) {
-      let bestIdx = -1, bestValue = -Infinity, bestKm = null;
-      remaining.forEach((cand, idx) => {
-        const trial = [...route, cand];
-        const d = loopDistanceKm(startPoint, trial);
-        if (d > maxKm) return;
-        const addedKm = d - currentKm;
-        const value = cand.res.total / Math.max(addedKm, 0.1); // poeng per ekstra km
-        if (value > bestValue) { bestValue = value; bestIdx = idx; bestKm = d; }
-      });
-      if (bestIdx === -1) break; // ingen flere soner får plass innenfor budsjettet
-      route.push(remaining[bestIdx]);
-      remaining.splice(bestIdx, 1);
-      currentKm = bestKm;
-    }
-
-    let improved = true;
-    while (improved && route.length > 2) {
-      improved = false;
-      for (let i = 0; i < route.length - 1; i++) {
-        for (let j = i + 1; j < route.length; j++) {
-          const trial = [...route];
-          const seg = trial.slice(i, j + 1).reverse();
-          trial.splice(i, seg.length, ...seg);
-          const d = loopDistanceKm(startPoint, trial);
-          if (d < currentKm - 0.001) { route = trial; currentKm = d; improved = true; }
-        }
-      }
-    }
-
-    return { stops: route, totalKm: currentKm };
-  }
+  // Radius (km) brukt til å samle alle kjente punkter rundt et område-anker
+  // (for terreng-beskrivelse og sirkelens utstrekning), OG som minste avstand
+  // mellom to ankre i clusterIntoZones — de stiplede sirklene overlapper da
+  // ikke for mye i tett-scorede områder.
+  const AREA_RADIUS_KM = 1.2;
 
   function clearRoute(){
     suggestedRoute = null;
@@ -1444,29 +1374,27 @@
     if (clearBtn) clearBtn.style.display = 'none';
   }
 
-  function renderRouteOnMap(){
+  // Stiplede sirkler i stedet for punkt-til-punkt-rute (se samtalen
+  // 2026-07-11: brukeren ønsket forslag på GODE OMRÅDER/TERRENG, ikke en
+  // spesifikk gåtur mellom eksakte koordinater — sirkelen markerer "let et
+  // sted her", ikke "gå akkurat denne stien"). Farget etter samme
+  // score-skala som kartprikkene ellers.
+  function renderAreasOnMap(){
     if (!routeLayer || !suggestedRoute) return;
     routeLayer.clearLayers();
-    const { startPoint, stops } = suggestedRoute;
-
-    L.marker([startPoint.lat, startPoint.lon], {
-      icon: L.divIcon({ className: 'sp-route-icon sp-route-start', html: 'P', iconSize: [24,24] })
-    }).bindPopup(`<b>Start/parkering</b><br/>${escapeHtml(startPoint.name || 'Anslått startpunkt')}`).addTo(routeLayer);
-
-    const latlngs = [[startPoint.lat, startPoint.lon]];
-    stops.forEach((s, i) => {
-      L.marker([s.loc.lat, s.loc.lon], {
-        icon: L.divIcon({ className: 'sp-route-icon', html: String(i+1), iconSize: [24,24] })
-      }).bindPopup(`<b>Stopp ${i+1}: ${escapeHtml(s.loc.name)}</b><br/>Score: ${s.res.total}`).addTo(routeLayer);
-      latlngs.push([s.loc.lat, s.loc.lon]);
+    const { areas } = suggestedRoute;
+    areas.forEach((a, i) => {
+      const score = a.anchor.res.total;
+      const color = score >= 65 ? '#5F7A3E' : score >= 40 ? '#C8974A' : '#A23E2E';
+      L.circle([a.anchor.loc.lat, a.anchor.loc.lon], {
+        radius: a.radiusM, color, weight: 2.5, dashArray: '8,8', fillColor: color, fillOpacity: 0.07
+      }).bindPopup(`<b>Område ${i+1}: ${escapeHtml(a.anchor.loc.name)}</b><br/>Beste score i området: ${score}<br/>${a.anchor.loc.parkeringNotat ? escapeHtml(a.anchor.loc.parkeringNotat) + '<br/>' : ''}${describeRouteTerrain(a.members)}`)
+        .addTo(routeLayer);
     });
-    latlngs.push([startPoint.lat, startPoint.lon]);
-
-    L.polyline(latlngs, { color: '#8C4A20', weight: 3, dashArray: '6,6', opacity: 0.85 }).addTo(routeLayer);
-    leafletMap.fitBounds(L.latLngBounds(latlngs).pad(0.2));
+    if (areas.length) leafletMap.fitBounds(L.featureGroup(routeLayer.getLayers()).getBounds().pad(0.15));
   }
 
-  async function suggestRoute(){
+  async function suggestAreas(){
     const summary = document.getElementById('sp-route-summary');
     summary.style.display = '';
     summary.textContent = 'Beregner forslag …';
@@ -1490,58 +1418,35 @@
     });
 
     if (!scoped.length) {
-      summary.textContent = 'Ingen steder å planlegge en tur fra i valgt område.';
+      summary.textContent = 'Ingen steder å foreslå områder fra i valgt område.';
       return;
     }
 
-    const allZones = clusterIntoZones(scoped, 12, 0.4);
-
-    // I fylke/kommune-modus kan de 12 beste sonene ligge spredt over et stort
-    // område (hele kommunen/fylket) — da gir et gjennomsnittlig midtpunkt et
-    // startpunkt som ikke er i nærheten av noen av dem. Anker derfor turen på
-    // den enkeltsonen med høyest score, og bygg turen rundt DEN i stedet for
-    // på tvers av alle sonene. Radius-modus er allerede lokal, så der beholdes
-    // gjennomsnittet av sonene som før.
-    const anchorMode = filterMode === 'fylke' || filterMode === 'kommune';
-    const bestZone = allZones[0];
-    const zones = anchorMode
-      ? allZones.filter(z => haversineKm(bestZone.loc.lat, bestZone.loc.lon, z.loc.lat, z.loc.lon) <= routeKm / 2)
-      : allZones;
-    const anchorLabel = anchorMode ? `${bestZone.loc.name} (${bestZone.loc.kommune})` : null;
-
-    const centerLat = anchorMode ? bestZone.loc.lat : zones.reduce((a,z) => a + z.loc.lat, 0) / zones.length;
-    const centerLon = anchorMode ? bestZone.loc.lon : zones.reduce((a,z) => a + z.loc.lon, 0) / zones.length;
-
-    const parkingCandidates = await findNearbyParking(centerLat, centerLon, 4000);
-    let startPoint;
-    if (parkingCandidates.length) {
-      startPoint = { ...nearestPoint({ lat: centerLat, lon: centerLon }, parkingCandidates), kilde: 'parkering' };
-    } else {
-      const withRoad = [...zones].filter(z => z.loc.avstandVeiM != null).sort((a,b) => a.loc.avstandVeiM - b.loc.avstandVeiM)[0];
-      startPoint = withRoad
-        ? { lat: withRoad.loc.lat, lon: withRoad.loc.lon, name: 'Nærmeste kjente veitilgang (ingen parkeringsplass funnet)', kilde: 'vei-fallback' }
-        : { lat: centerLat, lon: centerLon, name: 'Områdets midtpunkt (ingen vei-/parkeringsdata funnet)', kilde: 'midtpunkt-fallback' };
-    }
-
-    const { stops, totalKm } = buildRoute(startPoint, zones, routeKm);
-    if (!stops.length) {
-      summary.innerHTML = `Fant ingen soner som får plass innenfor ${routeKm} km rundtur fra foreslått startpunkt`
-        + ` (${escapeHtml(startPoint.name || 'ukjent sted')}, et reelt punkt fra OpenStreetMap ved ${startPoint.lat.toFixed(3)}, ${startPoint.lon.toFixed(3)}`
-        + `${anchorLabel ? `, nær beste sone: ${escapeHtml(anchorLabel)}` : ''}).`
-        + ` Prøv å øke lengden.`;
+    // Velger inntil `areaCount` distinkte, topp-scorende anker-punkter, minst
+    // AREA_RADIUS_KM fra hverandre. Grupperer deretter ALLE scorede punkter
+    // rundt sitt nærmeste anker for å bestemme sirkelens utstrekning og
+    // terreng-beskrivelsen (se describeRouteTerrain).
+    const anchors = clusterIntoZones(scoped, areaCount, AREA_RADIUS_KM);
+    if (!anchors.length) {
+      summary.textContent = 'Fant ingen gode områder i valgt filter.';
       return;
     }
 
-    suggestedRoute = { startPoint, stops, totalKm };
-    renderRouteOnMap();
+    const areas = anchors.map(anchor => {
+      const members = scoped.filter(s => haversineKm(anchor.loc.lat, anchor.loc.lon, s.loc.lat, s.loc.lon) <= AREA_RADIUS_KM);
+      const spreadM = Math.max(0, ...members.map(m => haversineKm(anchor.loc.lat, anchor.loc.lon, m.loc.lat, m.loc.lon) * 1000));
+      const radiusM = Math.min(1800, Math.max(400, spreadM + 200)); // liten margin utenfor ytterste kjente punkt
+      return { anchor, members, radiusM };
+    });
 
-    const estMinutes = Math.round((totalKm / 3.2) * 60); // ~3,2 km/t i skogsterreng, uten stopptid
+    suggestedRoute = { areas };
+    renderAreasOnMap();
+
+    const overskrift = areas.length === 1 ? '<b>1 godt område</b> foreslått' : `<b>${areas.length} gode områder</b> foreslått`;
     summary.innerHTML = `
-      <b>${stops.length} stopp</b>, ca <b>${totalKm.toFixed(1)} km</b> rundtur (~${estMinutes} min gange, uten tid til leting).<br/>
-      ${anchorLabel ? `Beste sone lagt til grunn: ${escapeHtml(anchorLabel)}<br/>` : ''}
-      Start/parkering: ${escapeHtml(startPoint.name || 'ukjent')}${startPoint.kilde === 'parkering' ? ' (reelt punkt fra OpenStreetMap)' : ''}
-      <div class="sp-route-why">${describeRouteTerrain(stops)}</div>
-      <span style="font-size:11px;opacity:0.8;">Rett linje mellom stoppene, ikke snappet til faktiske stier — bruk det topografiske kartlaget til å legge din egen linje mellom dem.</span>
+      ${overskrift} i valgt område (stiplede sirkler i kartet, farget etter score — klikk en sirkel for detaljer).<br/>
+      ${areas.map((a, i) => `<div class="sp-route-area-item">Område ${i+1}: <b>${escapeHtml(a.anchor.loc.name)}</b> (${escapeHtml(a.anchor.loc.kommune || 'ukjent kommune')}) — beste score ${a.anchor.res.total}, ${a.members.length} kjent${a.members.length===1?'':'e'} punkt${a.members.length===1?'':'er'} i området.</div>`).join('')}
+      <span style="font-size:11px;opacity:0.8;">Sirklene markerer OMRÅDER med gode odds, ikke eksakte punkter eller en gåtur mellom dem — bruk det topografiske kartlaget til å utforske selv innenfor sirkelen.</span>
     `;
     document.getElementById('sp-route-clear').style.display = '';
   }
@@ -2284,10 +2189,10 @@
   document.getElementById('sp-radius-slider').addEventListener('input', (e) => { radiusKm = parseInt(e.target.value); clearRoute(); render(); });
   document.getElementById('sp-radius-clear').addEventListener('click', () => { radiusCenter = null; clearRoute(); render(); });
   document.getElementById('sp-route-km-slider').addEventListener('input', (e) => {
-    routeKm = parseFloat(e.target.value);
-    document.getElementById('sp-route-km-label').textContent = routeKm + ' km';
+    areaCount = parseInt(e.target.value);
+    document.getElementById('sp-route-km-label').textContent = String(areaCount);
   });
-  document.getElementById('sp-route-suggest').addEventListener('click', suggestRoute);
+  document.getElementById('sp-route-suggest').addEventListener('click', suggestAreas);
   document.getElementById('sp-route-clear').addEventListener('click', clearRoute);
   document.getElementById('sp-score-filter-slider').addEventListener('input', (e) => {
     minScoreFilter = parseInt(e.target.value);
