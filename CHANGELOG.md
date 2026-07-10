@@ -1,5 +1,38 @@
 # Endringslogg
 
+## 0.13.0 — Kritisk gjennomgang av vektingsmodellen
+Etter en kritisk gjennomgang av scoringsmodellen (datagrunnlag, kilder,
+manglende signaler, om vektingen er optimal) ble fem konkrete svakheter
+rettet, i `scoreLocation()`/`adkomstScore()` (`js/app.js`) og i ETL-en
+(data-repoets `fetch_area.py`, se dets CHANGELOG v11 for detaljer der):
+
+- **Fjernet dobbelttellingen av `avstandVeiM`**: brukt til BÅDE
+  `kjorbarVei`-basert adkomstscore og "avstand fra vei ≥1000m"-bonusen i
+  ro-scoren — samme (og minst verifiserte) datakilde ga uttelling i to
+  score-kategorier. Adkomst bruker nå en kontinuerlig
+  `parkeringsavstandScore()` basert på ekte `avstandParkeringM` (se under);
+  ro-scoren drives nå kun av `befolkning`.
+- **Rebalanserte vektbudsjettet**: kategoriene summerte tidligere til 176
+  mulige poeng før 100-taket ble klippet, som gjorde at de fleste "gode nok"
+  steder mettet taket og virkelig gode steder ikke lenger skilte seg ut i
+  rangeringen (relevant for bl.a. sonevalget i "Foreslå tur"). Vektene er nå
+  strammet inn slik at "alltid tilgjengelige" kategorier (terreng, sesong,
+  vær, ro, adkomst) typisk summerer til under 100 — taket nås normalt kun
+  ved hjelp av faktisk korroborerende bevis (egen funnhistorikk, kjente
+  Artskart-funn, sørvendt skråning).
+- **`befolkning` og `stier` er nå koblet til reell data** (via OSM Overpass i
+  ETL-en) i stedet for å alltid være `"ukjent"` — "prioriter ro"-toggelen
+  var reelt sett inert for alle auto-hentede steder inntil nå.
+- **Parkeringssjekken er nå reell for auto-hentede steder**: `parkeringNotat`
+  bygges fra et ekte OSM-parkeringssøk (samme Overpass-mønster som
+  "Foreslå tur" allerede brukte), inkl. `access`-tag (privat/kun kunder/
+  krever tillatelse) — tidligere var dette alltid en placeholder-tekst som
+  aldri kunne utløse privat-parkering-varselet.
+- **Ny høyde-basert score** (`elevationScore()`) for de to artene
+  (kransmusserong, furuknippesopp) der en høydebegrensning er godt nok
+  dokumentert i norsk sopplitteratur til å tallfestes — `hoydeMoh` ble
+  hentet fra Kartverket hele tiden, men var aldri brukt i scoringen.
+
 ## 0.12.0 — Bolk 3, del 3: ekte Artsdatabanken-integrasjon
 - **Artskart-integrasjonen var i praksis dekorativ tidligere** — den viste kun en generell treffrate-statistikk, filtrert til arter som matchet beregnet treslag, og selve API-kallet brukte et bounding-box-filter mot Artsdatabanken som (etter grundig testing) aldri faktisk begrenset resultatene geografisk. Erstattet i data-repoet med ekte per-fylke-henting (`filter.countys`, det eneste geo-filteret som virker) og lokal avstandsmatching mot hvert punkt — se data-repoets CHANGELOG v10 for detaljer.
 - **Nytt kartlag "Artsdatabanken-funn"**: viser faktiske, navngitte artsfunn i nærheten (fra ekte Artsdatabanken-data) som egne markører, uavhengig av hvilken art du har valgt — kun begrenset til de stedene som faktisk vises i kartutsnittet (maks 300 markører).

@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.12.0';
-  const APP_BUILD_DATE = '2026-07-09';
+  const APP_VERSION = '0.13.0';
+  const APP_BUILD_DATE = '2026-07-10';
 
   const SPECIES = [
     { id:'kantarell', name:'Kantarell', latin:'Cantharellus cibarius', season:[7,10],
@@ -66,12 +66,17 @@
       lookalike:'⚠ Unge, hvite fluesopp-knapper kan i sjeldne tilfeller minne om sjampinjong før hatten er utsprunget. Sjekk ALLTID gjellefargen (rosa/brun hos sjampinjong, aldri hvit) og grav opp foten — ekte sjampinjong har ingen "eggeskall" (volva) ved roten.' },
     { id:'furuknippesopp', name:'Furuknippesopp', latin:'Lyophyllum shimeji', season:[9,10],
       treslag:['furu'], skogalder:['gammel'], fuktighet:['tørr'], berggrunn:['fattig'],
+      // Kontinentalt lavlandshabitat (sandfuru-moer på Østlandet) — i
+      // motsetning til de fleste andre artene her er høydebegrensningen godt
+      // nok dokumentert til å tallfestes (se elevationScore/scoreLocation).
+      hoydeMoh:{ ideal:400, max:600 },
       weather:{ minNedbor14:15, idealNedbor14:30, minTempAvg:6 },
       why:(loc,t)=>`Gammel, tørr furuskog på ${t.berggrunnTekst} sandgrunn — det sjeldne, kontinentale furumo-habitatet furuknippesopp krever.`,
       fieldTips:'Vokser i tette knipper direkte i sandholdig skogbunn i gammel, lysåpen furuskog, ofte med reinlav og blåbærlyng i bunnsjiktet. Gråbrun, fast hatt og hvitt kjøtt med en karakteristisk, litt melaktig-nøttete lukt. Regnes som en delikatesse i Japan (der kalt "shimeji"), men er svært sjelden i Norge og finnes stort sett i kontinentale furumoer på Østlandet.',
       lookalike:'⚠ Tilhører slekten knippesopp (Lyophyllum), som har flere likeartede sopper — vær nøye med artsbestemmelsen og bruk soppkontroll ved usikkerhet. Arten er dessuten sjelden/rødlistet i Norge: vis varsomhet og ikke tøm hele forekomsten om du finner den.' },
     { id:'kransmusserong', name:'Kransmusserong', latin:'Tricholoma matsutake', season:[9,10],
       treslag:['furu'], skogalder:['gammel'], fuktighet:['tørr'], berggrunn:['fattig'],
+      hoydeMoh:{ ideal:400, max:600 },
       weather:{ minNedbor14:15, idealNedbor14:30, minTempAvg:6 },
       why:(loc,t)=>`Sandholdig, gammel furuskog — kransmusserongens svært spesifikke voksested, best kjent fra furumoer på Østlandet (bl.a. rundt Elverum).`,
       fieldTips:'Kraftig, hvit-brun sopp med tydelig ring på stilken og en kraftig, kanelaktig/krydret duft som skiller den fra det meste annet. Vokser gjerne delvis nedgravd i sandjord under gammel furu, ofte i mose eller reinlav. Internasjonalt kjent som matsutake — en ettertraktet delikatesse i Japan.',
@@ -662,15 +667,46 @@
     return String(str).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   }
 
+  // Poengsetter reell gangavstand til nærmeste kjente parkeringsplass
+  // (avstandParkeringM, hentet fra OSM/Overpass i fetch_area.py) i stedet for
+  // den gamle grove kjorbarVei ja/nei-tersklen — sistnevnte var uansett bare
+  // en ja/nei-omregning av avstandVeiM, samme mål som "ro"-scoren også
+  // brukte (se roScore) — to score-kategorier fra ett og samme tall. Eldre
+  // steder (hentet før avstandParkeringM fantes, eller manuelt lagt inn) har
+  // ikke denne avstanden og faller tilbake til den grove kjorbarVei-vurderingen.
+  function parkeringsavstandScore(loc){
+    if (loc.avstandParkeringM != null) {
+      const d = loc.avstandParkeringM;
+      if (d <= 300) return 8;
+      if (d <= 800) return 5;
+      if (d <= 1500) return 2;
+      if (d <= 3000) return 0;
+      return -3;
+    }
+    if (loc.kjorbarVei === 'ja') return 4;
+    if (loc.kjorbarVei === 'nei') return -6;
+    return 0;
+  }
+
   function adkomstScore(loc){
     let pts = 0; const tags = [];
-    if (loc.kjorbarVei === 'ja') { pts += 6; tags.push({ text:'kjørbar vei til parkering', cls:'good' }); }
-    else if (loc.kjorbarVei === 'nei') { pts -= 8; tags.push({ text:'ingen kjent bilvei', cls:'warn' }); }
-    if (loc.parkeringNotat && /privat|gårdstun|avtale med grunneier|låst bom/i.test(loc.parkeringNotat)) {
+    const parkPts = parkeringsavstandScore(loc);
+    pts += parkPts;
+    if (loc.avstandParkeringM != null) {
+      tags.push({ text: `${loc.avstandParkeringM} m til nærmeste kjente parkering`, cls: parkPts >= 2 ? 'good' : parkPts < 0 ? 'warn' : 'neutral' });
+    } else if (loc.kjorbarVei === 'ja') {
+      tags.push({ text:'kjørbar vei i nærheten', cls:'good' });
+    } else if (loc.kjorbarVei === 'nei') {
+      tags.push({ text:'ingen kjent bilvei', cls:'warn' });
+    }
+    // OSM-adgangsflagg (access=private/customers/permit/no) og manuelt
+    // innskrevne notater havner begge her — se fetch_area.py for hvordan
+    // parkeringNotat genereres for auto-hentede steder.
+    if (loc.parkeringNotat && /privat|gårdstun|avtale med grunneier|låst bom|kun for kunder|krever.*tillatelse|stengt for parkering/i.test(loc.parkeringNotat)) {
       pts -= 10; tags.push({ text:'sjekk parkering – kan kreve avtale', cls:'warn' });
     }
-    if (loc.stier === 'ja') { pts += 4; tags.push({ text:'stier/skogsbilvei i terrenget', cls:'good' }); }
-    else if (loc.stier === 'nei') { pts -= 2; }
+    if (loc.stier === 'ja') { pts += 3; tags.push({ text:'sti/skogsbilvei i terrenget', cls:'good' }); }
+    else if (loc.stier === 'nei') { pts -= 1; }
     return { pts, tags };
   }
 
@@ -688,6 +724,32 @@
     return loc ? { lat: loc.lat, lon: loc.lon } : null;
   }
 
+  // Kun noen få arter har et presist nok kjent høydebegrensning i norsk
+  // sopplitteratur til at det er forsvarlig å tallfeste (se species.hoydeMoh)
+  // — resten forekommer over et for bredt/dårlig dokumentert høydespenn til
+  // at en tallfestet grense ville vært noe annet enn gjetning. Nøytral (0)
+  // når arten ikke har en satt preferanse, eller stedet mangler høydedata.
+  function elevationScore(species, loc){
+    if (!species.hoydeMoh || loc.hoydeMoh == null) return 0;
+    const { ideal, max } = species.hoydeMoh;
+    if (loc.hoydeMoh <= ideal) return 5;
+    if (loc.hoydeMoh <= max) return 2;
+    return -5;
+  }
+
+  // ---------------------------------------------------------------------
+  // Vektbudsjett (rebalansert 2026-07-10 — se kritisk gjennomgang samme dag):
+  // treslag 20, fuktighet 15, berggrunn 10, alder 10, sesong 8, høyde ±5,
+  // varme +4, vær +12/-10, ro (befolkning) +8/-8, adkomst (parkeringsavstand
+  // +stier) +11/-14, Artskart-funn +10, egen historikk +20.
+  // "Alltid tilgjengelige" kategorier (treslag+fukt+berg+alder+sesong+vær+ro
+  // +adkomst) summerer til ~90 i et typisk scenario — taket på 100 nås
+  // dermed normalt kun ved hjelp av faktisk KORROBORERENDE bevis (egen
+  // funnhistorikk, kjente Artskart-funn, sørvendt skråning), ikke av
+  // terrengmatch alene. Tidligere summerte maks-verdiene til 176 poeng
+  // klippet til 100, som gjorde at de fleste "gode nok" steder traff taket
+  // og de virkelig gode stedene ikke lenger skilte seg ut i rangeringen.
+  // ---------------------------------------------------------------------
   function scoreLocation(species, loc){
     const cutRecent = loc.hogstAr !== null && loc.hogstAr !== undefined && (yearNow - loc.hogstAr) <= 3;
     const manuallyCut = userCuts.includes(loc.id) || isWithinHogstOmrade(loc);
@@ -696,21 +758,24 @@
     const breakdown = [];
     let total = 0;
 
-    const rTreslag = attrScore(loc.treslag, species.treslag, 30);
+    const rTreslag = attrScore(loc.treslag, species.treslag, 20);
     total += rTreslag.pts; breakdown.push([rTreslag.ok===null?'Treslag ukjent':(rTreslag.ok?'Treslag passer':'Treslag passer dårlig'), rTreslag.pts]);
 
-    const rFukt = attrScore(loc.fuktighet, species.fuktighet, 20);
+    const rFukt = attrScore(loc.fuktighet, species.fuktighet, 15);
     total += rFukt.pts; breakdown.push([rFukt.ok===null?'Fuktighet ukjent':(rFukt.ok?'Fuktighetsnivå riktig':'Fuktighetsnivå avvikende'), rFukt.pts]);
 
-    const rBerg = attrScore(loc.berggrunn, species.berggrunn, 15);
+    const rBerg = attrScore(loc.berggrunn, species.berggrunn, 10);
     total += rBerg.pts; breakdown.push([rBerg.ok===null?'Berggrunn ukjent':(rBerg.ok?'Berggrunn/jordsmonn passer':'Berggrunn suboptimal'), rBerg.pts]);
 
-    const rAlder = attrScore(loc.skogalder, species.skogalder, 15);
+    const rAlder = attrScore(loc.skogalder, species.skogalder, 10);
     total += rAlder.pts; breakdown.push([rAlder.ok===null?'Skogalder ukjent':(rAlder.ok?'Skogalder riktig':'Skogalder ikke ideell'), rAlder.pts]);
 
     const inSeason = monthNow >= species.season[0] && monthNow <= species.season[1];
-    const seasonPts = inSeason ? 10 : 0;
+    const seasonPts = inSeason ? 8 : 0;
     total += seasonPts; breakdown.push([inSeason?'I sesong nå':'Utenfor typisk sesong', seasonPts]);
+
+    const elevPts = elevationScore(species, loc);
+    if (elevPts !== 0) { total += elevPts; breakdown.push(['Høyde over havet', elevPts]); }
 
     // kjenteFunnDetaljer (art/dato/avstandM per Artskart-observasjon) gir en
     // tetthetsbevisst bonus — flere kjente funn, og spesielt nære funn, teller
@@ -720,31 +785,36 @@
     const funnDetaljer = (loc.kjenteFunnDetaljer || []).filter(f => f.art === species.id);
     if (funnDetaljer.length) {
       const naerFunn = funnDetaljer.some(f => f.avstandM < 300);
-      const densityScore = Math.min(15, funnDetaljer.length * 3 + (naerFunn ? 4 : 0));
+      const densityScore = Math.min(10, funnDetaljer.length * 2 + (naerFunn ? 3 : 0));
       total += densityScore;
       breakdown.push([`${funnDetaljer.length} kjente Artsdatabanken-funn i nærheten${naerFunn ? ' (inkl. et svært nært)' : ''}`, densityScore]);
     } else if (loc.kjenteFunn && loc.kjenteFunn.includes(species.id)) {
-      total += 8; breakdown.push(['Tidligere kjente funn i nærheten (database)', 8]);
+      total += 5; breakdown.push(['Tidligere kjente funn i nærheten (database)', 5]);
     }
 
+    // Ro/folketetthet — drives nå UTELUKKENDE av befolkning (se
+    // fetch_area.py for hvordan dette hentes via Overpass place=*-noder).
+    // Ga tidligere ALLTID +4 ekstra for avstandVeiM>=1000 — samme mål som
+    // adkomstScore/parkeringsavstandScore bruker for reachability, så det
+    // dobbelttalte i praksis én og samme (og minst sikre) datakilde under to
+    // score-kategorier. Fjernet herfra; kun befolkning avgjør ro-scoren nå.
     let roScore = 0;
     if (prioritizeQuiet) {
-      if (loc.befolkning === 'lav') roScore = 10;
-      else if (loc.befolkning === 'middels') roScore = 4;
+      if (loc.befolkning === 'lav') roScore = 8;
+      else if (loc.befolkning === 'middels') roScore = 3;
       else if (loc.befolkning === 'hoy') roScore = -8;
-      else roScore = 2;
-      if (loc.avstandVeiM && loc.avstandVeiM >= 1000) roScore += 4;
+      else roScore = 1;
       total += roScore; breakdown.push(['Ro / avstand fra folk', roScore]);
     }
 
     const acc = adkomstScore(loc);
-    total += acc.pts; breakdown.push(['Adkomst (vei/parkering/stier)', acc.pts]);
+    total += acc.pts; breakdown.push(['Adkomst (parkeringsavstand/stier)', acc.pts]);
 
     if (WARMTH_LOVING_SPECIES.has(species.id) && loc.himmelretning && loc.helningGrader != null) {
       const sorvendt = ['S','SØ','SV'].includes(loc.himmelretning);
       const passeHelning = loc.helningGrader >= 3 && loc.helningGrader <= 25;
       if (sorvendt && passeHelning) {
-        total += 5; breakdown.push(['Sørvendt skråning (varmekrevende art)', 5]);
+        total += 4; breakdown.push(['Sørvendt skråning (varmekrevende art)', 4]);
       }
     }
 
@@ -764,7 +834,7 @@
     let histNote = null;
     if (myFinds.length) {
       const avgM = myFinds.reduce((a,f)=>a+f.mengde,0) / myFinds.length;
-      const histPts = Math.min(30, Math.round(8 + avgM*4 + Math.min(myFinds.length,5)*1.2));
+      const histPts = Math.min(20, Math.round(5 + avgM*3 + Math.min(myFinds.length,5)));
       total += histPts;
       breakdown.push([`Egen funnhistorikk (${myFinds.length} funn, snitt ${avgM.toFixed(1)}/5)`, histPts]);
       histNote = `Du har selv funnet ${species.name.toLowerCase()} her ${myFinds.length} gang${myFinds.length>1?'er':''} tidligere, snitt mengde ${avgM.toFixed(1)}/5 — dette teller sterkt i vurderingen.`;
@@ -1393,9 +1463,23 @@
       return;
     }
 
-    const zones = clusterIntoZones(scoped, 12, 0.4);
-    const centerLat = zones.reduce((a,z) => a + z.loc.lat, 0) / zones.length;
-    const centerLon = zones.reduce((a,z) => a + z.loc.lon, 0) / zones.length;
+    const allZones = clusterIntoZones(scoped, 12, 0.4);
+
+    // I fylke/kommune-modus kan de 12 beste sonene ligge spredt over et stort
+    // område (hele kommunen/fylket) — da gir et gjennomsnittlig midtpunkt et
+    // startpunkt som ikke er i nærheten av noen av dem. Anker derfor turen på
+    // den enkeltsonen med høyest score, og bygg turen rundt DEN i stedet for
+    // på tvers av alle sonene. Radius-modus er allerede lokal, så der beholdes
+    // gjennomsnittet av sonene som før.
+    const anchorMode = filterMode === 'fylke' || filterMode === 'kommune';
+    const bestZone = allZones[0];
+    const zones = anchorMode
+      ? allZones.filter(z => haversineKm(bestZone.loc.lat, bestZone.loc.lon, z.loc.lat, z.loc.lon) <= routeKm / 2)
+      : allZones;
+    const anchorLabel = anchorMode ? `${bestZone.loc.name} (${bestZone.loc.kommune})` : null;
+
+    const centerLat = anchorMode ? bestZone.loc.lat : zones.reduce((a,z) => a + z.loc.lat, 0) / zones.length;
+    const centerLon = anchorMode ? bestZone.loc.lon : zones.reduce((a,z) => a + z.loc.lon, 0) / zones.length;
 
     const parkingCandidates = await findNearbyParking(centerLat, centerLon, 4000);
     let startPoint;
@@ -1410,7 +1494,10 @@
 
     const { stops, totalKm } = buildRoute(startPoint, zones, routeKm);
     if (!stops.length) {
-      summary.innerHTML = `Fant ingen soner som får plass innenfor ${routeKm} km rundtur fra foreslått startpunkt (${escapeHtml(startPoint.name || '')}). Prøv å øke lengden.`;
+      summary.innerHTML = `Fant ingen soner som får plass innenfor ${routeKm} km rundtur fra foreslått startpunkt`
+        + ` (${escapeHtml(startPoint.name || 'ukjent sted')}, et reelt punkt fra OpenStreetMap ved ${startPoint.lat.toFixed(3)}, ${startPoint.lon.toFixed(3)}`
+        + `${anchorLabel ? `, nær beste sone: ${escapeHtml(anchorLabel)}` : ''}).`
+        + ` Prøv å øke lengden.`;
       return;
     }
 
@@ -1420,7 +1507,8 @@
     const estMinutes = Math.round((totalKm / 3.2) * 60); // ~3,2 km/t i skogsterreng, uten stopptid
     summary.innerHTML = `
       <b>${stops.length} stopp</b>, ca <b>${totalKm.toFixed(1)} km</b> rundtur (~${estMinutes} min gange, uten tid til leting).<br/>
-      Start/parkering: ${escapeHtml(startPoint.name || 'ukjent')}${startPoint.kilde === 'parkering' ? ' (fra OpenStreetMap)' : ''}
+      ${anchorLabel ? `Beste sone lagt til grunn: ${escapeHtml(anchorLabel)}<br/>` : ''}
+      Start/parkering: ${escapeHtml(startPoint.name || 'ukjent')}${startPoint.kilde === 'parkering' ? ' (reelt punkt fra OpenStreetMap)' : ''}
       <div class="sp-route-why">${describeRouteTerrain(stops)}</div>
       <span style="font-size:11px;opacity:0.8;">Rett linje mellom stoppene, ikke snappet til faktiske stier — bruk det topografiske kartlaget til å legge din egen linje mellom dem.</span>
     `;
