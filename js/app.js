@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.14.0';
+  const APP_VERSION = '0.14.1';
   const APP_BUILD_DATE = '2026-07-11';
 
   const SPECIES = [
@@ -1390,7 +1390,11 @@
   // 2026-07-11: brukeren ønsket forslag på GODE OMRÅDER/TERRENG, ikke en
   // spesifikk gåtur mellom eksakte koordinater — sirkelen markerer "let et
   // sted her", ikke "gå akkurat denne stien"). Farget etter samme
-  // score-skala som kartprikkene ellers.
+  // score-skala som kartprikkene ellers. Egen 🅿️-markør per område viser HVOR
+  // det er mulig å parkere (se findParkingForAreas) — loc.parkeringNotat/
+  // avstandParkeringM (fra ETL-en) er kun avstand+tekst, ALDRI selve
+  // koordinaten til parkeringsplassen, så et faktisk punkt på kartet krever
+  // dette ferske Overpass-oppslaget.
   function renderAreasOnMap(){
     if (!routeLayer || !suggestedRoute) return;
     routeLayer.clearLayers();
@@ -1398,12 +1402,72 @@
     areas.forEach((a, i) => {
       const score = a.anchor.res.total;
       const color = score >= 65 ? '#5F7A3E' : score >= 40 ? '#C8974A' : '#A23E2E';
+      const parkeringTekst = a.parking
+        ? `🅿️ Mulig parkering ca ${a.parking.distM} m fra sentrum av området${a.parking.access ? ` (merket "${escapeHtml(a.parking.access)}" på kart — bekreft på stedet)` : ''}`
+        : '🅿️ Ingen kjent parkeringsplass funnet i nærheten (OSM)';
       L.circle([a.anchor.loc.lat, a.anchor.loc.lon], {
         radius: a.radiusM, color, weight: 2.5, dashArray: '8,8', fillColor: color, fillOpacity: 0.07
-      }).bindPopup(`<b>Område ${i+1}: ${escapeHtml(a.anchor.loc.name)}</b><br/>Beste score i området: ${score}<br/>${a.anchor.loc.parkeringNotat ? escapeHtml(a.anchor.loc.parkeringNotat) + '<br/>' : ''}${describeRouteTerrain(a.members)}`)
+      }).bindPopup(`<b>Område ${i+1}: ${escapeHtml(a.anchor.loc.name)}</b><br/>Beste score i området: ${score}<br/>${parkeringTekst}<br/>${describeRouteTerrain(a.members)}`)
         .addTo(routeLayer);
+
+      if (a.parking) {
+        L.marker([a.parking.lat, a.parking.lon], {
+          icon: L.divIcon({ className: 'sp-parking-icon', html: 'P', iconSize: [22,22] })
+        }).bindPopup(`<b>Parkering — Område ${i+1}</b><br/>${escapeHtml(a.parking.name)}<br/>${a.parking.access ? `Merket tilgang: ${escapeHtml(a.parking.access)} — bekreft på stedet.` : 'Ingen tilgangsbegrensning merket i kartdata.'}`)
+          .addTo(routeLayer);
+      }
     });
     if (areas.length) leafletMap.fitBounds(L.featureGroup(routeLayer.getLayers()).getBounds().pad(0.15));
+  }
+
+  // RETTET 2026-07-11: ETT samlet Overpass-kall for alle områdene ga 504
+  // Gateway Timeout i praksis (verifisert i preview — se samtalen om
+  // enrich-point sin Overpass-bbox for samme mønster: kombinerte spørringer
+  // er mindre stabile enn små, individuelle). Ett lite kall PER område i
+  // stedet — tregere totalt (sekvensielt, med høflig pause mellom), men én
+  // enkelt feil/timeout rammer da kun DET området, ikke alle på én gang.
+  const AREA_PARKING_SEARCH_RADIUS_M = 2000;
+  const AREA_PARKING_MAX_RETRIES = 2;
+
+  async function fetchParkingNear(lat, lon){
+    const query = `[out:json][timeout:20];(node["amenity"="parking"](around:${AREA_PARKING_SEARCH_RADIUS_M},${lat},${lon});way["amenity"="parking"](around:${AREA_PARKING_SEARCH_RADIUS_M},${lat},${lon}););out center;`;
+    for (let attempt = 1; attempt <= AREA_PARKING_MAX_RETRIES; attempt++) {
+      try {
+        const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(query) });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        return (data.elements || [])
+          .map(el => {
+            const c = el.center || el;
+            return { lat: c.lat, lon: c.lon, name: (el.tags && el.tags.name) || 'Parkeringsplass', access: el.tags && el.tags.access };
+          })
+          .filter(p => p.lat != null && p.lon != null);
+      } catch (e) {
+        if (attempt === AREA_PARKING_MAX_RETRIES) {
+          console.warn(`Parkeringssøk feilet for (${lat}, ${lon}) etter ${AREA_PARKING_MAX_RETRIES} forsøk`, e);
+          return [];
+        }
+        await new Promise(r => setTimeout(r, 1500 * attempt));
+      }
+    }
+    return [];
+  }
+
+  async function findParkingForAreas(areas, onProgress){
+    const results = [];
+    for (let i = 0; i < areas.length; i++) {
+      if (onProgress) onProgress(i + 1, areas.length);
+      const a = areas[i];
+      const points = await fetchParkingNear(a.anchor.loc.lat, a.anchor.loc.lon);
+      let best = null, bestDistM = Infinity;
+      for (const p of points) {
+        const d = haversineKm(a.anchor.loc.lat, a.anchor.loc.lon, p.lat, p.lon) * 1000;
+        if (d <= AREA_PARKING_SEARCH_RADIUS_M && d < bestDistM) { bestDistM = d; best = p; }
+      }
+      results.push(best ? { ...best, distM: Math.round(bestDistM) } : null);
+      if (i < areas.length - 1) await new Promise(r => setTimeout(r, 300)); // høflig pause mellom kall
+    }
+    return results;
   }
 
   async function suggestAreas(){
@@ -1451,14 +1515,19 @@
       return { anchor, members, radiusM };
     });
 
+    const parkingByArea = await findParkingForAreas(areas, (n, total) => {
+      summary.textContent = `Fant områdene — søker etter parkering (${n}/${total}) …`;
+    });
+    areas.forEach((a, i) => { a.parking = parkingByArea[i]; });
+
     suggestedRoute = { areas };
     renderAreasOnMap();
 
     const overskrift = areas.length === 1 ? '<b>1 godt område</b> foreslått' : `<b>${areas.length} gode områder</b> foreslått`;
     summary.innerHTML = `
-      ${overskrift} i valgt område (stiplede sirkler i kartet, farget etter score — klikk en sirkel for detaljer).<br/>
-      ${areas.map((a, i) => `<div class="sp-route-area-item">Område ${i+1}: <b>${escapeHtml(a.anchor.loc.name)}</b> (${escapeHtml(a.anchor.loc.kommune || 'ukjent kommune')}) — beste score ${a.anchor.res.total}, ${a.members.length} kjent${a.members.length===1?'':'e'} punkt${a.members.length===1?'':'er'} i området.</div>`).join('')}
-      <span style="font-size:11px;opacity:0.8;">Sirklene markerer OMRÅDER med gode odds, ikke eksakte punkter eller en gåtur mellom dem — bruk det topografiske kartlaget til å utforske selv innenfor sirkelen.</span>
+      ${overskrift} i valgt område (stiplede sirkler i kartet, farget etter score — klikk en sirkel eller 🅿️-markøren for detaljer).<br/>
+      ${areas.map((a, i) => `<div class="sp-route-area-item">Område ${i+1}: <b>${escapeHtml(a.anchor.loc.name)}</b> (${escapeHtml(a.anchor.loc.kommune || 'ukjent kommune')}) — beste score ${a.anchor.res.total}, ${a.members.length} kjent${a.members.length===1?'':'e'} punkt${a.members.length===1?'':'er'} i området. ${a.parking ? `🅿️ ca ${a.parking.distM} m unna.` : '🅿️ ingen kjent parkering funnet.'}</div>`).join('')}
+      <span style="font-size:11px;opacity:0.8;">Sirklene markerer OMRÅDER med gode odds, ikke eksakte punkter eller en gåtur mellom dem — bruk det topografiske kartlaget til å utforske selv innenfor sirkelen. Parkeringsmarkører er hentet live fra OpenStreetMap og kan avvike fra virkeligheten — bekreft alltid på stedet.</span>
     `;
     document.getElementById('sp-route-clear').style.display = '';
   }

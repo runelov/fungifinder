@@ -150,6 +150,7 @@
   .sp-route-row input[type=range] { width: 120px; }
   .sp-route-summary { font-size: 12.5px; color: var(--ink); margin-top: 10px; line-height: 1.5; }
   .sp-route-area-item { font-size: 12.5px; color: var(--ink); background: rgba(108,122,82,0.1); border-left: 2px solid var(--gold); padding: 6px 10px; margin: 6px 0; border-radius: 0 3px 3px 0; }
+  .sp-parking-icon { background: #2E6FE0; color: #fff; border-radius: 4px; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); font-family: 'JetBrains Mono', monospace; }
 
   .sp-card { background: var(--paper-deep); border: 1px solid var(--line); border-radius: 4px; padding: 16px 18px; margin-bottom: 14px; position: relative; scroll-margin-top: 20px; }
   .sp-card.sp-excluded { opacity: 0.6; border-style: dashed; }
