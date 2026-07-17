@@ -1,5 +1,19 @@
 # Endringslogg
 
+## 0.16.1 — "Hent data"-meldingen tar hensyn til reell dekning
+Fant ved en radius-henting rundt Trondheim: `findFetchedAreaMatch()` krever
+et EKSAKT bokført treff (samme modus+verdi) i `fetchedAreas.json`, og vet
+derfor ikke at en tidligere radius-henting kan dekke det meste av en
+kommune/et fylke man senere velger via filteret. Dataene var riktige hele
+veien (alle punktene hadde korrekt `kommune`/`fylke` fra ETL-en) — bristen
+var kun i bokføringen, som ga et "Ingen terrengdata hentet ennå" som
+direkte motsa den nye dekningslinjen (0.16.0) rett over, som riktig viste
+antall kjente punkter. `updateFetchPanel()` i `js/app.js` bruker nå samme
+punkt-telling som dekningslinjen: har man kjente punkter i området men
+ikke noe eksakt bokført treff, sier meldingen nå "trolig dekket delvis av
+en tidligere henting med annet filter" i stedet for å late som feltet er
+helt uberørt.
+
 ## 0.16.0 — Dekningslinje: vet du om terrenget er analysert før du klikker
 UX-problem: etter å ha analysert et område tidligere var det uklart om man
 skulle klikke "Foreslå områder" eller "Hent data" først, og om det valgte

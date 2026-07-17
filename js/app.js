@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.16.0';
+  const APP_VERSION = '0.16.1';
   const APP_BUILD_DATE = '2026-07-17';
 
   const SPECIES = [
@@ -531,7 +531,7 @@
     return null;
   }
 
-  async function updateFetchPanel(){
+  async function updateFetchPanel(coverageCount){
     const panel = document.getElementById('sp-fetch-panel');
     // Selve GitHub Actions-triggeren er allerede sperret i startFetch() for en
     // ikke-tilkoblet besøkende, men panelet ble likevel vist og gjorde et ekte
@@ -566,7 +566,15 @@
 
     document.getElementById('sp-fetch-start').disabled = false;
     document.getElementById('sp-fetch-start').textContent = 'Hent data';
-    document.getElementById('sp-fetch-info').textContent = `Ingen terrengdata hentet for ${label} ennå.`;
+    // findFetchedAreaMatch() krever et EKSAKT treff (samme fylke/kommune-navn,
+    // eller radiussenter+radius) — den vet ikke at en tidligere RADIUS-henting
+    // kan dekke det meste av akkurat DENNE kommunen/fylket. Uten dette ga
+    // panelet et rett-frem misvisende "ingen data ennå" ved siden av en
+    // dekningslinje over "Foreslå områder" som samtidig (korrekt) viste at det
+    // fantes mange kjente punkter her — se konteksten som avdekket dette.
+    document.getElementById('sp-fetch-info').textContent = coverageCount > 0
+      ? `Ingen egen henting registrert for nøyaktig ${label} (trolig dekket delvis av en tidligere henting med annet filter, f.eks. radius) — men ${coverageCount} kjent${coverageCount===1?'':'e'} punkt${coverageCount===1?'':'er'} finnes her allerede. Hent likevel for å fylle ut resten av området.`
+      : `Ingen terrengdata hentet for ${label} ennå.`;
     // Rydd bort ev. statustekst fra en TIDLIGERE fullført/feilet henting (f.eks.
     // "Oppdaterer visningen …") — den ble stående synlig under "Hent data" for
     // et helt NYTT område ellers, og ga inntrykk av at noe fortsatt pågikk.
@@ -1989,7 +1997,8 @@
       return true;
     });
 
-    updateCoverageLine(scoped.length);
+    const coverageCount = scoped.length;
+    updateCoverageLine(coverageCount);
     if (hideHogst) scoped = scoped.filter(s => !s.res.isCut);
     renderArtskartLayer();
     scoped.sort((a,b) => {
@@ -1997,7 +2006,7 @@
       return b.res.total - a.res.total;
     });
 
-    updateFetchPanel();
+    updateFetchPanel(coverageCount);
 
     const areaLabel = filterMode === 'fylke' ? (fylkeFilter!=='alle' ? ' i ' + fylkeFilter : '')
       : filterMode === 'kommune' ? (kommuneFilter!=='alle' ? ' i ' + kommuneFilter : '')
