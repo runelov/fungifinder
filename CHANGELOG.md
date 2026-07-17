@@ -1,5 +1,25 @@
 # Endringslogg
 
+## 0.16.3 — Håndter Open-Meteo-throttling (429) bedre
+Konsollfeil fra bruker: `GET api.open-meteo.com/v1/forecast … 429 (Too Many
+Requests)` fra `loadWeather()`. Årsak: 14-dagers værhenting sendte lat/lon
+for HVER lokasjon i datasettet (fort 1000+ med et større privat repo) —
+Open-Meteos gratis kvote belastes per lokasjon i kallet, ikke per HTTP-
+request, så dette kostet reelt sett like mye kvote som 1000+ separate kall,
+på HVER sideinnlasting.
+- `loadWeather()` runder nå ned til unike ~0.1°-rutenettceller (~11×5 km,
+  grovt sammenfallende med værmodellens egen oppløsning) FØR den spør
+  Open-Meteo, og cacher svar i `localStorage` (2 timer) på tvers av
+  sideinnlastinger — de aller fleste sideinnlastinger gjør nå NULL kall mot
+  Open-Meteo i stedet for opptil et titalls. Verifisert: andre innlasting i
+  samme økt utløste ingen nettverkskall, samme værtall vist.
+- Samme prinsipp for `loadSeasonWeather()` (0.15.0): cachet 6 timer per
+  avrundet senterpunkt, med samme mønster som `loadKommuneRegister()`.
+- Begge håndterer nå 429 eksplisitt: stopper flere bolker øyeblikkelig
+  (i stedet for å fortsette og forverre throttlingen) og viser en tydelig
+  "værtjenesten er midlertidig overbelastet"-melding fremfor en generisk
+  feil. Verifisert med en midlertidig tvunget 429-respons i `loadWeather()`.
+
 ## 0.16.2 — Cache-busting for js/css, så oppdateringer faktisk når frem
 Reelt problem: repoet har bevisst ingen build-steg, så `css/styles.css` og
 `js/app.js`/`js/github-store.js` ble lastet med statiske, uversjonerte

@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.16.2';
+  const APP_VERSION = '0.16.3';
   const APP_BUILD_DATE = '2026-07-17';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -733,46 +733,109 @@
   }
 
   // ---------- weather ----------
+  // ~0.1° ≈ 11 km (nord-sør) / 5 km (øst-vest ved 63°N) — matcher grovt
+  // oppløsningen til værmodellen Open-Meteo selv bruker for disse variablene
+  // (typisk 9-11 km), så avrunding taper ingen reell presisjon: mange
+  // punkter fra et tett "Hent data"-rutenett (ned til 0.5 km) faller uansett
+  // innenfor SAMME underliggende modellcelle og ville fått identisk svar.
+  const WEATHER_GRID_DEG = 0.1;
+  const WEATHER_CACHE_KEY = 'fungifinder-weather-grid-cache';
+  const WEATHER_CACHE_MAX_AGE_HOURS = 2;
+
+  function weatherGridKey(lat, lon){
+    return (Math.round(lat / WEATHER_GRID_DEG) * WEATHER_GRID_DEG).toFixed(2) + ',' +
+           (Math.round(lon / WEATHER_GRID_DEG) * WEATHER_GRID_DEG).toFixed(2);
+  }
+
   async function loadWeather(){
     const box = document.getElementById('sp-weather-box');
     const locs = allLocations();
-    // Open-Meteos multi-lokasjons-endepunkt tar lat/lon som kommaseparerte
-    // lister i URL-en. Med mange auto-hentede steder (fort noen hundre i et
-    // område med tett rutenett) ble URL-en for lang og HELE kallet feilte
-    // stille (nettleserens/serverens URL-lengdegrense) — værdata forsvant da
-    // helt, selv om de fleste stedene i og for seg hadde fungert fint alene.
-    // Deler derfor opp i bolker.
-    const BATCH_SIZE = 100;
-    let anyOk = false;
-    for (let i = 0; i < locs.length; i += BATCH_SIZE) {
-      const batch = locs.slice(i, i + BATCH_SIZE);
+
+    // Uten dedup kostet HVER sideinnlasting like mange "lokasjoner" mot
+    // Open-Meteos gratis kvote som antall punkter i datasettet (fort 1000+
+    // med et større privat repo) — noe som utløste 429 (Too Many Requests).
+    // Runder derfor ned til unike rutenett-celler (se WEATHER_GRID_DEG) og
+    // cacher svar i localStorage på tvers av sideinnlastinger FØR vi i det
+    // hele tatt spør Open-Meteo på nytt.
+    const cellByLoc = {};
+    const uniqueCells = {};
+    locs.forEach(loc => {
+      const key = weatherGridKey(loc.lat, loc.lon);
+      cellByLoc[loc.id] = key;
+      if (!uniqueCells[key]) uniqueCells[key] = { lat: loc.lat, lon: loc.lon };
+    });
+
+    let cache = {};
+    try { cache = JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY) || '{}'); } catch(e) { cache = {}; }
+    const now = Date.now();
+    const freshCells = {};
+    const staleKeys = [];
+    Object.keys(uniqueCells).forEach(key => {
+      const entry = cache[key];
+      if (entry && (now - entry.fetchedAt) < WEATHER_CACHE_MAX_AGE_HOURS * 3600 * 1000) {
+        freshCells[key] = entry;
+      } else {
+        staleKeys.push(key);
+      }
+    });
+
+    let anyOk = Object.keys(freshCells).length > 0;
+    let hit429 = false;
+    const BATCH_SIZE = 100; // Open-Meteos multi-lokasjons-URL blir for lang og feiler stille over dette
+    for (let i = 0; i < staleKeys.length && !hit429; i += BATCH_SIZE) {
+      const batchKeys = staleKeys.slice(i, i + BATCH_SIZE);
+      const batchCells = batchKeys.map(k => uniqueCells[k]);
       try {
-        const lats = batch.map(l=>l.lat).join(',');
-        const lons = batch.map(l=>l.lon).join(',');
+        const lats = batchCells.map(c=>c.lat).join(',');
+        const lons = batchCells.map(c=>c.lon).join(',');
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&daily=precipitation_sum,temperature_2m_mean&past_days=14&forecast_days=1&timezone=Europe%2FOslo`;
         const res = await fetch(url);
+        if (res.status === 429) {
+          // Ikke fortsett med flere bolker denne runden — det gjør bare
+          // throttlingen verre. Det vi allerede har (cache + evt. tidligere
+          // bolker) brukes i stedet, resten forblir "ukjent" (scores nøytralt).
+          console.warn('Open-Meteo svarte 429 (Too Many Requests) — stopper flere værkall denne sesjonen.');
+          hit429 = true;
+          break;
+        }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         const arr = Array.isArray(data) ? data : [data];
         arr.forEach((d,j) => {
-          const loc = batch[j]; if(!loc || !d || !d.daily) return;
+          const key = batchKeys[j]; if(!key || !d || !d.daily) return;
           const precipArr = d.daily.precipitation_sum || [];
           const tempArr = d.daily.temperature_2m_mean || [];
           const last14p = precipArr.slice(0,14);
           const last5t = tempArr.slice(9,14);
           const sumP = last14p.reduce((a,b)=>a+(b||0),0);
           const avgT = last5t.length ? last5t.reduce((a,b)=>a+(b||0),0)/last5t.length : null;
-          weatherBySpecies[loc.id] = { precip14: Math.round(sumP*10)/10, tempAvg: avgT!==null? Math.round(avgT*10)/10 : null };
+          const entry = { precip14: Math.round(sumP*10)/10, tempAvg: avgT!==null? Math.round(avgT*10)/10 : null, fetchedAt: now };
+          freshCells[key] = entry;
+          cache[key] = entry;
         });
         anyOk = true;
       } catch (e) {
-        console.warn('Værdata feilet for en bolk med steder', e);
+        console.warn('Værdata feilet for en bolk med rutenett-celler', e);
       }
     }
+
+    if (staleKeys.length) {
+      try { localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(cache)); } catch(e) { /* full/blokkert lagring — ignorer, gjelder bare cache */ }
+    }
+
+    locs.forEach(loc => {
+      const cell = freshCells[cellByLoc[loc.id]];
+      if (cell) weatherBySpecies[loc.id] = { precip14: cell.precip14, tempAvg: cell.tempAvg };
+    });
+
     if (anyOk) {
       weatherReady = true;
       const vals = Object.values(weatherBySpecies);
       const avgPrecip = vals.reduce((a,b)=>a+(b.precip14||0),0) / (vals.length||1);
       box.innerHTML = `<span class="sp-wstatus">✓ live data hentet</span><br/>Snitt nedbør siste 14 dager (alle steder): <b>${Math.round(avgPrecip)} mm</b>.`;
+    } else if (hit429) {
+      weatherReady = false;
+      box.innerHTML = `<span class="sp-wstatus">⚠ værtjenesten er midlertidig overbelastet (429)</span><br/>Viser terrengscore uten tidsvurdering — prøv igjen litt senere.`;
     } else {
       weatherReady = false;
       box.innerHTML = `<span class="sp-wstatus">⚠ kunne ikke hente værdata</span><br/>Viser terrengscore uten tidsvurdering.`;
@@ -788,6 +851,8 @@
   // en ellers tørr sommer som nettopp har fått litt regn de siste 14 dagene).
   // Hentes på ett representativt punkt, ikke per lokasjon, for å unngå
   // hundrevis av kall for et sesonglangt datasett.
+  const SEASON_WEATHER_CACHE_MAX_AGE_HOURS = 6;
+
   async function loadSeasonWeather(){
     const locs = allLocations();
     if (!locs.length) return;
@@ -796,9 +861,29 @@
     const now = new Date();
     const seasonStart = `${now.getFullYear()}-05-01`;
     const todayStr = now.toISOString().slice(0,10);
+
+    // Centroiden flytter seg litt etter hvert som flere områder hentes, så
+    // avrundes til ~11 km for en stabil cache-nøkkel som fortsatt treffer på
+    // tvers av sideinnlastinger samme dag/kveld.
+    const cacheKey = `fungifinder-season-weather-${lat.toFixed(1)}_${lon.toFixed(1)}`;
+    try {
+      const cachedRaw = localStorage.getItem(cacheKey);
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw);
+        if ((Date.now() - cached.fetchedAt) < SEASON_WEATHER_CACHE_MAX_AGE_HOURS * 3600 * 1000 && cached.data) {
+          seasonWeather = cached.data;
+          seasonWeatherReady = true;
+          renderSeasonWeatherBox();
+          return;
+        }
+      }
+    } catch(e) { /* ignorer korrupt cache */ }
+
     try {
       const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}&start_date=${seasonStart}&end_date=${todayStr}&daily=precipitation_sum,temperature_2m_mean&timezone=Europe%2FOslo`;
       const res = await fetch(url);
+      if (res.status === 429) throw new Error('429 Too Many Requests (Open-Meteo arkiv)');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
       const dates = (data.daily && data.daily.time) || [];
       const precipArr = (data.daily && data.daily.precipitation_sum) || [];
@@ -837,6 +922,7 @@
         days: dates.length
       };
       seasonWeatherReady = true;
+      try { localStorage.setItem(cacheKey, JSON.stringify({ fetchedAt: Date.now(), data: seasonWeather })); } catch(e) { /* full/blokkert lagring — ignorer, gjelder bare cache */ }
     } catch (e) {
       console.warn('Sesongvær feilet', e);
       seasonWeatherReady = false;
