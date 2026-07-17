@@ -1,5 +1,24 @@
 # Endringslogg
 
+## 0.16.2 — Cache-busting for js/css, så oppdateringer faktisk når frem
+Reelt problem: repoet har bevisst ingen build-steg, så `css/styles.css` og
+`js/app.js`/`js/github-store.js` ble lastet med statiske, uversjonerte
+URL-er — nettlesere (spesielt installerte PWA-er på iOS, jf. manifest med
+`display: standalone`) kunne henge fast på gamle versjoner lenge etter en
+ny push, uten at et vanlig sidereload hjalp.
+- `index.html` laster nå disse tre filene med `?v=<versjon>`, som
+  tvinger frem riktig fil ved hver versjonsbump (nettleseren ser det som en
+  helt ny URL).
+- `index.html` har fått `Cache-Control`/`Pragma: no-cache`-metatagger, slik
+  at selve HTML-shellet alltid revalideres i stedet for å caches ukritisk.
+- `js/app.js` sjekker nå selv, ved oppstart, at `?v=` i scriptets egen
+  `<script>`-tag stemmer med `APP_VERSION` — og varsler i konsollen (ikke i
+  UI) hvis noen glemte å oppdatere `index.html` ved siste versjonsbump.
+  Verifisert manuelt at varselet faktisk trigges ved avvik.
+- Se ny seksjon "Versjonering og caching" i `README.md` for rutinen (tre
+  steder å oppdatere sammen ved hver release: `APP_VERSION`, `?v=` × 3,
+  CHANGELOG).
+
 ## 0.16.1 — "Hent data"-meldingen tar hensyn til reell dekning
 Fant ved en radius-henting rundt Trondheim: `findFetchedAreaMatch()` krever
 et EKSAKT bokført treff (samme modus+verdi) i `fetchedAreas.json`, og vet

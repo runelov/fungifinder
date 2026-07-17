@@ -3,6 +3,14 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<!-- Ingen build-steg i dette repoet (se README) — index.html er selve
+     cache-fasiten. GitHub Pages/nettlesere (spesielt installerte PWA-er på
+     iOS) kan ellers henge fast på gamle js/css-versjoner i lang tid.
+     "no-cache" her betyr "revalider alltid", ikke "aldri cache" — sammen
+     med ?v=-parameteren under tvinger det frem RIKTIG versjon på hvert
+     besøk uten å måtte be brukeren hard-refreshe manuelt. -->
+<meta http-equiv="Cache-Control" content="no-cache, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
 <title>FungiFinder</title>
 <link rel="icon" href="assets/favicon.ico" sizes="any"/>
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg"/>
@@ -10,7 +18,10 @@
 <link rel="manifest" href="manifest.webmanifest"/>
 <meta name="theme-color" content="#34432C"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<link rel="stylesheet" href="css/styles.css"/>
+<!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
+     app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
+     ikke i UI) hvis de kommer ut av synk. -->
+<link rel="stylesheet" href="css/styles.css?v=0.16.2"/>
 </head>
 <body>
 
@@ -204,7 +215,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="js/github-store.js"></script>
-<script src="js/app.js"></script>
+<script src="js/github-store.js?v=0.16.2"></script>
+<script src="js/app.js?v=0.16.2"></script>
 </body>
 </html>

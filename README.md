@@ -17,6 +17,21 @@ js/app.js            All applikasjonslogikk
 Ingen data ligger i dette repoet — det er trygt å gjøre offentlig, dele koden,
 eller gjenbruke som mal for andre prosjekter.
 
+## Versjonering og caching
+
+Ingen build-steg her, med vilje — så cache-busting er manuell. Ved hver
+versjonsbump må disse tre stedene oppdateres sammen:
+
+1. `APP_VERSION` i `js/app.js`
+2. `?v=<versjon>` på `css/styles.css`, `js/github-store.js` og `js/app.js` i `index.html`
+3. Ny seksjon i `CHANGELOG.md`
+
+Glemmer man punkt 2, varsler `app.js` selv i konsollen ved oppstart (ikke i
+UI) om at `?v=` i `index.html` ikke stemmer med `APP_VERSION`. `index.html`
+har også `Cache-Control: no-cache`-metatagger slik at nettlesere/installerte
+PWA-er alltid revaliderer HTML-en — kombinert med `?v=` tvinger dette frem
+riktig js/css uten at brukeren må hard-refreshe manuelt.
+
 ## Oppsett
 
 1. Publiser dette repoet via **GitHub Pages** (Settings → Pages → Deploy from

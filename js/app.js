@@ -1,7 +1,21 @@
 (function(){
 
-  const APP_VERSION = '0.16.1';
+  const APP_VERSION = '0.16.2';
   const APP_BUILD_DATE = '2026-07-17';
+
+  // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
+  // kommentar der) — de to må holdes i sync manuelt siden repoet bevisst
+  // ikke har noe build-steg. Varsler i konsollen (kun der) hvis noen glemte
+  // å oppdatere index.html ved siste versjonsbump, i stedet for å feile
+  // stille med en gammel cachet fil som later som den er ny.
+  (function checkScriptVersionSync(){
+    const src = document.currentScript && document.currentScript.src;
+    if (!src) return;
+    const v = new URL(src).searchParams.get('v');
+    if (v && v !== APP_VERSION) {
+      console.warn(`FungiFinder: index.html laster app.js?v=${v}, men APP_VERSION er ${APP_VERSION} — sjekk at ?v= i index.html ble oppdatert ved siste versjonsbump.`);
+    }
+  })();
 
   const SPECIES = [
     { id:'kantarell', name:'Kantarell', latin:'Cantharellus cibarius', season:[7,10],
