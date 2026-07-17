@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.14.1';
-  const APP_BUILD_DATE = '2026-07-11';
+  const APP_VERSION = '0.15.0';
+  const APP_BUILD_DATE = '2026-07-17';
 
   const SPECIES = [
     { id:'kantarell', name:'Kantarell', latin:'Cantharellus cibarius', season:[7,10],
@@ -134,6 +134,8 @@
   let radiusKm = 20;
   let weatherBySpecies = {};
   let weatherReady = false;
+  let seasonWeather = null; // { totalPrecip, avgTemp, months:[{label,precip,tempAvg}], dryStreakDays }, se loadSeasonWeather()
+  let seasonWeatherReady = false;
   let userFinds = [];
   let userCuts = [];
   let hogstOmrader = []; // [{id, lat, lon, radiusM, dato}] — egne merkede flatehogd-OMRÅDER,
@@ -278,18 +280,50 @@
     });
   }
 
+  // Ikke-hemmelige deler av tilkoblingen (eier/repo/stier) speiles i URL-en som
+  // en reconnect-fallback: hvis lokal lagring blir tømt (f.eks. Safaris
+  // 7-dagers ITP-opprydding i en sesongbasert app som denne), men siden ble
+  // bokmerket/lagret ETTER tilkobling, kan disse feltene forhåndsutfylles fra
+  // URL-en igjen — da gjenstår bare å lime inn tokenet på nytt.
+  function syncParamsFromUrl(){
+    const p = new URLSearchParams(location.search);
+    const owner = p.get('owner'), repo = p.get('repo');
+    if (!owner || !repo) return null;
+    return {
+      owner, repo,
+      locationsPath: p.get('locationsPath') || undefined,
+      personalPath: p.get('personalPath') || undefined
+    };
+  }
+
+  function reflectConfigInUrl(cfg){
+    const p = new URLSearchParams(location.search);
+    p.set('owner', cfg.owner);
+    p.set('repo', cfg.repo);
+    if (cfg.locationsPath) p.set('locationsPath', cfg.locationsPath); else p.delete('locationsPath');
+    if (cfg.personalPath) p.set('personalPath', cfg.personalPath); else p.delete('personalPath');
+    history.replaceState(null, '', location.pathname + '?' + p.toString());
+  }
+
   function wireSyncPanel(){
     const cfg = window.FungiStore ? window.FungiStore.getConfig() : null;
     const defaults = defaultPaths();
+    const fromUrl = cfg ? null : syncParamsFromUrl();
     if (cfg) {
       document.getElementById('sync-repo').value = `${cfg.owner}/${cfg.repo}`;
       document.getElementById('sync-locations-path').value = cfg.locationsPath || defaults.locationsPath;
       document.getElementById('sync-personal-path').value = cfg.personalPath || defaults.personalPath;
+    } else if (fromUrl) {
+      document.getElementById('sync-repo').value = `${fromUrl.owner}/${fromUrl.repo}`;
+      document.getElementById('sync-locations-path').value = fromUrl.locationsPath || defaults.locationsPath;
+      document.getElementById('sync-personal-path').value = fromUrl.personalPath || defaults.personalPath;
+      setSyncStatus('Eier/repo gjenkjent fra lenken — lim inn tokenet på nytt for å koble til.');
     } else {
       document.getElementById('sync-locations-path').value = defaults.locationsPath;
       document.getElementById('sync-personal-path').value = defaults.personalPath;
     }
-    document.getElementById('sync-connect').addEventListener('click', async () => {
+    document.getElementById('sp-sync-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
       const repoVal = document.getElementById('sync-repo').value.trim();
       const locationsPath = document.getElementById('sync-locations-path').value.trim() || defaults.locationsPath;
       const personalPath = document.getElementById('sync-personal-path').value.trim() || defaults.personalPath;
@@ -305,6 +339,7 @@
         setSyncStatus('⚠ Kunne ikke bekrefte repo/branch — sjekk eier/repo-navn. Prøver med "main".');
       }
       window.FungiStore.setConfig({ owner, repo, locationsPath, personalPath, token, branch });
+      reflectConfigInUrl({ owner, repo, locationsPath, personalPath });
       setSyncStatus(`Kobler til … (branch: ${branch})`);
       await loadLocations();
       await loadFetchedAreas();
@@ -312,9 +347,16 @@
       await loadStorage();
       render();
     });
-    document.getElementById('sync-disconnect').addEventListener('click', () => {
+    document.getElementById('sync-disconnect').addEventListener('click', async () => {
       window.FungiStore.clearConfig();
       setSyncStatus('Koblet fra — bruker lokal/eksempeldata på denne enheten.');
+      // Uten dette forble de tilkoblingsgatede funksjonene (funn/hogst/
+      // "foreslå områder") synlige til noe ANNET tilfeldigvis trigget en ny
+      // render() — f.eks. et filterbytte.
+      await loadLocations();
+      await loadStorage();
+      clearRoute();
+      render();
     });
   }
 
@@ -462,6 +504,12 @@
 
   async function updateFetchPanel(){
     const panel = document.getElementById('sp-fetch-panel');
+    // Selve GitHub Actions-triggeren er allerede sperret i startFetch() for en
+    // ikke-tilkoblet besøkende, men panelet ble likevel vist og gjorde et ekte
+    // kartoppslag (estimateAreaKm2 -> fetchAreaBbox) for hvert fylke/kommune-
+    // valg — nettverkstrafikk uten poeng siden hentingen uansett aldri kan
+    // fullføres. Skjul panelet helt (og hopp over oppslaget) i stedet.
+    if (!personalFeaturesEnabled()) { panel.style.display = 'none'; return; }
     if (fetchInProgress) { panel.style.display = ''; return; } // behold synlig under pågående henting
 
     const label = currentAreaLabel();
@@ -681,6 +729,85 @@
     render();
   }
 
+  // ---------- sesongvær (vekstsesong-historikk) ----------
+  // Henter hele vekstsesongens (1. mai -> i dag) nedbør/temperatur for ETT
+  // representativt punkt (senter av alle lastede steder) via Open-Meteos
+  // gratis arkiv-API. Formålet er å fange opp om sesongen totalt sett har
+  // vært våt eller tørr — noe et rent 14-dagersvindu ikke fanger opp (f.eks.
+  // en ellers tørr sommer som nettopp har fått litt regn de siste 14 dagene).
+  // Hentes på ett representativt punkt, ikke per lokasjon, for å unngå
+  // hundrevis av kall for et sesonglangt datasett.
+  async function loadSeasonWeather(){
+    const locs = allLocations();
+    if (!locs.length) return;
+    const lat = locs.reduce((a,l)=>a+l.lat,0) / locs.length;
+    const lon = locs.reduce((a,l)=>a+l.lon,0) / locs.length;
+    const now = new Date();
+    const seasonStart = `${now.getFullYear()}-05-01`;
+    const todayStr = now.toISOString().slice(0,10);
+    try {
+      const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}&start_date=${seasonStart}&end_date=${todayStr}&daily=precipitation_sum,temperature_2m_mean&timezone=Europe%2FOslo`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const dates = (data.daily && data.daily.time) || [];
+      const precipArr = (data.daily && data.daily.precipitation_sum) || [];
+      const tempArr = (data.daily && data.daily.temperature_2m_mean) || [];
+      if (!dates.length) throw new Error('tomt datasett');
+
+      const monthNames = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+      const monthBuckets = {};
+      let totalPrecip = 0, tempSum = 0, tempCount = 0;
+      let dryStreak = 0, longestDryStreak = 0;
+      dates.forEach((d, i) => {
+        const p = precipArr[i], t = tempArr[i];
+        const monthIdx = parseInt(d.slice(5,7), 10) - 1;
+        if (!monthBuckets[monthIdx]) monthBuckets[monthIdx] = { precip: 0, tempSum: 0, tempCount: 0 };
+        if (p != null) {
+          totalPrecip += p;
+          monthBuckets[monthIdx].precip += p;
+          dryStreak = p < 1 ? dryStreak + 1 : 0;
+          longestDryStreak = Math.max(longestDryStreak, dryStreak);
+        }
+        if (t != null) {
+          tempSum += t; tempCount++;
+          monthBuckets[monthIdx].tempSum += t;
+          monthBuckets[monthIdx].tempCount++;
+        }
+      });
+      const months = Object.keys(monthBuckets).sort((a,b)=>a-b).map(idx => {
+        const b = monthBuckets[idx];
+        return { label: monthNames[idx], precip: Math.round(b.precip), tempAvg: b.tempCount ? Math.round(b.tempSum/b.tempCount*10)/10 : null };
+      });
+      seasonWeather = {
+        totalPrecip: Math.round(totalPrecip),
+        avgTemp: tempCount ? Math.round(tempSum/tempCount*10)/10 : null,
+        months,
+        dryStreakDays: longestDryStreak,
+        days: dates.length
+      };
+      seasonWeatherReady = true;
+    } catch (e) {
+      console.warn('Sesongvær feilet', e);
+      seasonWeatherReady = false;
+    }
+    renderSeasonWeatherBox();
+    render();
+  }
+
+  function renderSeasonWeatherBox(){
+    const box = document.getElementById('sp-season-weather-box');
+    if (!box) return;
+    if (!seasonWeatherReady || !seasonWeather) {
+      box.innerHTML = `<span class="sp-wstatus">⚠ kunne ikke hente sesonghistorikk</span>`;
+      return;
+    }
+    const sw = seasonWeather;
+    const monthsHtml = sw.months.map(m => `${m.label}: ${m.precip} mm${m.tempAvg!=null?`, ${m.tempAvg}°C`:''}`).join(' · ');
+    box.innerHTML = `<span class="sp-wstatus">✓ sesongoversikt (${sw.days} dager, 1. mai–i dag)</span><br/>
+      Totalt <b>${sw.totalPrecip} mm</b> nedbør, snitt <b>${sw.avgTemp ?? '–'}°C</b>. Lengste tørkeperiode: ${sw.dryStreakDays} dager.<br/>
+      <span style="opacity:.8">${monthsHtml}</span>`;
+  }
+
   // ---------- helpers ----------
   function attrScore(locVal, wantedArr, maxPoints){
     const unknown = !locVal || locVal === 'ukjent' || (Array.isArray(locVal) && (locVal.length===0 || locVal.includes('ukjent')));
@@ -859,6 +986,26 @@
       else { wScore = -6; weatherVerdict = 'For tørt siste 14 dager — vent til mer nedbør.'; }
       if (prof.minTempAvg !== undefined && w.tempAvg !== null && w.tempAvg < prof.minTempAvg - 4) { wScore -= 4; weatherVerdict += ' Også kjøligere enn ideelt.'; }
       total += wScore; breakdown.push(['Værvindu (nedbør/temp)', wScore]);
+    }
+
+    // Sesonghistorikk (1. mai -> i dag) — egen, mindre modifikator ved siden
+    // av det ferske 14-dagersvinduet over. Fanger opp en sesong som totalt
+    // sett har vært tørr/våt, selv om de siste 14 dagene alene ser greie ut
+    // (eller motsatt). idealNedbor14 brukes som et grovt ukentlig referansenivå
+    // og skaleres opp til sesongens lengde — bevisst holdt upresist/lav vekt,
+    // se samme resonnement som elevationScore om å ikke tallfeste mer presist
+    // enn datagrunnlaget faktisk tillater.
+    if (seasonWeatherReady && seasonWeather && species.weather.idealNedbor14) {
+      const expectedSeasonPrecip = species.weather.idealNedbor14 * (seasonWeather.days / 14);
+      const ratio = expectedSeasonPrecip > 0 ? seasonWeather.totalPrecip / expectedSeasonPrecip : 1;
+      let seasonScore = 0, seasonNote = null;
+      if (ratio >= 0.9) { seasonScore = 4; seasonNote = 'God sesong hittil — nok nedbør over tid til gode vekstforhold.'; }
+      else if (ratio < 0.5) { seasonScore = -4; seasonNote = 'Tørr sesong hittil — kan gi svakere oppblomstring selv med fuktighet nå.'; }
+      if (seasonScore !== 0) {
+        total += seasonScore;
+        breakdown.push(['Sesonghistorikk (nedbør mai–i dag)', seasonScore]);
+        weatherVerdict = weatherVerdict ? `${weatherVerdict} ${seasonNote}` : seasonNote;
+      }
     }
 
     const myFinds = findsFor(loc.id, species.id);
@@ -1284,10 +1431,11 @@
     }
 
     const hint = document.getElementById('sp-map-hint');
+    const addHint = personalFeaturesEnabled() ? ' Klikk et tomt sted i kartet for å legge til et eget sted der.' : '';
     if (filterMode === 'fylke') {
-      hint.textContent = 'Klikk et punkt for å filtrere til det fylket. Klikk et tomt sted i kartet for å legge til et eget sted der.';
+      hint.textContent = 'Klikk et punkt for å filtrere til det fylket.' + addHint;
     } else if (filterMode === 'kommune') {
-      hint.textContent = 'Klikk et punkt for å filtrere til den kommunen. Klikk et tomt sted i kartet for å legge til et eget sted der.';
+      hint.textContent = 'Klikk et punkt for å filtrere til den kommunen.' + addHint;
     } else {
       hint.textContent = radiusCenter
         ? `Senter satt ved ${radiusCenter.lat.toFixed(3)}, ${radiusCenter.lon.toFixed(3)}. Klikk et nytt punkt for å flytte senteret.`
@@ -1471,6 +1619,10 @@
   }
 
   async function suggestAreas(){
+    if (!personalFeaturesEnabled()) {
+      alert('Koble til ditt private data-repo under ⚙ Preferanser & Config → Config for å foreslå områder.');
+      return;
+    }
     const summary = document.getElementById('sp-route-summary');
     summary.style.display = '';
     summary.textContent = 'Beregner forslag …';
@@ -1632,9 +1784,9 @@
         ${w ? `<div class="sp-breakdown">Vær nå: <span>${w.precip14} mm</span> nedbør siste 14 dager, snitt temp <span>${w.tempAvg ?? '–'}°C</span>. ${res.weatherVerdict || ''}</div>` : ''}
         ${finds.length ? `<div class="sp-findlist">${finds.map(f => `<div class="sp-find-row"><span>${SPECIES.find(s=>s.id===f.speciesId)?.name || f.speciesId} — ${f.date}</span><span class="sp-dots">${[1,2,3,4,5].map(n=>`<span class="${n<=f.mengde?'filled':''}"></span>`).join('')}</span></div>`).join('')}</div>` : ''}
         <div class="sp-card-actions">
-          <button class="sp-btn sp-primary" data-action="find" data-loc="${loc.id}">Registrer funn her</button>
+          ${personalFeaturesEnabled() ? `<button class="sp-btn sp-primary" data-action="find" data-loc="${loc.id}">Registrer funn her</button>` : ''}
           <button class="sp-btn" data-action="locate" data-loc="${loc.id}">📍 Vis i kart</button>
-          <button class="sp-btn sp-ghost-danger" data-action="cut" data-loc="${loc.id}">${userCuts.includes(loc.id)?'Fjern hogst-merking':'Merk som flatehogd'}</button>
+          ${personalFeaturesEnabled() ? `<button class="sp-btn sp-ghost-danger" data-action="cut" data-loc="${loc.id}">${userCuts.includes(loc.id)?'Fjern hogst-merking':'Merk som flatehogd'}</button>` : ''}
         </div>
       </div>`;
   }
@@ -1688,9 +1840,9 @@
         ${w ? `<div class="sp-breakdown">Vær nå: <span>${w.precip14} mm</span> nedbør siste 14 dager, snitt temp <span>${w.tempAvg ?? '–'}°C</span>. ${res.weatherVerdict || ''}</div>` : ''}
         ${finds.length ? `<div class="sp-findlist">${finds.map(f => `<div class="sp-find-row"><span>${SPECIES.find(s=>s.id===f.speciesId)?.name || f.speciesId} — ${f.date}</span><span class="sp-dots">${[1,2,3,4,5].map(n=>`<span class="${n<=f.mengde?'filled':''}"></span>`).join('')}</span></div>`).join('')}</div>` : ''}
         <div class="sp-card-actions">
-          <button class="sp-btn sp-primary" data-action="find" data-loc="${loc.id}">Registrer funn her</button>
+          ${personalFeaturesEnabled() ? `<button class="sp-btn sp-primary" data-action="find" data-loc="${loc.id}">Registrer funn her</button>` : ''}
           <button class="sp-btn" data-action="locate" data-loc="${loc.id}">📍 Vis i kart</button>
-          <button class="sp-btn sp-ghost-danger" data-action="cut" data-loc="${loc.id}">${userCuts.includes(loc.id)?'Fjern hogst-merking':'Merk som flatehogd'}</button>
+          ${personalFeaturesEnabled() ? `<button class="sp-btn sp-ghost-danger" data-action="cut" data-loc="${loc.id}">${userCuts.includes(loc.id)?'Fjern hogst-merking':'Merk som flatehogd'}</button>` : ''}
         </div>
       </div>`;
   }
@@ -1702,6 +1854,13 @@
     renderSpeciesList();
     renderMyFindsList();
     renderFilterControls();
+    // "Foreslå områder" gir ingen mening uten ekte terrengdata (kun 2
+    // demo-punkter uten tilkobling), og gjør et ekte, levende Overpass-kall
+    // for parkering — skjules derfor helt for en ikke-tilkoblet besøkende
+    // i stedet for å bare la den feile/være tom ved klikk.
+    const routeEnabled = personalFeaturesEnabled();
+    document.getElementById('sp-route-panel').style.display = routeEnabled ? '' : 'none';
+    document.getElementById('sp-route-disabled-note').style.display = routeEnabled ? 'none' : '';
     document.getElementById('sp-toggle-quiet').classList.toggle('on', prioritizeQuiet);
     document.getElementById('sp-toggle-hogst').classList.toggle('on', hideHogst);
     document.getElementById('sp-toggle-artskart-recent').classList.toggle('on', artskartOnlyRecent);
@@ -1945,6 +2104,10 @@
 
   function openFindModal(locId, opts){
     opts = opts || {};
+    if (!personalFeaturesEnabled()) {
+      alert('Koble til ditt private data-repo under ⚙ Preferanser & Config → Config for å registrere funn.');
+      return;
+    }
     const editingFind = opts.editingFind || null;
     const needsPosition = !editingFind && !locId;
     let pendingLat = needsPosition ? (opts.lat ?? null) : null;
@@ -2123,8 +2286,25 @@
     });
   }
 
+  function personalFeaturesEnabled(){
+    return !!(window.FungiStore && window.FungiStore.isConfigured());
+  }
+
+  // Registrering av funn/hogstfelt er meningsløst uten et tilkoblet privat
+  // data-repo (ville bare skrive til localStorage på denne ene enheten) — så
+  // knappene skjules og lista erstattes med en tilkoblingsoppfordring i stedet
+  // for å late som funksjonen "virker" for en ikke-tilkoblet besøkende.
   function renderMyFindsList(){
     const el = document.getElementById('sp-myfinds-list');
+    const addBtn = document.getElementById('sp-add-place');
+    const hogstBtn = document.getElementById('sp-mark-hogst');
+    const enabled = personalFeaturesEnabled();
+    addBtn.style.display = enabled ? '' : 'none';
+    hogstBtn.style.display = enabled ? '' : 'none';
+    if (!enabled) {
+      el.innerHTML = `<div class="sp-empty-mine">Koble til ditt private data-repo under ⚙ Preferanser &amp; Config → Config for å registrere funn og hogstfelt.</div>`;
+      return;
+    }
     if (!userFinds.length) { el.innerHTML = `<div class="sp-empty-mine">Ingen funn registrert ennå.</div>`; return; }
     const sorted = [...userFinds].sort((a,b) => (b.date||'').localeCompare(a.date||''));
     el.innerHTML = sorted.map(f => {
@@ -2297,6 +2477,7 @@
     loadKommuneRegister().then(() => renderFilterControls()); // ikke-blokkerende, oppdaterer UI når klar
     render();
     loadWeather();
+    loadSeasonWeather();
   })();
 
 })();

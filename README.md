@@ -61,7 +61,7 @@ detaljer per kilde):
 | NGU berggrunn | Kalkinnhold |
 | NVDB/OSM Overpass | Avstand til kjørbar vei |
 | Artsdatabanken Artskart | Kjente tidligere funn av arten i nærheten |
-| Open-Meteo (live, i appen) | Nedbør/temperatur siste 14 dager |
+| Open-Meteo (live, i appen) | Nedbør/temperatur siste 14 dager, og sesonghistorikk (1. mai–i dag) |
 | Dine egne funn | Din funnhistorikk på stedet |
 
 `scoreLocation()` i `js/app.js` vekter disse mot artens profil (0-100 poeng
@@ -75,7 +75,8 @@ totalt, ukjent verdi teller alltid nøytralt/50%):
 | Skogalder | 15 |
 | Sesong | 10 |
 | Kjente funn i databasen | +8 |
-| Værvindu (nedbør/temp) | +12 / -6 |
+| Værvindu (nedbør/temp, siste 14 dager) | +12 / -6 |
+| Sesonghistorikk (nedbør mai–i dag) | +4 / -4 |
 | Egen funnhistorikk | opptil +30 |
 | Sørvendt skråning (varmekjære arter) | +5 |
 | Adkomst (vei/parkering/stier) | +10 / -18 |

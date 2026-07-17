@@ -1,5 +1,27 @@
 # Endringslogg
 
+## 0.15.0 — Strammere public/private-skille, enklere reconnect, sesongvær
+- **Funn-registrering og hogstmerking er nå skjult** (både topp-knappene,
+  per-kort-knappene og "klikk i kart for eget sted") når appen ikke er
+  koblet til et privat data-repo — tidligere fungerte disse "lokalt" for
+  en hvilken som helst besøkende på Pages-URL-en, uten at det faktisk gikk
+  noe sted. Vises nå kun når `FungiStore.isConfigured()`.
+- **Config-panelet er nå et ekte `<form>`** med `autocomplete="username"`/
+  `"current-password"` på repo-/token-feltene, slik at nettleserens/en
+  passordbehandler kan tilby å lagre og fylle inn PAT-tokenet automatisk —
+  mer robust enn å stole på at `localStorage` overlever (Safaris ITP tømmer
+  all script-skrivbar lagring etter 7 dager uten besøk, noe en sesongbasert
+  app som denne lett rammes av).
+- **Eier/repo/stier speiles nå i URL-en** ved tilkobling (ikke tokenet) —
+  hvis lokal lagring blir tømt, men URL-en er bokmerket/lagret, forhånds-
+  utfylles disse feltene igjen og bare tokenet må limes inn på nytt.
+- **Ny "Vekstsesong (mai–i dag)"-oversikt** hentet fra Open-Meteos arkiv-API
+  for ett representativt punkt: totalnedbør, snittemperatur, lengste
+  tørkeperiode og en månedsvis oppsummering — utfyller det eksisterende
+  14-dagersvinduet, som ikke fanger opp om resten av sesongen har vært våt
+  eller tørr. Brukes også som en liten separat modifikator (±4) i
+  `scoreLocation()`, se `sesonghistorikk`-linjen i score-breakdownen.
+
 ## 0.13.0 — Kritisk gjennomgang av vektingsmodellen
 Etter en kritisk gjennomgang av scoringsmodellen (datagrunnlag, kilder,
 manglende signaler, om vektingen er optimal) ble fem konkrete svakheter
