@@ -1,5 +1,23 @@
 # Endringslogg
 
+## 0.16.0 — Dekningslinje: vet du om terrenget er analysert før du klikker
+UX-problem: etter å ha analysert et område tidligere var det uklart om man
+skulle klikke "Foreslå områder" eller "Hent data" først, og om det valgte
+fylket/kommunen/radiuset allerede hadde data. To grep, se `render()`/
+`suggestAreas()` i `js/app.js`:
+- **Ny dekningslinje** over "Foreslå områder"-knappen (`updateCoverageLine()`)
+  viser med det samme antall kjente punkter i gjeldende fylke/kommune/radius:
+  "God dekning" (≥5 punkter), "tynt datagrunnlag" (1-4), eller et rødt varsel
+  med lenke til hent-panelet ved 0 punkter — der er knappen også disablet,
+  siden det ikke er noe å klynge forslag fra.
+- **Post-forslag-nudge**: hvis "Foreslå områder" likevel ender opp tynt
+  (samme terskel), vises en lenke i selve resultatet som scroller til
+  "Hent data"-panelet — kun når det panelet faktisk er tilgjengelig (ikke
+  skjult pga. et allerede registrert treff for nøyaktig dette området).
+- Lagt til `:disabled`-styling for `.sp-btn` i `css/styles.css` (fantes ikke
+  fra før noe sted, selv om `sp-fetch-start` også har hatt en disabled-state
+  lenge).
+
 ## 0.15.0 — Strammere public/private-skille, enklere reconnect, sesongvær
 - **Funn-registrering og hogstmerking er nå skjult** (både topp-knappene,
   per-kort-knappene og "klikk i kart for eget sted") når appen ikke er

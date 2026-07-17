@@ -198,6 +198,9 @@
   .sp-btn.sp-primary { background: var(--russet); border-color: var(--russet-deep); color: #fff; }
   .sp-btn.sp-primary:hover { background: var(--russet-deep); }
   .sp-btn.sp-ghost-danger { border-color: var(--danger); color: var(--danger); }
+  .sp-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .sp-btn:disabled:hover { background: transparent; }
+  .sp-btn.sp-primary:disabled:hover { background: var(--russet); }
 
   .sp-findlist { margin-top: 10px; font-size: 12.5px; }
   .sp-find-row { display: flex; justify-content: space-between; padding: 4px 0; border-top: 1px solid var(--line); }

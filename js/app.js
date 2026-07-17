@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.15.0';
+  const APP_VERSION = '0.16.0';
   const APP_BUILD_DATE = '2026-07-17';
 
   const SPECIES = [
@@ -435,6 +435,35 @@
     if (filterMode === 'kommune') return kommuneFilter !== 'alle' ? kommuneFilter : null;
     if (filterMode === 'radius') return radiusCenter ? `${radiusKm} km rundt valgt punkt` : null;
     return null;
+  }
+
+  // Svarer på "er dette terrenget allerede analysert, helt/delvis, eller
+  // nytt?" FØR brukeren må gjette seg til om "Foreslå områder" eller "Hent
+  // data" er riktig neste steg — count er antall kjente punkter (inkl.
+  // flatehogde) i gjeldende fylke/kommune/radius-filter, samme sett som
+  // suggestAreas() selv bruker (før egen isCut-filtrering der).
+  function updateCoverageLine(count){
+    const line = document.getElementById('sp-coverage-line');
+    const suggestBtn = document.getElementById('sp-route-suggest');
+    if (!line || !suggestBtn || !personalFeaturesEnabled()) return;
+    const areaLabel = currentAreaLabel();
+    if (!areaLabel) { line.style.display = 'none'; suggestBtn.disabled = false; return; }
+    line.style.display = '';
+    if (count === 0) {
+      line.innerHTML = `⚠ Ingen kjente punkter i ${escapeHtml(areaLabel)} ennå — <a href="#sp-fetch-panel" id="sp-coverage-fetch-link">hent terrengdata</a> først.`;
+      suggestBtn.disabled = true;
+      const link = document.getElementById('sp-coverage-fetch-link');
+      if (link) link.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('sp-fetch-panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    } else if (count < AREA_COVERAGE_THIN_THRESHOLD) {
+      line.textContent = `${count} kjent${count===1?'':'e'} punkt${count===1?'':'er'} i ${areaLabel} — tynt datagrunnlag, forslagene kan bli få.`;
+      suggestBtn.disabled = false;
+    } else {
+      line.textContent = `${count} kjente punkter i ${areaLabel} — god dekning.`;
+      suggestBtn.disabled = false;
+    }
   }
 
   // Henter (og cacher) bounding box for et fylke/kommune-navn via Nominatim.
@@ -1525,6 +1554,11 @@
   // ikke for mye i tett-scorede områder.
   const AREA_RADIUS_KM = 1.2;
 
+  // Grov terskel for "tynt datagrunnlag" i dekningslinjen over "Foreslå
+  // områder" — bevisst rundt tall, ikke ment som noe presist mål, bare nok
+  // til å skille "har egentlig ikke data her" fra "har noe å jobbe med".
+  const AREA_COVERAGE_THIN_THRESHOLD = 5;
+
   function clearRoute(){
     suggestedRoute = null;
     if (routeLayer) routeLayer.clearLayers();
@@ -1646,7 +1680,8 @@
     });
 
     if (!scoped.length) {
-      summary.textContent = 'Ingen steder å foreslå områder fra i valgt område.';
+      summary.innerHTML = 'Ingen steder å foreslå områder fra i valgt område.' + fetchNudgeHtml(0);
+      wireFetchNudgeLink();
       return;
     }
 
@@ -1680,8 +1715,30 @@
       ${overskrift} i valgt område (stiplede sirkler i kartet, farget etter score — klikk en sirkel eller 🅿️-markøren for detaljer).<br/>
       ${areas.map((a, i) => `<div class="sp-route-area-item">Område ${i+1}: <b>${escapeHtml(a.anchor.loc.name)}</b> (${escapeHtml(a.anchor.loc.kommune || 'ukjent kommune')}) — beste score ${a.anchor.res.total}, ${a.members.length} kjent${a.members.length===1?'':'e'} punkt${a.members.length===1?'':'er'} i området. ${a.parking ? `🅿️ ca ${a.parking.distM} m unna.` : '🅿️ ingen kjent parkering funnet.'}</div>`).join('')}
       <span style="font-size:11px;opacity:0.8;">Sirklene markerer OMRÅDER med gode odds, ikke eksakte punkter eller en gåtur mellom dem — bruk det topografiske kartlaget til å utforske selv innenfor sirkelen. Parkeringsmarkører er hentet live fra OpenStreetMap og kan avvike fra virkeligheten — bekreft alltid på stedet.</span>
+      ${fetchNudgeHtml(scoped.length)}
     `;
+    wireFetchNudgeLink();
     document.getElementById('sp-route-clear').style.display = '';
+  }
+
+  // Oppfordring om å hente mer terrengdata, vist i resultat-sammendraget når
+  // "Foreslå områder" endte opp med tynt datagrunnlag — svarer på samme
+  // spørsmål som dekningslinjen over knappen (se updateCoverageLine), bare
+  // ETTER at brukeren faktisk har prøvd, i stedet for i forkant. Vises kun
+  // hvis hent-panelet faktisk er tilgjengelig (ikke skjult pga. et allerede
+  // registrert treff for nøyaktig dette området).
+  function fetchNudgeHtml(count){
+    if (count >= AREA_COVERAGE_THIN_THRESHOLD) return '';
+    const fetchPanel = document.getElementById('sp-fetch-panel');
+    if (!fetchPanel || fetchPanel.style.display === 'none') return '';
+    return `<div class="sp-route-nudge" style="margin-top:8px;font-size:12px;color:var(--ink-soft);">Tynt datagrunnlag her (${count} punkt${count===1?'':'er'}) — <a href="#sp-fetch-panel" id="sp-route-nudge-link">hent mer terrengdata</a> for bedre forslag.</div>`;
+  }
+  function wireFetchNudgeLink(){
+    const link = document.getElementById('sp-route-nudge-link');
+    if (link) link.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('sp-fetch-panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
   }
 
   // ---------- render ----------
@@ -1932,6 +1989,7 @@
       return true;
     });
 
+    updateCoverageLine(scoped.length);
     if (hideHogst) scoped = scoped.filter(s => !s.res.isCut);
     renderArtskartLayer();
     scoped.sort((a,b) => {
