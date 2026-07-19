@@ -13,6 +13,11 @@ function headers(env, extra) {
     Authorization: `Bearer ${env.GITHUB_PAT}`,
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
+    // Påkrevd av GitHub (se https://docs.github.com/en/rest/overview/resources-in-the-rest-api#user-agent-required)
+    // — nettlesere sender denne automatisk (derfor trengte ikke
+    // js/github-store.js å sette den), men Workers sin fetch() gjør det
+    // ikke, og GitHub svarer 403 uten den.
+    'User-Agent': 'fungifinder-api-worker',
     ...extra,
   };
 }
