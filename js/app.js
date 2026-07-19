@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.16.3';
-  const APP_BUILD_DATE = '2026-07-17';
+  const APP_VERSION = '0.17.0';
+  const APP_BUILD_DATE = '2026-07-19';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
   // kommentar der) — de to må holdes i sync manuelt siden repoet bevisst
@@ -115,8 +115,8 @@
   // gradvis på-forespørsel (se fetch_area.py), og lastes normalt inn av
   // loadLocations() via GitHub-synk.
   let BASE_LOCATIONS = [
-    { id:'demo-1', name:'Eksempelskog A (demo)', fylke:'Demo', kommune:'Demo', lat:60.0, lon:10.0, treslag:['gran','bjork'], skogalder:'gammel', fuktighet:'frisk', berggrunn:'fattig', avstandVeiM:null, befolkning:'ukjent', hogstAr:null, kjenteFunn:[], custom:false, kjorbarVei:'ukjent', parkeringNotat:'Koble til ditt private data-repo for ekte steder', stier:'ukjent', avstandParkeringM:null },
-    { id:'demo-2', name:'Eksempelskog B (demo)', fylke:'Demo', kommune:'Demo', lat:60.2, lon:10.4, treslag:['furu'], skogalder:'middels', fuktighet:'tørr', berggrunn:'moderat', avstandVeiM:null, befolkning:'ukjent', hogstAr:null, kjenteFunn:[], custom:false, kjorbarVei:'ukjent', parkeringNotat:'Koble til ditt private data-repo for ekte steder', stier:'ukjent', avstandParkeringM:null }
+    { id:'demo-1', name:'Eksempelskog A (demo)', fylke:'Demo', kommune:'Demo', lat:60.0, lon:10.0, treslag:['gran','bjork'], skogalder:'gammel', fuktighet:'frisk', berggrunn:'fattig', avstandVeiM:null, befolkning:'ukjent', hogstAr:null, kjenteFunn:[], custom:false, kjorbarVei:'ukjent', parkeringNotat:'Logg inn for ekte steder', stier:'ukjent', avstandParkeringM:null },
+    { id:'demo-2', name:'Eksempelskog B (demo)', fylke:'Demo', kommune:'Demo', lat:60.2, lon:10.4, treslag:['furu'], skogalder:'middels', fuktighet:'tørr', berggrunn:'moderat', avstandVeiM:null, befolkning:'ukjent', hogstAr:null, kjenteFunn:[], custom:false, kjorbarVei:'ukjent', parkeringNotat:'Logg inn for ekte steder', stier:'ukjent', avstandParkeringM:null }
   ];
 
   // Arter som er kjent for å foretrekke varme, soleksponerte vokseplasser —
@@ -164,6 +164,7 @@
   let fetchInProgress = false;
   let fetchPollTimer = null;
   let bboxAreaCache = {}; // cache av Nominatim bbox-areal per fylke/kommune-navn
+  let currentUser = null; // { epost, kortnavn, rolle } fra ApiClient.meg(), eller null hvis ikke innlogget
 
   const monthNow = new Date().getMonth() + 1;
   const yearNow = new Date().getFullYear();
@@ -201,54 +202,36 @@
     return hogstOmrader.some(z => haversineKm(z.lat, z.lon, loc.lat, loc.lon) * 1000 <= z.radiusM);
   }
 
-  // ---------- storage (GitHub-som-database i privat data-repo, med lokal fallback) ----------
-  let personalSha = null; // sha til personal.json på GitHub, trengs for å oppdatere
-
-  function defaultPaths(){
-    return { locationsPath: 'data/locations.json', personalPath: 'data/personal.json' };
-  }
-
+  // ---------- storage (fungifinder-api, sesjonsbasert) ----------
   async function loadStorage(){
-    const cfg = window.FungiStore ? window.FungiStore.getConfig() : null;
-    if (cfg && window.FungiStore.isConfigured()) {
-      try {
-        const result = await window.FungiStore.loadFile(cfg.personalPath || defaultPaths().personalPath);
-        personalSha = result.sha;
-        const d = result.data || {};
-        userFinds = d.finds || [];
-        userCuts = d.cuts || [];
-        hogstOmrader = d.hogstOmrader || [];
-        customLocations = d.customLocations || [];
-        favoriteSpecies = d.favoriteSpecies || [];
-        setSyncStatus(`✓ Koblet til ${cfg.owner}/${cfg.repo}`);
-        return;
-      } catch (e) {
-        console.error(e);
-        setSyncStatus('⚠ Kunne ikke laste personlige data — bruker lokal kopi. ' + e.message);
-      }
+    if (!currentUser) {
+      userFinds = []; userCuts = []; hogstOmrader = []; customLocations = []; favoriteSpecies = [];
+      return;
     }
-    const local = window.FungiStore ? window.FungiStore.loadLocal('personal') : null;
-    userFinds = local?.finds || [];
-    userCuts = local?.cuts || [];
-    hogstOmrader = local?.hogstOmrader || [];
-    customLocations = local?.customLocations || [];
-    favoriteSpecies = local?.favoriteSpecies || [];
+    try {
+      const d = await window.ApiClient.hentMineData();
+      userFinds = d.finds || [];
+      userCuts = d.cuts || [];
+      hogstOmrader = d.hogstOmrader || [];
+      customLocations = d.customLocations || [];
+      favoriteSpecies = d.favoriteSpecies || [];
+      setSyncStatus(`✓ Innlogget som ${currentUser.kortnavn}`);
+    } catch (e) {
+      console.error(e);
+      setSyncStatus('⚠ Kunne ikke laste dine data. ' + e.message);
+    }
   }
 
   async function persistAll(){
+    if (!currentUser) return;
     const payload = { finds: userFinds, cuts: userCuts, hogstOmrader: hogstOmrader, customLocations: customLocations, favoriteSpecies: favoriteSpecies };
-    const cfg = window.FungiStore ? window.FungiStore.getConfig() : null;
-    if (cfg && window.FungiStore.isConfigured()) {
-      try {
-        personalSha = await window.FungiStore.saveFile(cfg.personalPath || defaultPaths().personalPath, payload, personalSha);
-        setSyncStatus(`✓ Lagret til ${cfg.owner}/${cfg.repo} (${new Date().toLocaleTimeString('no')})`);
-        return;
-      } catch (e) {
-        console.error(e);
-        setSyncStatus('⚠ Lagring feilet, lagret lokalt i stedet. ' + e.message);
-      }
+    try {
+      await window.ApiClient.lagreMineData(payload);
+      setSyncStatus(`✓ Lagret (${new Date().toLocaleTimeString('no')})`);
+    } catch (e) {
+      console.error(e);
+      setSyncStatus('⚠ Lagring feilet. ' + e.message);
     }
-    if (window.FungiStore) window.FungiStore.saveLocal('personal', payload);
   }
   async function saveFinds(){ await persistAll(); }
   async function saveCuts(){ await persistAll(); }
@@ -294,79 +277,62 @@
     });
   }
 
-  // Ikke-hemmelige deler av tilkoblingen (eier/repo/stier) speiles i URL-en som
-  // en reconnect-fallback: hvis lokal lagring blir tømt (f.eks. Safaris
-  // 7-dagers ITP-opprydding i en sesongbasert app som denne), men siden ble
-  // bokmerket/lagret ETTER tilkobling, kan disse feltene forhåndsutfylles fra
-  // URL-en igjen — da gjenstår bare å lime inn tokenet på nytt.
-  function syncParamsFromUrl(){
-    const p = new URLSearchParams(location.search);
-    const owner = p.get('owner'), repo = p.get('repo');
-    if (!owner || !repo) return null;
-    return {
-      owner, repo,
-      locationsPath: p.get('locationsPath') || undefined,
-      personalPath: p.get('personalPath') || undefined
-    };
+  // ---------- auth (fungifinder-api: magic-link + sesjon + roller) ----------
+  function isAdmin(){ return !!(currentUser && currentUser.rolle === 'admin'); }
+
+  async function initAuth(){
+    currentUser = await window.ApiClient.meg();
+    reflectAccountUi();
   }
 
-  function reflectConfigInUrl(cfg){
-    const p = new URLSearchParams(location.search);
-    p.set('owner', cfg.owner);
-    p.set('repo', cfg.repo);
-    if (cfg.locationsPath) p.set('locationsPath', cfg.locationsPath); else p.delete('locationsPath');
-    if (cfg.personalPath) p.set('personalPath', cfg.personalPath); else p.delete('personalPath');
-    history.replaceState(null, '', location.pathname + '?' + p.toString());
-  }
-
-  function wireSyncPanel(){
-    const cfg = window.FungiStore ? window.FungiStore.getConfig() : null;
-    const defaults = defaultPaths();
-    const fromUrl = cfg ? null : syncParamsFromUrl();
-    if (cfg) {
-      document.getElementById('sync-repo').value = `${cfg.owner}/${cfg.repo}`;
-      document.getElementById('sync-locations-path').value = cfg.locationsPath || defaults.locationsPath;
-      document.getElementById('sync-personal-path').value = cfg.personalPath || defaults.personalPath;
-    } else if (fromUrl) {
-      document.getElementById('sync-repo').value = `${fromUrl.owner}/${fromUrl.repo}`;
-      document.getElementById('sync-locations-path').value = fromUrl.locationsPath || defaults.locationsPath;
-      document.getElementById('sync-personal-path').value = fromUrl.personalPath || defaults.personalPath;
-      setSyncStatus('Eier/repo gjenkjent fra lenken — lim inn tokenet på nytt for å koble til.');
+  function reflectAccountUi(){
+    const loggedOut = document.getElementById('sp-account-loggedout');
+    const loggedIn = document.getElementById('sp-account-loggedin');
+    const adminPanel = document.getElementById('sp-admin-panel');
+    if (currentUser) {
+      loggedOut.style.display = 'none';
+      loggedIn.style.display = '';
+      document.getElementById('sp-account-name').textContent = currentUser.kortnavn;
+      document.getElementById('sp-account-role').textContent = currentUser.rolle === 'admin' ? 'admin' : 'bruker';
     } else {
-      document.getElementById('sync-locations-path').value = defaults.locationsPath;
-      document.getElementById('sync-personal-path').value = defaults.personalPath;
+      loggedOut.style.display = '';
+      loggedIn.style.display = 'none';
+      setSyncStatus('Ikke innlogget — viser kun eksempeldata.');
     }
-    document.getElementById('sp-sync-form').addEventListener('submit', async (e) => {
+    if (adminPanel) {
+      adminPanel.hidden = !isAdmin();
+      if (isAdmin()) { renderAdminBrukere(); renderAdminInvitasjoner(); }
+    }
+  }
+
+  function wireLoginForm(){
+    document.getElementById('sp-login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const repoVal = document.getElementById('sync-repo').value.trim();
-      const locationsPath = document.getElementById('sync-locations-path').value.trim() || defaults.locationsPath;
-      const personalPath = document.getElementById('sync-personal-path').value.trim() || defaults.personalPath;
-      const token = document.getElementById('sync-token').value.trim();
-      const [owner, repo] = repoVal.split('/');
-      if (!owner || !repo || !token) { setSyncStatus('⚠ Fyll ut eier/repo og token.'); return; }
-      setSyncStatus('Kobler til … sjekker repo-innstillinger');
-      let branch = 'main';
+      const epost = document.getElementById('sp-login-epost').value.trim();
+      const statusEl = document.getElementById('sp-login-status');
+      const btn = document.getElementById('sp-login-send');
+      // Turnstile (implicit rendering) legger selv til dette skjulte feltet
+      // inni #sp-turnstile når widgeten er løst — se index.html.
+      const turnstileToken = document.querySelector('#sp-turnstile [name="cf-turnstile-response"]')?.value || '';
+      if (!epost) { statusEl.textContent = '⚠ Fyll ut e-post.'; return; }
+      btn.disabled = true;
+      statusEl.textContent = 'Sender …';
       try {
-        branch = await window.FungiStore.detectDefaultBranch(owner, repo, token);
-      } catch (e) {
-        console.warn('Kunne ikke autodetektere default-branch, bruker "main".', e);
-        setSyncStatus('⚠ Kunne ikke bekrefte repo/branch — sjekk eier/repo-navn. Prøver med "main".');
+        const data = await window.ApiClient.beOmLenke(epost, turnstileToken);
+        statusEl.textContent = '✓ ' + data.melding;
+      } catch (err) {
+        statusEl.textContent = '⚠ ' + err.message;
+      } finally {
+        btn.disabled = false;
       }
-      window.FungiStore.setConfig({ owner, repo, locationsPath, personalPath, token, branch });
-      reflectConfigInUrl({ owner, repo, locationsPath, personalPath });
-      setSyncStatus(`Kobler til … (branch: ${branch})`);
-      await loadLocations();
-      await loadFetchedAreas();
-      await loadArtsfunn();
-      await loadStorage();
-      render();
     });
-    document.getElementById('sync-disconnect').addEventListener('click', async () => {
-      window.FungiStore.clearConfig();
-      setSyncStatus('Koblet fra — bruker lokal/eksempeldata på denne enheten.');
-      // Uten dette forble de tilkoblingsgatede funksjonene (funn/hogst/
-      // "foreslå områder") synlige til noe ANNET tilfeldigvis trigget en ny
-      // render() — f.eks. et filterbytte.
+  }
+
+  function wireLogout(){
+    document.getElementById('sp-logout-btn').addEventListener('click', async () => {
+      await window.ApiClient.loggUt();
+      currentUser = null;
+      reflectAccountUi();
       await loadLocations();
       await loadStorage();
       clearRoute();
@@ -374,57 +340,148 @@
     });
   }
 
-  // ---------- lokasjonsdata (fra privat data-repo via GitHub API, med innebygd fallback) ----------
-  async function loadLocations(){
-    const cfg = window.FungiStore ? window.FungiStore.getConfig() : null;
-    if (cfg && window.FungiStore.isConfigured()) {
-      try {
-        const result = await window.FungiStore.loadFile(cfg.locationsPath || defaultPaths().locationsPath);
-        if (result.data && Array.isArray(result.data) && result.data.length) {
-          BASE_LOCATIONS = result.data;
-          window.FungiStore.saveLocal('locations', result.data); // cache lokalt for rask offline-fallback neste gang
-          return;
+  // ---------- invitasjonsregistrering (?invitasjon=<token> i URL-en) ----------
+  async function checkUrlInvitasjon(){
+    const token = new URLSearchParams(location.search).get('invitasjon');
+    if (!token) return;
+    const panel = document.getElementById('sp-invite-panel');
+    const statusEl = document.getElementById('sp-invite-status');
+    const form = document.getElementById('sp-invite-form');
+    panel.style.display = '';
+    statusEl.textContent = 'Sjekker invitasjonen …';
+    try {
+      const res = await window.ApiClient.sjekkInvitasjon(token);
+      if (!res.gyldig) { statusEl.textContent = '⚠ Invitasjonslenken er ugyldig, utløpt, eller allerede brukt.'; return; }
+      statusEl.textContent = '';
+      document.getElementById('sp-invite-epost').value = res.epost;
+      form.style.display = '';
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const kortnavn = document.getElementById('sp-invite-kortnavn').value.trim();
+        try {
+          await window.ApiClient.registrerMedInvitasjon(token, kortnavn);
+          const p = new URLSearchParams(location.search);
+          p.delete('invitasjon');
+          history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p.toString() : ''));
+          panel.style.display = 'none';
+          await initAuth();
+          await loadLocations();
+          await loadStorage();
+          render();
+        } catch (err) {
+          statusEl.textContent = '⚠ ' + err.message;
         }
-      } catch (e) {
-        console.warn('Kunne ikke laste terrengdata fra GitHub, prøver lokal cache/eksempeldata.', e);
-      }
+      });
+    } catch (err) {
+      statusEl.textContent = '⚠ ' + err.message;
     }
-    const cached = window.FungiStore ? window.FungiStore.loadLocal('locations') : null;
-    if (cached && Array.isArray(cached) && cached.length) {
-      BASE_LOCATIONS = cached;
-    }
-    // Ellers: beholder den innebygde SAMPLE_LOCATIONS-fallbacken definert øverst i filen.
   }
 
-  async function loadFetchedAreas(){
-    const cfg = window.FungiStore ? window.FungiStore.getConfig() : null;
-    if (cfg && window.FungiStore.isConfigured()) {
+  // ---------- admin: brukere + invitasjoner ----------
+  function wireAdminPanel(){
+    document.getElementById('sp-invitasjon-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const epostInput = document.getElementById('sp-invitasjon-epost');
+      const box = document.getElementById('sp-invitasjon-ny-lenke');
       try {
-        const result = await window.FungiStore.loadFile('data/fetched-areas.json');
-        fetchedAreas = Array.isArray(result.data) ? result.data : [];
-        return;
-      } catch (e) {
-        console.warn('Kunne ikke laste fetched-areas.json.', e);
+        const inv = await window.ApiClient.opprettInvitasjon(epostInput.value.trim());
+        const lenke = `${location.origin}${location.pathname}?invitasjon=${inv.token}`;
+        box.style.display = '';
+        box.innerHTML = `Invitasjon opprettet for <b>${escapeHtml(inv.epost)}</b> — del denne lenken (vises kun nå, gyldig 7 dager):<br><code>${escapeHtml(lenke)}</code>`;
+        epostInput.value = '';
+        await renderAdminInvitasjoner();
+      } catch (err) {
+        box.style.display = '';
+        box.textContent = '⚠ ' + err.message;
       }
+    });
+  }
+
+  async function renderAdminBrukere(){
+    const el = document.getElementById('sp-admin-brukere-list');
+    if (!el) return;
+    el.innerHTML = 'Laster …';
+    try {
+      const brukere = await window.ApiClient.hentBrukere();
+      el.innerHTML = brukere.map(b => `
+        <div class="sp-mine-row">
+          <span>${escapeHtml(b.kortnavn)} <span style="opacity:.6">— ${escapeHtml(b.epost)} · ${b.rolle}${b.status==='deaktivert' ? ' · deaktivert' : ''}</span></span>
+          <span class="sp-mine-row-actions">
+            ${b.rolle !== 'admin' ? `<button class="sp-locate" data-toggle-bruker="${b.id}" data-ny-status="${b.status==='aktiv'?'deaktivert':'aktiv'}" title="${b.status==='aktiv'?'Deaktiver':'Aktiver'}">${b.status==='aktiv'?'⏸':'▶'}</button>` : ''}
+            ${b.rolle !== 'admin' ? `<button class="sp-remove" data-slett-bruker="${b.id}" title="Slett permanent">✕</button>` : ''}
+          </span>
+        </div>`).join('') || '<div class="sp-empty-mine">Ingen brukere ennå.</div>';
+      el.querySelectorAll('[data-toggle-bruker]').forEach(btn => btn.addEventListener('click', async () => {
+        await window.ApiClient.settBrukerStatus(btn.dataset.toggleBruker, btn.dataset.nyStatus);
+        renderAdminBrukere();
+      }));
+      el.querySelectorAll('[data-slett-bruker]').forEach(btn => btn.addEventListener('click', async () => {
+        if (!confirm('Slette denne brukeren permanent? Dette kan ikke angres.')) return;
+        await window.ApiClient.slettBrukerPermanent(btn.dataset.slettBruker);
+        renderAdminBrukere();
+      }));
+    } catch (err) {
+      el.innerHTML = `<div class="sp-empty-mine">⚠ ${escapeHtml(err.message)}</div>`;
     }
-    fetchedAreas = [];
+  }
+
+  async function renderAdminInvitasjoner(){
+    const el = document.getElementById('sp-admin-invitasjoner-list');
+    if (!el) return;
+    el.innerHTML = 'Laster …';
+    try {
+      const invitasjoner = await window.ApiClient.hentInvitasjoner();
+      el.innerHTML = invitasjoner.map(i => `
+        <div class="sp-mine-row">
+          <span>${escapeHtml(i.epost)} <span style="opacity:.6">${i.brukt ? '· brukt av ' + escapeHtml(i.brukt_av_kortnavn||'') : (i.utloper < Date.now() ? '· utløpt' : '· venter')}</span></span>
+          <span class="sp-mine-row-actions">
+            ${!i.brukt ? `<button class="sp-remove" data-slett-invitasjon="${i.id}" title="Trekk tilbake">✕</button>` : ''}
+          </span>
+        </div>`).join('') || '<div class="sp-empty-mine">Ingen invitasjoner ennå.</div>';
+      el.querySelectorAll('[data-slett-invitasjon]').forEach(btn => btn.addEventListener('click', async () => {
+        await window.ApiClient.slettInvitasjon(btn.dataset.slettInvitasjon);
+        renderAdminInvitasjoner();
+      }));
+    } catch (err) {
+      el.innerHTML = `<div class="sp-empty-mine">⚠ ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  // ---------- lokasjonsdata (fra fungifinder-api, med innebygd demo-fallback) ----------
+  async function loadLocations(){
+    if (!currentUser) return; // beholder BASE_LOCATIONS-demofallbacken definert øverst i filen
+    try {
+      const data = await window.ApiClient.hentTerrengdata();
+      if (Array.isArray(data) && data.length) BASE_LOCATIONS = data;
+    } catch (e) {
+      console.warn('Kunne ikke laste terrengdata.', e);
+    }
+  }
+
+  // Admin-only server-side (se worker/api/src/routes/omrader.js) — kun
+  // relevant for "Hent terrengdata"-panelet, som selv er skjult for
+  // ikke-admin (se updateFetchPanel).
+  async function loadFetchedAreas(){
+    if (!isAdmin()) { fetchedAreas = []; return; }
+    try {
+      fetchedAreas = await window.ApiClient.hentOmraderDekning();
+    } catch (e) {
+      console.warn('Kunne ikke laste dekningsdata.', e);
+      fetchedAreas = [];
+    }
   }
 
   // Ekte Artsdatabanken-observasjoner (art/koordinat/dato), hentet av
   // fetch_area.py og akkumulert i data/artsfunn.json — se
   // fetch_artskart_observations_for_fylke() i data-repoet.
   async function loadArtsfunn(){
-    const cfg = window.FungiStore ? window.FungiStore.getConfig() : null;
-    if (cfg && window.FungiStore.isConfigured()) {
-      try {
-        const result = await window.FungiStore.loadFile('data/artsfunn.json');
-        artsfunn = Array.isArray(result.data) ? result.data : [];
-        return;
-      } catch (e) {
-        console.warn('Kunne ikke laste artsfunn.json.', e);
-      }
+    if (!currentUser) { artsfunn = []; return; }
+    try {
+      artsfunn = await window.ApiClient.hentArtsfunn();
+    } catch (e) {
+      console.warn('Kunne ikke laste artsfunn.', e);
+      artsfunn = [];
     }
-    artsfunn = [];
   }
 
   // ---------- on-demand henting av terrengdata ----------
@@ -537,9 +594,9 @@
   }
 
   async function checkForActiveRun(){
-    if (!window.FungiStore || !window.FungiStore.isConfigured()) return null;
+    if (!isAdmin()) return null;
     try {
-      const run = await window.FungiStore.getLatestRun('fetch-area.yml');
+      const run = await window.ApiClient.hentOmradeStatus();
       if (run && (run.status === 'queued' || run.status === 'in_progress')) return run;
     } catch (e) { /* stille feil her — dette er kun en høflig sjekk */ }
     return null;
@@ -547,12 +604,11 @@
 
   async function updateFetchPanel(coverageCount){
     const panel = document.getElementById('sp-fetch-panel');
-    // Selve GitHub Actions-triggeren er allerede sperret i startFetch() for en
-    // ikke-tilkoblet besøkende, men panelet ble likevel vist og gjorde et ekte
-    // kartoppslag (estimateAreaKm2 -> fetchAreaBbox) for hvert fylke/kommune-
-    // valg — nettverkstrafikk uten poeng siden hentingen uansett aldri kan
-    // fullføres. Skjul panelet helt (og hopp over oppslaget) i stedet.
-    if (!personalFeaturesEnabled()) { panel.style.display = 'none'; return; }
+    // Å sette i gang områdeanalyser er nå admin-only (server-side håndhevet,
+    // se worker/api/src/routes/omrader.js) — panelet er helt usynlig for
+    // inviterte brukere, ikke bare deaktivert, og vi hopper over det ekte
+    // kartoppslaget (estimateAreaKm2 -> fetchAreaBbox) for dem.
+    if (!isAdmin()) { panel.style.display = 'none'; return; }
     if (fetchInProgress) { panel.style.display = ''; return; } // behold synlig under pågående henting
 
     const label = currentAreaLabel();
@@ -620,8 +676,8 @@
   }
 
   async function startFetch(){
-    if (!window.FungiStore || !window.FungiStore.isConfigured()) {
-      document.getElementById('sp-fetch-info').textContent = 'Koble til ditt private data-repo under "Config" først.';
+    if (!isAdmin()) {
+      document.getElementById('sp-fetch-info').textContent = 'Kun admin kan hente terrengdata for nye områder.';
       return;
     }
 
@@ -657,12 +713,12 @@
     const dispatchedAt = new Date(Date.now() - 5000).toISOString(); // liten margin for klokke-avvik
 
     try {
-      await window.FungiStore.triggerWorkflow('fetch-area.yml', inputs);
+      await window.ApiClient.startOmradeHenting(inputs);
       progress.textContent = '⏳ Jobb bedt om å starte — venter på at GitHub Actions registrerer den nye kjøringen (kan ta 10-30 sekunder) …';
       pollFetchStatus(progress, dispatchedAt);
     } catch (e) {
       console.error(e);
-      progress.textContent = '⚠ Kunne ikke starte jobben: ' + e.message + ' (sjekk at tokenet har "Actions: Read and write")';
+      progress.textContent = '⚠ Kunne ikke starte jobben: ' + e.message;
       fetchInProgress = false;
       document.getElementById('sp-fetch-start').disabled = false;
       document.getElementById('sp-fetch-start').textContent = 'Hent data';
@@ -676,7 +732,7 @@
     const poll = async () => {
       attempts++;
       try {
-        const run = await window.FungiStore.getLatestRun('fetch-area.yml', sinceIso);
+        const run = await window.ApiClient.hentOmradeStatus(sinceIso);
         if (run) {
           if (run.status === 'completed') {
             if (run.conclusion === 'success') {
@@ -1762,7 +1818,7 @@
 
   async function suggestAreas(){
     if (!personalFeaturesEnabled()) {
-      alert('Koble til ditt private data-repo under ⚙ Preferanser & Config → Config for å foreslå områder.');
+      alert('Logg inn under ⚙ Preferanser & Config → Konto for å foreslå områder.');
       return;
     }
     const summary = document.getElementById('sp-route-summary');
@@ -2232,14 +2288,14 @@
   }
 
   // Trigger enrich-point.yml (se fungifinder-db) for ETT nyopprettet sted —
-  // kalles KUN etter at personal.json faktisk er lagret (se onSave i
-  // openFindModal), ellers kan jobben starte og sjekke ut filen før stedet
-  // er pushet, og finne ingenting å berike.
+  // tilgjengelig for ALLE innloggede brukere (ikke admin-only), siden dette
+  // er en del av å registrere et funn, ikke av å starte en ny områdeanalyse
+  // — se worker/api/src/routes/omrader.js sin berikPunkt().
   async function triggerPointEnrichment(locationId, lat, lon){
-    if (!window.FungiStore || !window.FungiStore.isConfigured()) return; // ingen synk koblet til — stedet blir værende "ukjent", men scorer likevel
+    if (!currentUser) return; // ikke innlogget — stedet blir værende "ukjent", men scorer likevel
     const dispatchedAt = new Date(Date.now() - 5000).toISOString();
     try {
-      await window.FungiStore.triggerWorkflow('enrich-point.yml', { locationId, lat: String(lat), lon: String(lon) });
+      await window.ApiClient.trigBerikelse(locationId, lat, lon);
       pollEnrichStatus(locationId, dispatchedAt);
     } catch (e) {
       console.warn('Kunne ikke starte berikelse for ' + locationId, e);
@@ -2254,10 +2310,23 @@
     const maxAttempts = 30; // ~15 min ved 30 sek mellomrom
     setTimeout(async () => {
       try {
-        const run = await window.FungiStore.getLatestRun('enrich-point.yml', dispatchedAt);
+        const run = await window.ApiClient.hentPunktStatus(dispatchedAt);
         if (run && run.status === 'completed') {
           if (run.conclusion === 'success') {
-            await loadStorage();
+            // Resultatet ligger i det DELTE (ikke-personlige) oppslaget
+            // data/enrichments.json — hentes og slås inn i akkurat DENNE
+            // brukerens customLocations-oppføring, siden personlige data nå
+            // lever per bruker (D1), ikke lenger som en fil hele appen leser.
+            try {
+              const felter = await window.ApiClient.hentBerikelse(locationId);
+              const loc = customLocations.find(l => l.id === locationId);
+              if (felter && loc) {
+                Object.keys(felter).forEach(k => { if (felter[k] != null) loc[k] = felter[k]; });
+                await persistAll();
+              }
+            } catch (e) {
+              console.warn('Kunne ikke hente berikelsesresultat for ' + locationId, e);
+            }
             render();
           } else {
             console.warn(`Berikelse feilet for ${locationId} (${run.conclusion}) — stedet blir værende "ukjent", men teller uansett i vurderingen.`);
@@ -2272,7 +2341,7 @@
   function openFindModal(locId, opts){
     opts = opts || {};
     if (!personalFeaturesEnabled()) {
-      alert('Koble til ditt private data-repo under ⚙ Preferanser & Config → Config for å registrere funn.');
+      alert('Logg inn under ⚙ Preferanser & Config → Konto for å registrere funn.');
       return;
     }
     const editingFind = opts.editingFind || null;
@@ -2454,13 +2523,13 @@
   }
 
   function personalFeaturesEnabled(){
-    return !!(window.FungiStore && window.FungiStore.isConfigured());
+    return !!currentUser;
   }
 
-  // Registrering av funn/hogstfelt er meningsløst uten et tilkoblet privat
-  // data-repo (ville bare skrive til localStorage på denne ene enheten) — så
-  // knappene skjules og lista erstattes med en tilkoblingsoppfordring i stedet
-  // for å late som funksjonen "virker" for en ikke-tilkoblet besøkende.
+  // Registrering av funn/hogstfelt krever en innlogget konto (data lagres
+  // per bruker hos fungifinder-api) — så knappene skjules og lista erstattes
+  // med en innloggingsoppfordring i stedet for å late som funksjonen
+  // "virker" for en ikke-innlogget besøkende.
   function renderMyFindsList(){
     const el = document.getElementById('sp-myfinds-list');
     const addBtn = document.getElementById('sp-add-place');
@@ -2469,7 +2538,7 @@
     addBtn.style.display = enabled ? '' : 'none';
     hogstBtn.style.display = enabled ? '' : 'none';
     if (!enabled) {
-      el.innerHTML = `<div class="sp-empty-mine">Koble til ditt private data-repo under ⚙ Preferanser &amp; Config → Config for å registrere funn og hogstfelt.</div>`;
+      el.innerHTML = `<div class="sp-empty-mine">Logg inn under ⚙ Preferanser &amp; Config → Konto for å registrere funn og hogstfelt.</div>`;
       return;
     }
     if (!userFinds.length) { el.innerHTML = `<div class="sp-empty-mine">Ingen funn registrert ennå.</div>`; return; }
@@ -2634,9 +2703,13 @@
     wireVersionInfo();
     wireTabs();
     wireCollapsibles();
-    wireSyncPanel();
+    wireLoginForm();
+    wireLogout();
+    wireAdminPanel();
     wireFetchPanel();
     initMap();
+    await initAuth();
+    await checkUrlInvitasjon();
     await loadLocations();
     await loadFetchedAreas();
     await loadArtsfunn();

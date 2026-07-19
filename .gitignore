@@ -1,0 +1,3 @@
+worker/api/node_modules/
+worker/api/.wrangler/
+worker/api/.dev.vars

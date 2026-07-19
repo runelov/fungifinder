@@ -1,0 +1,31 @@
+name = "fungifinder-api"
+main = "src/index.js"
+compatibility_date = "2026-07-12"
+
+# Ingen custom_domain ennå — nås via <name>.<konto>.workers.dev til videre.
+# routes = [ ... ]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "fungifinder"
+database_id = "0e527357-62d8-4e34-9aff-b9e531bd500c"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "2f7c380270ac4c7488a4df0530b9101c"
+
+[vars]
+# Bar opprinnelse (origin, uten sti) — brukt av CORS og
+# sjekkOpprinnelse()-CSRF-sjekken. IKKE bruk denne som redirect-mål, se APP_URL.
+ALLOWED_ORIGIN = "https://runelov.github.io"
+# Selve appens fulle URL (prosjekt-side, ikke kontoroten) — brukt som
+# redirect-mål etter magic-link-verifisering, se routes/auth.js.
+APP_URL = "https://runelov.github.io/fungifinder/"
+ENVIRONMENT = "production"
+
+# GITHUB_PAT, TURNSTILE_SECRET_KEY og (senere) RESEND_API_KEY settes IKKE
+# her — sett dem med:
+#   wrangler secret put GITHUB_PAT
+#   wrangler secret put TURNSTILE_SECRET_KEY
+#   wrangler secret put RESEND_API_KEY
+# aldri i denne filen eller noe annet sted i det offentlige repoet.

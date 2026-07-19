@@ -1,5 +1,55 @@
 # Endringslogg
 
+## 0.17.0 — Ekte innlogging, roller og admin-fane (erstatter delt GitHub-token)
+Bruker ba om en admin-fane for å invitere flere brukere med reduserte
+rettigheter, etter samme mønster/sikkerhetsmekanismer som Bondøya (magic-link
++ sesjoner, se `mittbondøya-workspace/bondoya/worker/api`). Frem til nå hadde
+FungiFinder ingen egen backend — alt gikk gjennom ett delt, fine-grained
+GitHub PAT limt inn i `localStorage` (`js/github-store.js`): den som hadde
+tokenet hadde full lese-/skrivetilgang, inkludert å trigge nye
+områdeanalyser. Umulig å gi noen redusert tilgang med det opplegget.
+
+- **Ny backend**: `worker/api/` — en Cloudflare Worker (D1 + KV) kalt
+  `fungifinder-api`. Magic-link-innlogging (ingen passord), sesjonscookie
+  (`HttpOnly`/`Secure`, rulleres periodisk), to roller (`admin`/`bruker`),
+  admin-styrte e-postbundne invitasjonslenker. Se `worker/api/README.md` for
+  oppsett (krever egen Cloudflare-konto — gjøres av deg).
+- **GitHub-PAT-en flyttet server-side**: `worker/api/src/lib/github.js`
+  holder nå det eneste GitHub-tokenet (Worker-hemmelighet), og medierer all
+  lesing av `data/locations.json`/`data/artsfunn.json` og all
+  Actions-triggering (`fetch-area.yml`/`enrich-point.yml`) i
+  `fungifinder-db`. Ingen bruker eier eller limer inn noe GitHub-token i
+  nettleseren lenger.
+- **Rollehåndhevet server-side**: kun `admin` kan trigge nye
+  områdeanalyser (`POST /omrader/hent`, 403 ellers — ikke bare skjult i
+  UI). `bruker` kan lese allerede analyserte terrengpunkter, foreslå
+  områder, og registrere/redigere/slette egne funn (inkl. berikelse av
+  et nytt, ukjent funn-sted — se under).
+- **Personlige data (funn/hogst-merker/egne steder) flyttet fra ett delt
+  `data/personal.json` til én rad per bruker i D1** (`bruker_data`), lest/
+  skrevet via nye `GET`/`PUT /meg/data` — samme JSON-skjema som før, bare
+  skilt per bruker i stedet for delt av alle. Engangsmigrering av
+  eksisterende data dokumentert i `worker/api/README.md`.
+- **`fungifinder-db` sin `enrich-point.yml`/`fetch_area.py`** (berikelse av
+  ett egendefinert funn-sted) skriver nå til en ny, ikke-personlig
+  `data/enrichments.json` (oppslag `{locationId: felter}`) i stedet for å
+  mutere `data/personal.json` sin `customLocations`-liste direkte — gir ikke
+  lenger mening når personlige steder er per bruker i D1.
+  `fungifinder-api` leser resultatet tilbake via
+  `GET /terrengdata/berikelse/:locationId` og appen slår det inn i riktig
+  brukers egen `customLocations`-rad.
+- **Ny "🛡️ Admin"-fane**: brukerliste (aktiver/deaktiver/slett permanent) +
+  invitasjoner (opprett med bundet e-post, liste, trekk tilbake). Synlig kun
+  for `rolle==='admin'` fra `/meg`.
+- Fjernet: "Synk (GitHub-datarepo)"-panelet (eier/repo/token-skjema) i
+  Config-fanen, erstattet med en enkel innloggingsboks under den nye
+  "Konto"-fanen. `js/github-store.js` slettet, erstattet av
+  `js/api-client.js`.
+- Sesjonscookien er bevisst `SameSite=None` (ikke `Lax` slik Bondøya bruker)
+  siden frontend (GitHub Pages) og API-et (`workers.dev`) er ulike
+  registrerbare domener — kompensert med streng `Origin`-header-sjekk på
+  alle muterende ruter. Se `worker/api/README.md` for begrunnelsen.
+
 ## 0.16.3 — Håndter Open-Meteo-throttling (429) bedre
 Konsollfeil fra bruker: `GET api.open-meteo.com/v1/forecast … 429 (Too Many
 Requests)` fra `loadWeather()`. Årsak: 14-dagers værhenting sendte lat/lon

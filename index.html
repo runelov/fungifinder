@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.16.3"/>
+<link rel="stylesheet" href="css/styles.css?v=0.17.0"/>
 </head>
 <body>
 
@@ -38,9 +38,9 @@
     <details class="sp-collapsible sp-notice" id="sp-notice">
       <summary><b>Om dataene</b> <span class="sp-collapse-hint">(klikk for å skjule/vise)</span></summary>
       <div class="sp-collapsible-body">
-      Terreng- og adkomstdata hentes on-demand fra ditt private data-repo når du velger et område uten data ennå.
-      Værdata hentes <b>live</b>. Dine personlige data (funn, hogst-merker, egne steder) lastes fra samme repo —
-      koble til under "Config"-fanen i sidepanelet.
+      Terreng- og adkomstdata hentes on-demand av admin når et område uten data ennå velges.
+      Værdata hentes <b>live</b>. Dine personlige data (funn, hogst-merker, egne steder) lagres på din innloggede
+      konto — logg inn under "Konto"-fanen i sidepanelet.
       </div>
     </details>
 
@@ -63,7 +63,7 @@
       <div class="sp-collapsible-body">
         <div class="sp-tab-bar" id="sp-tab-bar">
           <button class="sp-tab-btn active" data-tab="preferences">Preferanser</button>
-          <button class="sp-tab-btn" data-tab="config">Config</button>
+          <button class="sp-tab-btn" data-tab="konto">Konto</button>
         </div>
 
         <div class="sp-tab-content" data-tab-content="preferences">
@@ -81,24 +81,46 @@
           </div>
         </div>
 
-        <div class="sp-tab-content" data-tab-content="config" style="display:none;">
-          <div id="sp-sync-status" style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">Ikke koblet til — viser kun eksempeldata.</div>
-          <form id="sp-sync-form" autocomplete="on">
-            <label style="display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:3px;">Privat data-repo (eier/repo)</label>
-            <input type="text" id="sync-repo" name="username" autocomplete="username" placeholder="brukernavn/fungifinder-data" style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;font-size:12.5px;"/>
-            <label style="display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:3px;">Sti til terrengdata</label>
-            <input type="text" id="sync-locations-path" autocomplete="off" placeholder="data/locations.json" style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;font-size:12.5px;"/>
-            <label style="display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:3px;">Sti til personlige data</label>
-            <input type="text" id="sync-personal-path" autocomplete="off" placeholder="data/personal.json" style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;font-size:12.5px;"/>
-            <label style="display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:3px;">Personal access token (fine-grained, kun dette repoet — Contents + Actions)</label>
-            <input type="password" id="sync-token" name="password" autocomplete="current-password" placeholder="github_pat_..." style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:8px;font-size:12.5px;"/>
-            <div style="display:flex;gap:6px;">
-              <button type="submit" class="sp-btn sp-primary" id="sync-connect" style="flex:1;">Koble til</button>
-              <button type="button" class="sp-btn" id="sync-disconnect">Koble fra</button>
+        <div class="sp-tab-content" data-tab-content="konto" style="display:none;">
+          <div id="sp-account-loggedout">
+            <p class="sp-account-hint">Logg inn med e-posten din for å registrere funn og se turforslag. Du må være invitert av en administrator fra før.</p>
+            <form id="sp-login-form" autocomplete="on">
+              <input type="email" id="sp-login-epost" name="email" autocomplete="email" required placeholder="din@epost.no" style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;font-size:12.5px;"/>
+              <div id="sp-turnstile" class="cf-turnstile" data-sitekey="1x00000000000000000000AA" style="margin-bottom:8px;"></div>
+              <button type="submit" class="sp-btn sp-primary" id="sp-login-send" style="width:100%;">Send innloggingslenke</button>
+            </form>
+            <div id="sp-login-status" style="font-size:12px;color:var(--ink-soft);margin-top:8px;"></div>
+          </div>
+          <div id="sp-account-loggedin" style="display:none;">
+            <div style="font-size:13px;margin-bottom:8px;">
+              Innlogget som <b id="sp-account-name"></b> <span class="sp-tag" id="sp-account-role"></span>
             </div>
-            <div style="font-size:11px;color:var(--ink-soft);margin-top:6px;">Tips: la nettleseren/passordbehandleren din lagre tokenet ved tilkobling, så slipper du å taste det inn på nytt hvis enheten tømmer lokal lagring.</div>
-          </form>
+            <button class="sp-btn" id="sp-logout-btn">Logg ut</button>
+          </div>
           <div class="sp-config-version" id="sp-config-version"></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="sp-collapsible sp-tabbed-panel" id="sp-admin-panel" hidden>
+      <summary><b>🛡️ Admin</b> <span class="sp-collapse-hint">(klikk for å skjule/vise)</span></summary>
+      <div class="sp-collapsible-body">
+        <div class="sp-tab-bar" id="sp-admin-tab-bar">
+          <button class="sp-tab-btn active" data-tab="brukere">Brukere</button>
+          <button class="sp-tab-btn" data-tab="invitasjoner">Invitasjoner</button>
+        </div>
+
+        <div class="sp-tab-content" data-tab-content="brukere">
+          <div id="sp-admin-brukere-list" class="sp-mine-list"></div>
+        </div>
+
+        <div class="sp-tab-content" data-tab-content="invitasjoner" style="display:none;">
+          <form id="sp-invitasjon-form" style="display:flex;gap:6px;margin-bottom:10px;">
+            <input type="email" id="sp-invitasjon-epost" required placeholder="epost@eksempel.no" style="flex:1;padding:6px 8px;border-radius:3px;border:1px solid var(--line);font-size:12.5px;"/>
+            <button type="submit" class="sp-btn sp-primary">Inviter</button>
+          </form>
+          <div id="sp-invitasjon-ny-lenke" class="sp-access-box" style="display:none;word-break:break-all;"></div>
+          <div id="sp-admin-invitasjoner-list" class="sp-mine-list"></div>
         </div>
       </div>
     </details>
@@ -181,7 +203,7 @@
             <div id="sp-route-summary" style="display:none;"></div>
           </div>
           <div id="sp-route-disabled-note" style="display:none;font-size:12px;color:var(--ink-soft);">
-            Koble til ditt private data-repo under ⚙ Preferanser &amp; Config → Config for å foreslå områder.
+            Logg inn under ⚙ Preferanser &amp; Config → Konto for å foreslå områder.
           </div>
 
           <div id="sp-fetch-panel" style="display:none; margin-top:14px; padding-top:12px; border-top: 1px dashed var(--line); border-left: 3px solid var(--gold); padding-left: 12px;">
@@ -212,10 +234,36 @@
   </div>
 
   <div id="sp-modal-slot"></div>
+
+  <!-- Vises kun når siden åpnes via en invitasjonslenke (?invitasjon=<token>)
+       — se checkUrlInvitasjon() i app.js. Gjenbruker samme
+       .sp-modal-backdrop/.sp-modal-mønster som funn-/hogst-modalene
+       (bygget i JS, se openFindModal). -->
+  <div id="sp-invite-panel" style="display:none;">
+    <div class="sp-modal-backdrop">
+      <div class="sp-modal">
+        <h4>Bli med på FungiFinder</h4>
+        <div id="sp-invite-status" class="sp-modal-sub"></div>
+        <form id="sp-invite-form" style="display:none;">
+          <label for="sp-invite-epost">E-post</label>
+          <input type="email" id="sp-invite-epost" disabled/>
+          <label for="sp-invite-kortnavn">Kortnavn (vises for admin)</label>
+          <input type="text" id="sp-invite-kortnavn" required maxlength="100" placeholder="F.eks. fornavnet ditt"/>
+          <div class="sp-modal-actions">
+            <button type="submit" class="sp-btn sp-primary">Registrer meg</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="js/github-store.js?v=0.16.3"></script>
-<script src="js/app.js?v=0.16.3"></script>
+<!-- Cloudflare Turnstile — sitekey over er den offentlige alltid-bestå
+     testnøkkelen frem til dere registrerer et ekte Turnstile-widget for
+     fungifinder-domenet i Cloudflare-dashbordet, se worker/api/README.md. -->
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<script src="js/api-client.js?v=0.17.0"></script>
+<script src="js/app.js?v=0.17.0"></script>
 </body>
 </html>
