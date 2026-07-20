@@ -1,5 +1,33 @@
 # Endringslogg
 
+## 0.18.0 — Ekte Turnstile-nøkkel og kode-basert innlogging for PWA på hjemskjerm
+Bruker rapporterte to ting: Turnstile-widgeten under Konto viste Cloudflares
+"kun for testing"-varsel i produksjon, og innlogging "satt ikke" etter at
+appen ble lagt til på hjemskjermen på iOS.
+
+- **Ekte Turnstile site key**: `index.html` brukte fortsatt Cloudflares
+  offentlige alltid-bestå testnøkkel (`1x00000000000000000000AA`) i
+  produksjon — den var kun ment for `worker/api/.dev.vars` (lokal
+  utvikling), men ble aldri byttet ut i den committede, faktisk deployede
+  `index.html`. Registrerte et ekte Turnstile-widget for
+  `runelov.github.io` i Cloudflare-dashbordet og satte tilhørende
+  `TURNSTILE_SECRET_KEY` på workeren.
+- **Kode-basert innlogging** (`POST /auth/verifiser-kode`, ny kolonne
+  `kode_hash`/`kode_forsok` på `innloggingstokens`, migrasjon
+  `0002_innloggingskode.sql`): en PWA lagt til på hjemskjermen
+  (`display: standalone` i `manifest.webmanifest`) har på iOS verken
+  adressefelt å lime inn magic-link-en i, eller noen "åpne i app"-håndtering
+  av e-postlenken — og får dessuten sin egen isolerte cookie-lagring,
+  atskilt fra Safari, der lenken uansett åpnes. Innloggingsmailen
+  (`sendInnloggingsLenke`) inneholder nå i tillegg en 6-sifret kode brukeren
+  kan taste rett inn under Konto i selve appen. Hele verifiseringen skjer
+  som ett `fetch()`-kall fra appens egen JS (`js/api-client.js` sin
+  `verifiserKode()`), så `Set-Cookie` havner i den lagringskonteksten koden
+  faktisk kjører i — uansett om det er Safari eller hjemskjerm-PWA-en.
+  Rate-limitert med IP-teller adskilt fra lenke-forespørselens (deler ikke
+  bøtte — en feiltastet kode skal ikke låse brukeren ute fra å be om en ny
+  lenke), og maks 5 feilforsøk per utstedt kode.
+
 ## 0.17.0 — Ekte innlogging, roller og admin-fane (erstatter delt GitHub-token)
 Bruker ba om en admin-fane for å invitere flere brukere med reduserte
 rettigheter, etter samme mønster/sikkerhetsmekanismer som Bondøya (magic-link
