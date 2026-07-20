@@ -2,7 +2,7 @@ import { createRouter } from './router.js';
 import { corsHeaders } from './lib/cors.js';
 import { json } from './lib/json.js';
 import { rullerSesjonHvisNodvendig, sesjonCookieHeader } from './lib/session.js';
-import { beOmLenke, verifiser, loggUt } from './routes/auth.js';
+import { beOmLenke, verifiser, verifiserKode, loggUt } from './routes/auth.js';
 import { meg } from './routes/meg.js';
 import { hentMineData, lagreMineData } from './routes/data.js';
 import { hentTerrengdata, hentArtsfunn, hentBerikelse } from './routes/terreng.js';
@@ -16,6 +16,7 @@ import { sjekkInvitasjon, registrerMedInvitasjon } from './routes/invitasjoner.j
 const router = createRouter();
 router.post('/auth/be-om-lenke', beOmLenke);
 router.get('/auth/verifiser', verifiser);
+router.post('/auth/verifiser-kode', verifiserKode);
 router.post('/auth/logg-ut', loggUt);
 router.get('/meg', meg);
 router.get('/meg/data', hentMineData);

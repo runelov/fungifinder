@@ -328,6 +328,32 @@
     });
   }
 
+  function wireKodeForm(){
+    document.getElementById('sp-kode-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const epost = document.getElementById('sp-login-epost').value.trim();
+      const kode = document.getElementById('sp-kode-input').value.trim();
+      const statusEl = document.getElementById('sp-kode-status');
+      const btn = document.getElementById('sp-kode-send');
+      if (!epost) { statusEl.textContent = '⚠ Fyll ut e-post over først.'; return; }
+      if (!/^\d{6}$/.test(kode)) { statusEl.textContent = '⚠ Koden må være 6 sifre.'; return; }
+      btn.disabled = true;
+      statusEl.textContent = 'Sjekker …';
+      try {
+        currentUser = await window.ApiClient.verifiserKode(epost, kode);
+        statusEl.textContent = '';
+        reflectAccountUi();
+        await loadLocations();
+        await loadStorage();
+        render();
+      } catch (err) {
+        statusEl.textContent = '⚠ ' + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
   function wireLogout(){
     document.getElementById('sp-logout-btn').addEventListener('click', async () => {
       await window.ApiClient.loggUt();
@@ -2704,6 +2730,7 @@
     wireTabs();
     wireCollapsibles();
     wireLoginForm();
+    wireKodeForm();
     wireLogout();
     wireAdminPanel();
     wireFetchPanel();

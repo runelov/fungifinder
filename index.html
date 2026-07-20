@@ -90,6 +90,12 @@
               <button type="submit" class="sp-btn sp-primary" id="sp-login-send" style="width:100%;">Send innloggingslenke</button>
             </form>
             <div id="sp-login-status" style="font-size:12px;color:var(--ink-soft);margin-top:8px;"></div>
+            <p class="sp-account-hint" style="margin-top:10px;">Lagt til FungiFinder på hjemskjermen? Lenken over åpnes i Safari, ikke i appen. Skriv i stedet inn den 6-sifrede koden fra e-posten her:</p>
+            <form id="sp-kode-form" autocomplete="off">
+              <input type="text" id="sp-kode-input" name="kode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6-sifret kode" style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;font-size:12.5px;"/>
+              <button type="submit" class="sp-btn" id="sp-kode-send" style="width:100%;">Bekreft kode</button>
+            </form>
+            <div id="sp-kode-status" style="font-size:12px;color:var(--ink-soft);margin-top:8px;"></div>
           </div>
           <div id="sp-account-loggedin" style="display:none;">
             <div style="font-size:13px;margin-bottom:8px;">

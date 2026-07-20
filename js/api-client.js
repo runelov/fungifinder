@@ -35,6 +35,23 @@ async function beOmLenke(epost, turnstileToken){
   return data;
 }
 
+// Alternativ til å klikke magic-link-en fra e-posten — se README/CLAUDE.md
+// for hvorfor: en PWA lagt til på hjemskjermen har ingen adressefelt å lime
+// lenken inn i, og lenken åpnes uansett i Safari sin egen, isolerte
+// cookie-lagring, atskilt fra PWA-ens. Ved å kjøre HELE verifiseringen som
+// et fetch() herfra, havner Set-Cookie-en i den lagringskonteksten denne
+// koden faktisk kjører i.
+async function verifiserKode(epost, kode){
+  const res = await kall('/auth/verifiser-kode', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ epost, kode })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Uventet feil (${res.status}).`);
+  return { epost: data.epost, kortnavn: data.kortnavn, rolle: data.rolle };
+}
+
 async function loggUt(){
   await kall('/auth/logg-ut', { method: 'POST' });
 }
@@ -196,7 +213,7 @@ async function registrerMedInvitasjon(token, kortnavn){
 }
 
 window.ApiClient = {
-  meg, beOmLenke, loggUt,
+  meg, beOmLenke, verifiserKode, loggUt,
   hentMineData, lagreMineData,
   hentTerrengdata, hentArtsfunn, hentBerikelse,
   hentOmraderDekning, startOmradeHenting, hentOmradeStatus,

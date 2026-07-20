@@ -15,6 +15,16 @@ export async function sha256Hex(input) {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+// Brukes til innloggingskoden (se routes/auth.js sin verifiserKode) — et
+// kort, manuelt inntastbart alternativ til magic-link-en, for konteksten
+// der den ikke kan brukes (PWA lagt til på hjemskjermen har hverken
+// adressefelt eller "åpne i app"-håndtering av lenken i e-posten).
+export function randomDigitCode(lengde = 6) {
+  const maks = 10 ** lengde;
+  const tall = crypto.getRandomValues(new Uint32Array(1))[0] % maks;
+  return String(tall).padStart(lengde, '0');
+}
+
 export function timingSafeEqual(a, b) {
   const enc = new TextEncoder();
   const aBytes = enc.encode(a);
