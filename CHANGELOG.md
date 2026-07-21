@@ -1,5 +1,34 @@
 # Endringslogg
 
+## 0.19.0 — Flyttet til eget domene (fungifinder.no), SameSite=Lax
+Brukeren rapporterte at målepunkter, Artsdatabanken-funn og egne data
+forsvant i PWA-en på iPhone selv om "Konto"-fanen viste innlogget. Rotårsak:
+frontend (GitHub Pages, `runelov.github.io`) og API (`*.workers.dev`) var
+to ulike registrerbare domener — ekte cross-site — som tvang sesjonscookien
+til `SameSite=None`, notorisk upålitelig i iOS/WebKit sin behandling av
+frittstående PWA-er. Løsningen (kjøpt `fungifinder.no` hos Webhuset) er
+samme arkitektur som Bondøya:
+
+- **Nytt domene**: appen kjører nå på `https://fungifinder.no`
+  (+ `www.fungifinder.no`) som Custom Domain på GitHub Pages, API-et på
+  `https://api.fungifinder.no` som Cloudflare Worker Custom Domain — begge
+  DNS-satt opp i Cloudflare (navnetjenere flyttet fra Webhuset). Den gamle
+  `runelov.github.io/fungifinder`-URL-en og `*.workers.dev`-API-URL-en
+  fungerer ikke lenger for innlogging/data (bevisst — se under).
+- **`SameSite=Lax` i stedet for `SameSite=None`**: mulig nå som frontend og
+  API deler registrerbart domene. Den tidligere `Origin`-header-CSRF-sjekken
+  (`sjekkOpprinnelse()` i `worker/api/src/lib/cors.js`, kalt fra alle
+  muterende ruter) er fjernet — `SameSite=Lax` gir samme beskyttelse gratis.
+- **`ALLOWED_ORIGIN`/`APP_URL`** i `worker/api/wrangler.toml` oppdatert til
+  `https://fungifinder.no` (hhv. med og uten sti).
+- Turnstile-widgeten fra v0.18.0 fikk `fungifinder.no`/`www.fungifinder.no`
+  lagt til som ekstra tillatte domener (samme widget/sitekey, ikke en ny).
+- E-post-sending **uendret** — fortsatt via Bondøyas `mail.bondoya.no`
+  (Resends gratis-tier tillater kun ett verifisert domene per konto, og det
+  er allerede brukt av `bondoya.no`).
+- Ingen viderekobling fra den gamle `runelov.github.io`-URL-en er satt opp
+  — kun én reell bruker (kontoeieren selv), ingen andre har den lagret.
+
 ## 0.18.0 — Ekte Turnstile-nøkkel og kode-basert innlogging for PWA på hjemskjerm
 Bruker rapporterte to ting: Turnstile-widgeten under Konto viste Cloudflares
 "kun for testing"-varsel i produksjon, og innlogging "satt ikke" etter at

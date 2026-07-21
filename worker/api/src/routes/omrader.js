@@ -1,5 +1,5 @@
 import { json } from '../lib/json.js';
-import { corsHeaders, sjekkOpprinnelse } from '../lib/cors.js';
+import { corsHeaders } from '../lib/cors.js';
 import { requireAdmin, requireSession } from '../lib/session.js';
 import { loadFile, triggerWorkflow, getLatestRun } from '../lib/github.js';
 
@@ -18,7 +18,6 @@ export async function startOmradeHenting({ request, env }) {
   const cors = corsHeaders(env);
   const admin = await requireAdmin(request, env);
   if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
-  if (!sjekkOpprinnelse(request, env)) return json({ error: 'Ugyldig forespørsel.' }, 403, cors);
 
   let body;
   try {
@@ -66,7 +65,6 @@ export async function berikPunkt({ request, env, params }) {
   const cors = corsHeaders(env);
   const bruker = await requireSession(request, env);
   if (!bruker) return json({ error: 'Ikke innlogget.' }, 401, cors);
-  if (!sjekkOpprinnelse(request, env)) return json({ error: 'Ugyldig forespørsel.' }, 403, cors);
 
   let body;
   try {

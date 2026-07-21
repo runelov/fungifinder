@@ -1,5 +1,5 @@
 import { json } from '../lib/json.js';
-import { corsHeaders, sjekkOpprinnelse } from '../lib/cors.js';
+import { corsHeaders } from '../lib/cors.js';
 import { sha256Hex } from '../lib/crypto.js';
 import { opprettSesjon, sesjonCookieHeader } from '../lib/session.js';
 import { sjekkOgTellIp } from '../lib/ratelimit.js';
@@ -27,7 +27,6 @@ export async function sjekkInvitasjon({ request, env, params }) {
 
 export async function registrerMedInvitasjon({ request, env, params }) {
   const cors = corsHeaders(env);
-  if (!sjekkOpprinnelse(request, env)) return json({ error: 'Ugyldig forespørsel.' }, 403, cors);
   const ip = request.headers.get('CF-Connecting-IP') || 'ukjent';
   const ipOk = await sjekkOgTellIp(ip, 'registrer-invitasjon', 10, env);
   if (!ipOk) return json({ error: 'For mange forsøk. Prøv igjen senere.' }, 429, cors);

@@ -28,9 +28,11 @@ dag. Etter at dette er satt opp og verifisert kan det gamle
 nettleser-tokenet slettes/roteres i GitHub-innstillingene; ingen bruker
 trenger lenger å eie eller lime inn noe GitHub-token selv.
 
-Ingen `routes`/custom domain i `wrangler.toml` ennå — API-et nås kun via sin
-`workers.dev`-URL. Denne URL-en må limes inn i `js/api-client.js`
-(`API_BASE`) etter første `wrangler deploy`.
+API-et nås via Worker Custom Domain `api.fungifinder.no`
+(`wrangler.toml` sin `routes`), ikke lenger via `*.workers.dev` — se
+"Hvorfor SameSite=Lax" nederst i denne filen for hvorfor. Å legge til
+denne routen slår automatisk av den gamle `workers.dev`-URL-en ved neste
+`wrangler deploy`.
 
 ## Lokal utvikling og test
 
@@ -51,19 +53,15 @@ ALLOWED_ORIGIN=http://localhost:8743
 APP_URL=http://localhost:8743/
 ```
 
-Uten `ALLOWED_ORIGIN`-overstyringen returnerer alle muterende ruter 403 mot
-en lokalt kjørende frontend — CSRF-sjekken (`sjekkOpprinnelse()` i
-`lib/cors.js`) krever eksakt match mot `Origin`-headeren, se "Hvorfor
-SameSite=None"-avsnittet nederst i denne filen.
+Uten `ALLOWED_ORIGIN`-overstyringen svarer CORS-headerne med feil opphav mot
+en lokalt kjørende frontend, se "Hvorfor SameSite=Lax"-avsnittet nederst i
+denne filen.
 
 `APP_URL` er et EGET felt, bevisst forskjellig fra `ALLOWED_ORIGIN`: sistnevnte
-er en bar opprinnelse (uten sti, riktig for CORS/CSRF), mens `APP_URL` er
-selve appens fulle URL — i produksjon `https://runelov.github.io/fungifinder/`
-(en GitHub Pages PROSJEKT-side, ikke kontoroten), lokalt bare
+er en bar opprinnelse (uten sti, riktig for CORS), mens `APP_URL` er selve
+appens fulle URL — i produksjon `https://fungifinder.no/`, lokalt bare
 `http://localhost:8743/`. `routes/auth.js` sin `verifiser()` redirecter hit
-etter en vellykket magic-link-verifisering. Blander man disse to sammen
-(brukt til å være samme variabel) ender innlogging på en 404, siden
-kontoroten `https://runelov.github.io/` ikke er der appen faktisk ligger.
+etter en vellykket magic-link-verifisering.
 I utviklingsmodus (eller når `RESEND_API_KEY` mangler) logger
 `src/lib/epost.js` hele magic-link-URL-en til `wrangler dev`-konsollen i
 stedet for å faktisk sende e-post:
@@ -123,14 +121,18 @@ visning, så én blob per bruker (tabellen `bruker_data`) holder — og
 minimerer omskriving i `js/app.js`, som allerede kjenner akkurat dette
 skjemaet fra `data/personal.json`.
 
-## Hvorfor SameSite=None i stedet for Lax?
+## Hvorfor SameSite=Lax (og ingen egen CSRF-sjekk)?
 
-Bondøya kjører frontend og API på samme registrerbare domene
-(`bondoya.no`/`api.bondoya.no`). FungiFinders frontend er GitHub Pages
-(`runelov.github.io`) og dette API-et er `*.workers.dev` — to ULIKE
-registrerbare domener, altså ekte cross-site. En `SameSite=Lax`-cookie ville
-ikke blitt sendt med på `fetch()`-kall dit. Løsningen (`SameSite=None`, se
-`src/lib/session.js`) krever som motvekt at alle muterende ruter
-(POST/PUT/PATCH/DELETE) verifiserer `Origin`-headeren mot `ALLOWED_ORIGIN`
-(`src/lib/cors.js` sin `sjekkOpprinnelse()`) — dette forsvinner av seg selv
-den dagen frontend og API ev. flyttes til et felles domene.
+Siden 2026-07-21 kjører FungiFinder frontend og API på samme registrerbare
+domene (`fungifinder.no`/`api.fungifinder.no`), samme mønster som Bondøya
+(`bondoya.no`/`api.bondoya.no`). Sesjonscookien bruker derfor
+`SameSite=Lax` (`src/lib/session.js`) — en cross-site-forespørsel sender
+ikke cookien med i det hele tatt, så det gir CSRF-beskyttelse gratis, uten
+behov for den tidligere `Origin`-header-sjekken (`sjekkOpprinnelse()`,
+fjernet).
+
+Før dette kjørte frontend på GitHub Pages (`runelov.github.io`) og API-et
+kun via `*.workers.dev` — to ULIKE registrerbare domener, altså ekte
+cross-site, som tvang `SameSite=None` og en egen CSRF-motforanstaltning.
+Se git-historikk for `wrangler.toml`/`session.js`/`cors.js` for det
+tidligere oppsettet.

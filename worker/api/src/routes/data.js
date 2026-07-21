@@ -1,5 +1,5 @@
 import { json } from '../lib/json.js';
-import { corsHeaders, sjekkOpprinnelse } from '../lib/cors.js';
+import { corsHeaders } from '../lib/cors.js';
 import { requireSession } from '../lib/session.js';
 
 const TOM_STRUKTUR = { finds: [], cuts: [], hogstOmrader: [], customLocations: [], favoriteSpecies: [] };
@@ -32,7 +32,6 @@ export async function lagreMineData({ request, env }) {
   const cors = corsHeaders(env);
   const bruker = await requireSession(request, env);
   if (!bruker) return json({ error: 'Ikke innlogget.' }, 401, cors);
-  if (!sjekkOpprinnelse(request, env)) return json({ error: 'Ugyldig forespørsel.' }, 403, cors);
 
   let body;
   try {

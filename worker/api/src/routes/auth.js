@@ -1,5 +1,5 @@
 import { json } from '../lib/json.js';
-import { corsHeaders, sjekkOpprinnelse } from '../lib/cors.js';
+import { corsHeaders } from '../lib/cors.js';
 import { randomToken, randomDigitCode, sha256Hex, timingSafeEqual } from '../lib/crypto.js';
 import { verifyTurnstile } from '../lib/turnstile.js';
 import { sjekkOgTellEpost, sjekkOgTellIp } from '../lib/ratelimit.js';
@@ -13,7 +13,6 @@ const KODE_MAKS_FORSOK = 5;
 export async function beOmLenke({ request, env, url }) {
   const start = Date.now();
   const cors = corsHeaders(env);
-  if (!sjekkOpprinnelse(request, env)) return json({ error: 'Ugyldig forespørsel.' }, 403, cors);
 
   let body;
   try {
@@ -110,11 +109,8 @@ export async function verifiser({ request, env, url }) {
     status: 302,
     headers: {
       // IKKE env.ALLOWED_ORIGIN her — den er bevisst kun en bar opprinnelse
-      // (origin, uten sti), riktig for CORS/CSRF-sjekken (sjekkOpprinnelse i
-      // lib/cors.js), men FungiFinder er en GitHub Pages PROSJEKT-side
-      // (github.io/<repo>/), ikke en konto-rot-side — en redirect til bar
-      // ALLOWED_ORIGIN endte på en 404 på selve kontoroten i praksis. Egen
-      // APP_URL-variabel peker på selve appens faktiske sti.
+      // (origin, uten sti), riktig for CORS. Egen APP_URL-variabel peker på
+      // selve appens fulle URL.
       Location: env.APP_URL,
       'Set-Cookie': sesjonCookieHeader(sesjonToken),
       ...cors,
@@ -133,7 +129,6 @@ export async function verifiser({ request, env, url }) {
 // rett.
 export async function verifiserKode({ request, env }) {
   const cors = corsHeaders(env);
-  if (!sjekkOpprinnelse(request, env)) return json({ error: 'Ugyldig forespørsel.' }, 403, cors);
 
   let body;
   try {
@@ -200,7 +195,6 @@ export async function verifiserKode({ request, env }) {
 
 export async function loggUt({ request, env }) {
   const cors = corsHeaders(env);
-  if (!sjekkOpprinnelse(request, env)) return json({ error: 'Ugyldig forespørsel.' }, 403, cors);
   await slettSesjon(request, env);
   return new Response(null, {
     status: 204,

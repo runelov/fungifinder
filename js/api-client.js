@@ -7,7 +7,7 @@
 //
 const API_BASE = ['localhost', '127.0.0.1'].includes(location.hostname)
   ? 'http://localhost:8787'
-  : 'https://fungifinder-api.bondoya.workers.dev';
+  : 'https://api.fungifinder.no';
 
 async function kall(sti, opts){
   const res = await fetch(`${API_BASE}${sti}`, { credentials: 'include', ...opts });

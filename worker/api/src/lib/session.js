@@ -7,8 +7,7 @@ const LEVETID_MS = 30 * 24 * 60 * 60 * 1000; // 30 dager
 // i stedet for å stå fast i hele 30-dagers levetiden — begrenser hvor lenge
 // et ev. lekket token forblir gyldig. Bevisst periodisk, ikke på hvert
 // eneste kall — se Bondøyas worker/api/src/lib/session.js for den fulle
-// race-begrunnelsen (portert uendret, kun cookie-attributtene under er
-// tilpasset FungiFinders cross-site-oppsett).
+// race-begrunnelsen (portert uendret).
 const ROTASJON_INTERVALL_MS = 24 * 60 * 60 * 1000; // 24 timer
 const ROTASJON_OVERLAPP_MS = 5 * 60 * 1000; // 5 minutter
 
@@ -23,18 +22,18 @@ export async function opprettSesjon(brukerId, env) {
   return token;
 }
 
-// Ulikt Bondøya: SameSite=None (ikke Lax), fordi frontend
-// (runelov.github.io) og dette API-et (workers.dev) er ulike registrerbare
-// domener — se lib/cors.js sin sjekkOpprinnelse() for motvekten dette
-// krever på muterende ruter. Fortsatt HttpOnly+Secure, host-only (ingen
+// Samme som Bondøya: SameSite=Lax, siden frontend (fungifinder.no) og
+// dette API-et (api.fungifinder.no) er på samme registrerbare domene —
+// ingen egen Origin-header-CSRF-sjekk nødvendig (Lax gir det gratis, se
+// lib/cors.js). Fortsatt HttpOnly+Secure, host-only (ingen
 // Domain-attributt).
 export function sesjonCookieHeader(token, maxAgeSekunder) {
   const maxAge = maxAgeSekunder != null ? Math.max(0, Math.floor(maxAgeSekunder)) : LEVETID_MS / 1000;
-  return `${COOKIE_NAVN}=${token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${maxAge}`;
+  return `${COOKIE_NAVN}=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAge}`;
 }
 
 export function slettSesjonCookieHeader() {
-  return `${COOKIE_NAVN}=; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=0`;
+  return `${COOKIE_NAVN}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
 }
 
 // Den delte autorisasjonsfunksjonen — alle beskyttede ruter kaller DENNE,

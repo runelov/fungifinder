@@ -2,8 +2,14 @@ name = "fungifinder-api"
 main = "src/index.js"
 compatibility_date = "2026-07-12"
 
-# Ingen custom_domain ennå — nås via <name>.<konto>.workers.dev til videre.
-# routes = [ ... ]
+# Merk: å legge til denne routen slår automatisk av den gamle
+# <name>.<konto>.workers.dev-URL-en for denne Workeren ved neste deploy —
+# samme oppførsel som Bondøyas api.bondoya.no. js/api-client.js sin
+# API_BASE må derfor allerede peke til api.fungifinder.no (og være live på
+# fungifinder.no) FØR denne deployes, ellers oppstår et nedetidsvindu.
+routes = [
+  { pattern = "api.fungifinder.no", custom_domain = true }
+]
 
 [[d1_databases]]
 binding = "DB"
@@ -15,12 +21,12 @@ binding = "RATE_LIMIT"
 id = "2f7c380270ac4c7488a4df0530b9101c"
 
 [vars]
-# Bar opprinnelse (origin, uten sti) — brukt av CORS og
-# sjekkOpprinnelse()-CSRF-sjekken. IKKE bruk denne som redirect-mål, se APP_URL.
-ALLOWED_ORIGIN = "https://runelov.github.io"
-# Selve appens fulle URL (prosjekt-side, ikke kontoroten) — brukt som
-# redirect-mål etter magic-link-verifisering, se routes/auth.js.
-APP_URL = "https://runelov.github.io/fungifinder/"
+# Bar opprinnelse (origin, uten sti) — brukt av CORS. IKKE bruk denne som
+# redirect-mål, se APP_URL.
+ALLOWED_ORIGIN = "https://fungifinder.no"
+# Selve appens fulle URL — brukt som redirect-mål etter
+# magic-link-verifisering, se routes/auth.js.
+APP_URL = "https://fungifinder.no/"
 ENVIRONMENT = "production"
 
 # GITHUB_PAT, TURNSTILE_SECRET_KEY og (senere) RESEND_API_KEY settes IKKE

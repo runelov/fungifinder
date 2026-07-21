@@ -1,5 +1,5 @@
 import { json } from '../lib/json.js';
-import { corsHeaders, sjekkOpprinnelse } from '../lib/cors.js';
+import { corsHeaders } from '../lib/cors.js';
 import { requireAdmin } from '../lib/session.js';
 import { randomToken, sha256Hex } from '../lib/crypto.js';
 import { validerEpost } from '../lib/invitasjoner.js';
@@ -20,7 +20,6 @@ export async function oppdaterBrukerStatus({ request, env, params }) {
   const cors = corsHeaders(env);
   const admin = await requireAdmin(request, env);
   if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
-  if (!sjekkOpprinnelse(request, env)) return json({ error: 'Ugyldig forespørsel.' }, 403, cors);
 
   const id = parseInt(params.id, 10);
   if (id === admin.id) return json({ error: 'Du kan ikke endre din egen konto her.' }, 400, cors);
@@ -54,7 +53,6 @@ export async function slettBrukerPermanent({ request, env, params }) {
   const cors = corsHeaders(env);
   const admin = await requireAdmin(request, env);
   if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
-  if (!sjekkOpprinnelse(request, env)) return json({ error: 'Ugyldig forespørsel.' }, 403, cors);
 
   const id = parseInt(params.id, 10);
   if (id === admin.id) return json({ error: 'Du kan ikke slette din egen konto her.' }, 400, cors);
@@ -101,7 +99,6 @@ export async function opprettInvitasjon({ request, env }) {
   const cors = corsHeaders(env);
   const admin = await requireAdmin(request, env);
   if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
-  if (!sjekkOpprinnelse(request, env)) return json({ error: 'Ugyldig forespørsel.' }, 403, cors);
 
   let body;
   try {
@@ -136,7 +133,6 @@ export async function slettInvitasjon({ request, env, params }) {
   const cors = corsHeaders(env);
   const admin = await requireAdmin(request, env);
   if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
-  if (!sjekkOpprinnelse(request, env)) return json({ error: 'Ugyldig forespørsel.' }, 403, cors);
 
   const rad = await env.DB.prepare('SELECT brukt FROM invitasjoner WHERE id = ?').bind(params.id).first();
   if (!rad) return json({ error: 'Fant ikke invitasjonen.' }, 404, cors);

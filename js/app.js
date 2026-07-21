@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.18.0';
-  const APP_BUILD_DATE = '2026-07-20';
+  const APP_VERSION = '0.19.0';
+  const APP_BUILD_DATE = '2026-07-21';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
   // kommentar der) — de to må holdes i sync manuelt siden repoet bevisst
