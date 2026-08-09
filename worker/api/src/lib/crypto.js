@@ -21,8 +21,17 @@ export async function sha256Hex(input) {
 // adressefelt eller "åpne i app"-håndtering av lenken i e-posten).
 export function randomDigitCode(lengde = 6) {
   const maks = 10 ** lengde;
-  const tall = crypto.getRandomValues(new Uint32Array(1))[0] % maks;
-  return String(tall).padStart(lengde, '0');
+  // Rett modulo på et 32-bits tilfeldig tall gir bias (2^32 er ikke delelig
+  // med maks, så de laveste verdiene blir marginalt mer sannsynlige) — CodeQL
+  // js/biased-cryptographic-random. Forkaster i stedet trekk som havner i
+  // "halen" som ikke går jevnt opp i maks, og trekker på nytt — det som er
+  // igjen er uniformt fordelt.
+  const grense = Math.floor(0x100000000 / maks) * maks;
+  let tall;
+  do {
+    tall = crypto.getRandomValues(new Uint32Array(1))[0];
+  } while (tall >= grense);
+  return String(tall % maks).padStart(lengde, '0');
 }
 
 export function timingSafeEqual(a, b) {

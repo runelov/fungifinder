@@ -2029,7 +2029,7 @@
         <ul class="sp-microtips">${terrainMicrotips(species_for_card(), loc).map(tip => `<li>${tip}</li>`).join('')}</ul>
         ${crossSpeciesTipsHtml(loc, species_for_card().id)}
         ${w ? `<div class="sp-breakdown">Vær nå: <span>${w.precip14} mm</span> nedbør siste 14 dager, snitt temp <span>${w.tempAvg ?? '–'}°C</span>. ${res.weatherVerdict || ''}</div>` : ''}
-        ${finds.length ? `<div class="sp-findlist">${finds.map(f => `<div class="sp-find-row"><span>${SPECIES.find(s=>s.id===f.speciesId)?.name || f.speciesId} — ${f.date}</span><span class="sp-dots">${[1,2,3,4,5].map(n=>`<span class="${n<=f.mengde?'filled':''}"></span>`).join('')}</span></div>`).join('')}</div>` : ''}
+        ${finds.length ? `<div class="sp-findlist">${finds.map(f => `<div class="sp-find-row"><span>${escapeHtml(SPECIES.find(s=>s.id===f.speciesId)?.name || f.speciesId)} — ${escapeHtml(f.date)}</span><span class="sp-dots">${[1,2,3,4,5].map(n=>`<span class="${n<=f.mengde?'filled':''}"></span>`).join('')}</span></div>`).join('')}</div>` : ''}
         <div class="sp-card-actions">
           ${personalFeaturesEnabled() ? `<button class="sp-btn sp-primary" data-action="find" data-loc="${loc.id}">Registrer funn her</button>` : ''}
           <button class="sp-btn" data-action="locate" data-loc="${loc.id}">📍 Vis i kart</button>
@@ -2085,7 +2085,7 @@
         <ul class="sp-microtips">${terrainMicrotips(topSpecies, loc).map(tip => `<li>${tip}</li>`).join('')}</ul>
         ${crossSpeciesTipsHtml(loc, topSpecies.id, { hideFavorites: true })}
         ${w ? `<div class="sp-breakdown">Vær nå: <span>${w.precip14} mm</span> nedbør siste 14 dager, snitt temp <span>${w.tempAvg ?? '–'}°C</span>. ${res.weatherVerdict || ''}</div>` : ''}
-        ${finds.length ? `<div class="sp-findlist">${finds.map(f => `<div class="sp-find-row"><span>${SPECIES.find(s=>s.id===f.speciesId)?.name || f.speciesId} — ${f.date}</span><span class="sp-dots">${[1,2,3,4,5].map(n=>`<span class="${n<=f.mengde?'filled':''}"></span>`).join('')}</span></div>`).join('')}</div>` : ''}
+        ${finds.length ? `<div class="sp-findlist">${finds.map(f => `<div class="sp-find-row"><span>${escapeHtml(SPECIES.find(s=>s.id===f.speciesId)?.name || f.speciesId)} — ${escapeHtml(f.date)}</span><span class="sp-dots">${[1,2,3,4,5].map(n=>`<span class="${n<=f.mengde?'filled':''}"></span>`).join('')}</span></div>`).join('')}</div>` : ''}
         <div class="sp-card-actions">
           ${personalFeaturesEnabled() ? `<button class="sp-btn sp-primary" data-action="find" data-loc="${loc.id}">Registrer funn her</button>` : ''}
           <button class="sp-btn" data-action="locate" data-loc="${loc.id}">📍 Vis i kart</button>
@@ -2190,8 +2190,11 @@
 
     updateFetchPanel(coverageCount);
 
-    const areaLabel = filterMode === 'fylke' ? (fylkeFilter!=='alle' ? ' i ' + fylkeFilter : '')
-      : filterMode === 'kommune' ? (kommuneFilter!=='alle' ? ' i ' + kommuneFilter : '')
+    // kommuneFilter kommer fra et fritekstfelt (autocomplete, ikke en låst
+    // <select>), så den må escapes før den havner i innerHTML nedenfor —
+    // ellers kan noen skrive HTML/script rett inn i "0 steder vist"-meldingen.
+    const areaLabel = filterMode === 'fylke' ? (fylkeFilter!=='alle' ? ' i ' + escapeHtml(fylkeFilter) : '')
+      : filterMode === 'kommune' ? (kommuneFilter!=='alle' ? ' i ' + escapeHtml(kommuneFilter) : '')
       : (radiusCenter ? ` innen ${radiusKm} km` : '');
 
     const container = document.getElementById('sp-results');
@@ -2381,10 +2384,10 @@
     slot.innerHTML = `
       <div class="sp-modal-backdrop" id="sp-modal-backdrop">
         <div class="sp-modal">
-          <h4>${opts.title || (editingFind ? 'Rediger funn — ' + escapeHtml(loc ? loc.name : '') : (loc ? 'Registrer funn — ' + escapeHtml(loc.name) : 'Registrer nytt funn'))}</h4>
-          ${opts.sub ? `<div class="sp-modal-sub">${opts.sub}</div>` : ''}
+          <h4>${opts.title ? escapeHtml(opts.title) : (editingFind ? 'Rediger funn — ' + escapeHtml(loc ? loc.name : '') : (loc ? 'Registrer funn — ' + escapeHtml(loc.name) : 'Registrer nytt funn'))}</h4>
+          ${opts.sub ? `<div class="sp-modal-sub">${escapeHtml(opts.sub)}</div>` : ''}
           <label>Sopptype</label>
-          <select id="sp-find-species">${SPECIES.map(s => `<option value="${s.id}" ${s.id===(editingFind?editingFind.speciesId:selectedSpecies)?'selected':''}>${s.name}</option>`).join('')}</select>
+          <select id="sp-find-species">${SPECIES.map(s => `<option value="${s.id}" ${s.id===(editingFind?editingFind.speciesId:selectedSpecies)?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}</select>
           <label>Mengde funnet</label>
           <div class="sp-scale" id="sp-find-scale">${[1,2,3,4,5].map(n => `<button data-n="${n}" class="${n===mengde?'sel':''}">${n}</button>`).join('')}</div>
           ${needsPosition ? `
@@ -2394,11 +2397,11 @@
             <span id="sp-find-position-display" style="align-self:center;font-size:12.5px;color:var(--ink-soft);">${pendingLat!=null ? pendingLat.toFixed(5)+', '+pendingLon.toFixed(5) : 'Ikke satt — bruk knappen, eller lukk og klikk i kartet der du fant den'}</span>
           </div>` : ''}
           <label>Dato</label>
-          <input type="date" id="sp-find-date" value="${editingFind ? editingFind.date : todayStr}"/>
+          <input type="date" id="sp-find-date" value="${escapeHtml(editingFind ? editingFind.date : todayStr)}"/>
           <label>Notat (valgfritt)</label>
           <textarea id="sp-find-note" rows="2" placeholder="F.eks. nordvendt skråning nær bekken">${editingFind ? escapeHtml(editingFind.note || '') : ''}</textarea>
           <div class="sp-modal-actions">
-            <button class="sp-btn" id="sp-find-cancel">${opts.skipLabel || 'Avbryt'}</button>
+            <button class="sp-btn" id="sp-find-cancel">${opts.skipLabel ? escapeHtml(opts.skipLabel) : 'Avbryt'}</button>
             <button class="sp-btn sp-primary" id="sp-find-save">${editingFind ? 'Lagre endringer' : 'Lagre funn'}</button>
           </div>
         </div>
@@ -2574,7 +2577,7 @@
       const loc = allLocations().find(l => l.id === f.locId);
       const pending = loc && loc.enrichStatus === 'pending';
       return `<div class="sp-mine-row">
-        <span>${escapeHtml(sp ? sp.name : f.speciesId)} <span style="opacity:.6">— ${escapeHtml(loc ? loc.name : 'ukjent sted')} · ${f.date}</span>${pending ? ' <span class="sp-tag" title="Terrengdata hentes i bakgrunnen — funnet teller allerede i vurderingen">⏳ beriker …</span>' : ''}</span>
+        <span>${escapeHtml(sp ? sp.name : f.speciesId)} <span style="opacity:.6">— ${escapeHtml(loc ? loc.name : 'ukjent sted')} · ${escapeHtml(f.date)}</span>${pending ? ' <span class="sp-tag" title="Terrengdata hentes i bakgrunnen — funnet teller allerede i vurderingen">⏳ beriker …</span>' : ''}</span>
         <span class="sp-mine-row-actions">
           <button class="sp-locate" data-view-find="${f.id}" title="Vis i kart">🔍</button>
           <button class="sp-locate" data-move-find="${f.id}" title="Flytt til min posisjon">📍</button>
