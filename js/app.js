@@ -344,6 +344,12 @@
         statusEl.textContent = '';
         reflectAccountUi();
         await loadLocations();
+        // Uten dette kallet blir artsfunn stående på [] resten av økten hvis
+        // siden først ble lastet uinnlogget (loadArtsfunn() i init() kjørte
+        // da med currentUser=null) — nøyaktig scenarioet kodeinnlogging
+        // finnes for (iOS-PWA, ingen sideomlasting via magic-link her).
+        // "Artsdatabanken-funn"-laget sto da som aktivt, men tomt.
+        await loadArtsfunn();
         await loadStorage();
         render();
       } catch (err) {
@@ -358,6 +364,7 @@
     document.getElementById('sp-logout-btn').addEventListener('click', async () => {
       await window.ApiClient.loggUt();
       currentUser = null;
+      artsfunn = []; // ikke la gamle Artskart-observasjoner bli stående synlige uten sesjon
       reflectAccountUi();
       await loadLocations();
       await loadStorage();

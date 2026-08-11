@@ -1,5 +1,23 @@
 # Endringslogg
 
+## 0.19.1 — Rettet: Artsdatabanken-funn kunne forbli tomt etter kodeinnlogging
+Brukeren rapporterte at "Artsdatabanken-funn"-laget av og til ikke viste
+noen prikker, selv om det sto avkrysset/aktivt i lagkontrollen. Rotårsak:
+`loadArtsfunn()` kalles kun én gang, i `init()`, og henter ingenting
+(`artsfunn = []`) hvis `currentUser` ennå ikke var satt på det tidspunktet
+— den normale tilstanden ved appstart før innlogging. Ved innlogging via
+magic-link merkes ikke dette, siden lenken går via en serverside-redirect
+og trigger en full sideomlasting (`init()` kjører på nytt med gyldig
+sesjon). Men `wireKodeForm()` — kodeinnloggingen som finnes spesifikt for
+iOS-PWA-brukere uten sideomlasting (se 0.18.0) — satte `currentUser` og
+rendret på nytt uten å kalle `loadArtsfunn()` igjen, så laget sto tomt
+resten av økten for enhver som logget inn med kode.
+
+- `js/app.js`: `wireKodeForm()` kaller nå `loadArtsfunn()` etter vellykket
+  kodeverifisering, samme mønster som `loadLocations()`/`loadStorage()`.
+- `wireLogout()` nullstiller nå også `artsfunn` ved utlogging (tidligere
+  ble gamle observasjoner stående tegnet på kartet uten gyldig sesjon).
+
 ## 0.19.0 — Flyttet til eget domene (fungifinder.no), SameSite=Lax
 Brukeren rapporterte at målepunkter, Artsdatabanken-funn og egne data
 forsvant i PWA-en på iPhone selv om "Konto"-fanen viste innlogget. Rotårsak:
