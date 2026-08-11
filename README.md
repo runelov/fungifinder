@@ -29,10 +29,21 @@ versjonsbump må disse tre stedene oppdateres sammen:
 3. Ny seksjon i `CHANGELOG.md`
 
 Glemmer man punkt 2, varsler `app.js` selv i konsollen ved oppstart (ikke i
-UI) om at `?v=` i `index.html` ikke stemmer med `APP_VERSION`. `index.html`
+UI) om at `?v=` i `index.html` ikke stemmer med `APP_VERSION` — men KUN for
+sin egen `<script>`-tag, ikke for `css/styles.css`/`js/api-client.js` (se
+2026-08-11: `js/app.js?v=` ble bumpet korrekt, de to andre ble likevel
+stående på gamle verdier siden konsoll-sjekken aldri fanger det). `index.html`
 har også `Cache-Control: no-cache`-metatagger slik at nettlesere/installerte
 PWA-er alltid revaliderer HTML-en — kombinert med `?v=` tvinger dette frem
 riktig js/css uten at brukeren må hard-refreshe manuelt.
+
+En pre-commit-hook (`.githooks/pre-commit`) sjekker nå alle tre `?v=` mot
+`APP_VERSION` og blokkerer committen ved avvik — mer pålitelig enn å stole
+på at noen husker det. Aktiver den én gang per klon:
+
+```bash
+git config core.hooksPath .githooks
+```
 
 ## Oppsett
 

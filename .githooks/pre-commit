@@ -1,0 +1,36 @@
+#!/bin/sh
+# Sjekker at APP_VERSION (js/app.js) og alle tre ?v=-cache-busterne i
+# index.html (css/styles.css, js/api-client.js, js/app.js) er i sync før
+# commit — se README.md "Versjonering og caching" for hvorfor dette ikke
+# bare er kosmetisk (?v= ER cache-busting-mekanismen, ingen build-steg her).
+#
+# Fanger opp nøyaktig den type delvis versjonsbump som skjedde 2026-08-11:
+# APP_VERSION og js/app.js?v= ble bumpet til 0.19.2, men css/styles.css?v=
+# og js/api-client.js?v= ble stående på gamle verdier.
+#
+# Aktiver denne (én gang per klon):
+#   git config core.hooksPath .githooks
+
+app_version=$(sed -n "s/.*APP_VERSION = '\([^']*\)'.*/\1/p" js/app.js)
+if [ -z "$app_version" ]; then
+  echo "pre-commit: fant ikke APP_VERSION i js/app.js — hopper over versjonssjekk" >&2
+  exit 0
+fi
+
+mismatch=0
+for fil in "css/styles.css" "js/api-client.js" "js/app.js"; do
+  v=$(grep -o "${fil}?v=[^\"']*" index.html | head -1 | sed "s|.*?v=||")
+  if [ "$v" != "$app_version" ]; then
+    echo "pre-commit: index.html sin ?v= for $fil er '$v', men APP_VERSION er '$app_version'" >&2
+    mismatch=1
+  fi
+done
+
+if [ "$mismatch" -eq 1 ]; then
+  echo "" >&2
+  echo "Alle tre ?v= i index.html må bumpes sammen med APP_VERSION ved hver release" >&2
+  echo "— se README.md 'Versjonering og caching'. Commit avbrutt." >&2
+  exit 1
+fi
+
+exit 0

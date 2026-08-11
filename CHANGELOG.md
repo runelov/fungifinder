@@ -1,6 +1,19 @@
 # Endringslogg
 
-## 0.19.2 — suggestAreas() ekskluderer høy-befolkning-punkter som anker + versjonsopprydding
+## 0.19.2 — Pre-commit-hook for versjons-sync + suggestAreas() ekskluderer høy-befolkning-punkter som anker
+Ved forrige versjonsbump (se under) ble kun `APP_VERSION`/`js/app.js?v=`
+bumpet — `css/styles.css?v=` og `js/api-client.js?v=` ble stående på gamle
+verdier, til tross for at README.md eksplisitt dokumenterer at alle tre skal
+bumpes sammen. Konsoll-varselet i `app.js` (se README "Versjonering og
+caching") fanger kun avvik på sin EGEN `<script>`-tag, ikke de to andre —
+så dette hadde gått upåaktet hen inntil en bruker rapporterte stale
+CSS/API-klient i produksjon.
+
+- Rettet `css/styles.css?v=`/`js/api-client.js?v=` til `0.19.2` i
+  `index.html`.
+- Ny `.githooks/pre-commit`: sjekker at `APP_VERSION` og alle tre `?v=` i
+  `index.html` stemmer overens, blokkerer committen ved avvik. Aktiveres
+  med `git config core.hooksPath .githooks` (se README).
 Brukeren rapporterte at et foreslått søkeområde (skogpunkt 268, Lørenskog)
 i stor grad dekket bebyggelse — under halvparten av den foreslåtte
 sirkelen var faktisk skog. Se `fungifinder-db` CHANGELOG v22/v23 for
