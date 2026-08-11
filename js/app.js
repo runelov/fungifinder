@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.19.3';
+  const APP_VERSION = '0.19.4';
   const APP_BUILD_DATE = '2026-08-11';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -115,8 +115,8 @@
   // gradvis på-forespørsel (se fetch_area.py), og lastes normalt inn av
   // loadLocations() via GitHub-synk.
   let BASE_LOCATIONS = [
-    { id:'demo-1', name:'Eksempelskog A (demo)', fylke:'Demo', kommune:'Demo', lat:60.0, lon:10.0, treslag:['gran','bjork'], skogalder:'gammel', fuktighet:'frisk', berggrunn:'fattig', avstandVeiM:null, befolkning:'ukjent', hogstAr:null, kjenteFunn:[], custom:false, kjorbarVei:'ukjent', parkeringNotat:'Logg inn for ekte steder', stier:'ukjent', avstandParkeringM:null },
-    { id:'demo-2', name:'Eksempelskog B (demo)', fylke:'Demo', kommune:'Demo', lat:60.2, lon:10.4, treslag:['furu'], skogalder:'middels', fuktighet:'tørr', berggrunn:'moderat', avstandVeiM:null, befolkning:'ukjent', hogstAr:null, kjenteFunn:[], custom:false, kjorbarVei:'ukjent', parkeringNotat:'Logg inn for ekte steder', stier:'ukjent', avstandParkeringM:null }
+    { id:'demo-1', name:'Eksempelskog A (demo)', fylke:'Demo', kommune:'Demo', lat:60.0, lon:10.0, treslag:['gran','bjork'], skogalder:'gammel', fuktighet:'frisk', berggrunn:'fattig', avstandVeiM:null, befolkning:'ukjent', hogstAr:null, kjenteFunn:[], custom:false, kjorbarVei:'ukjent', parkeringNotat:'Logg inn for ekte steder', stier:'ukjent', avstandStiM:null, avstandParkeringM:null },
+    { id:'demo-2', name:'Eksempelskog B (demo)', fylke:'Demo', kommune:'Demo', lat:60.2, lon:10.4, treslag:['furu'], skogalder:'middels', fuktighet:'tørr', berggrunn:'moderat', avstandVeiM:null, befolkning:'ukjent', hogstAr:null, kjenteFunn:[], custom:false, kjorbarVei:'ukjent', parkeringNotat:'Logg inn for ekte steder', stier:'ukjent', avstandStiM:null, avstandParkeringM:null }
   ];
 
   // Arter som er kjent for å foretrekke varme, soleksponerte vokseplasser —
@@ -135,6 +135,13 @@
   let favoriteSpecies = []; // art-ID-er merket med ★ — se viewMode
   let viewMode = 'single'; // 'single' (én valgt art) | 'favorites' (beste treff blant favoritter)
   let prioritizeQuiet = true;
+  // Nedprioriterer steder nær kjent sti/skogsbilvei — uavhengig av og i
+  // TILLEGG til adkomstScore()'s +3/-1 for stier (som gjelder reachability:
+  // kan du komme deg dit), siden "nær en (populær) sti" og "lett å komme
+  // til" er to forskjellige egenskaper som deler samme underliggende
+  // OSM-data. Default AV — de fleste vil fortsatt sette pris på stier for å
+  // komme seg inn i terrenget. Se stiavstandScore().
+  let weighTrailDistance = false;
   let hideHogst = false;
   let artskartOnlyRecent = false; // vis kun Artsdatabanken-funn siste år i kartlaget — se renderArtskartLayer
   // Skjuler kun LISTEN under en viss score — kartet fortsetter å vise alle
@@ -1094,6 +1101,23 @@
     return { pts, tags };
   }
 
+  // Motpolen til adkomstScore()'s sti-bonus: en sti gjør et sted lett å
+  // KOMME TIL (fortsatt et rent pluss der), men gjør det ofte samtidig mer
+  // populært hos andre soppsankere — mer tråkk, mindre sjanse for uplukket
+  // funn. To forskjellige egenskaper fra samme underliggende OSM-data
+  // (avstandStiM, se fetch_area.py — samme mønster som avstandParkeringM).
+  // Kun aktiv når weighTrailDistance-preferansen er på (default av).
+  // Eldre steder uten avstandStiM (hentet før dette feltet fantes) gir
+  // nøytralt 0 — ikke straffet for manglende data.
+  function stiavstandScore(loc){
+    if (loc.avstandStiM == null) return 0;
+    const d = loc.avstandStiM;
+    if (d <= 100) return -8;
+    if (d <= 300) return -4;
+    if (d <= 800) return 0;
+    return 4;
+  }
+
   function findsFor(locId, speciesId){
     return userFinds.filter(f => f.locId === locId && (!speciesId || f.speciesId === speciesId));
   }
@@ -1133,6 +1157,10 @@
   // terrengmatch alene. Tidligere summerte maks-verdiene til 176 poeng
   // klippet til 100, som gjorde at de fleste "gode nok" steder traff taket
   // og de virkelig gode stedene ikke lenger skilte seg ut i rangeringen.
+  // 2026-08-11: lagt til stiavstand (±8, opt-in, default AV, se
+  // weighTrailDistance/stiavstandScore) — holdt UTENFOR "alltid
+  // tilgjengelig"-budsjettet over med vilje, akkurat som ro/befolkning,
+  // siden begge er brukerpreferanser en bruker selv kan skru av.
   // ---------------------------------------------------------------------
   function scoreLocation(species, loc){
     const cutRecent = loc.hogstAr !== null && loc.hogstAr !== undefined && (yearNow - loc.hogstAr) <= 3;
@@ -1189,6 +1217,15 @@
       else if (loc.befolkning === 'hoy') roScore = -8;
       else roScore = 1;
       total += roScore; breakdown.push(['Ro / avstand fra folk', roScore]);
+    }
+
+    // Egen preferanse (default av) — se stiavstandScore() for hvorfor dette
+    // er en EGEN kategori, uavhengig av adkomstScore()'s sti-bonus under.
+    let stiScore = 0;
+    if (weighTrailDistance) {
+      stiScore = stiavstandScore(loc);
+      total += stiScore;
+      breakdown.push([loc.avstandStiM == null ? 'Avstand fra sti (ukjent)' : 'Avstand fra sti/skogsbilvei', stiScore]);
     }
 
     const acc = adkomstScore(loc);
@@ -2047,7 +2084,7 @@
         </div>
         <div class="sp-access-box">
           <div>🚗 <b>Parkering:</b> ${escapeHtml(loc.parkeringNotat) || 'ikke oppgitt'}${parkWarn ? ' <span class="sp-access-warn">— bekreft selv at det ikke er privat grunn</span>' : ''}</div>
-          <div>🥾 <b>Sti/skogsbilvei i terrenget:</b> ${loc.stier==='ja'?'ja':loc.stier==='nei'?'nei, ingen kjent sti':'ukjent'}${loc.avstandParkeringM ? ` · ca ${loc.avstandParkeringM} m å gå fra parkering` : ''}</div>
+          <div>🥾 <b>Sti/skogsbilvei i terrenget:</b> ${loc.stier==='ja'?'ja':loc.stier==='nei'?'nei, ingen kjent sti':'ukjent'}${loc.avstandStiM != null ? ` (${loc.avstandStiM} m)` : ''}${loc.avstandParkeringM ? ` · ca ${loc.avstandParkeringM} m å gå fra parkering` : ''}</div>
         </div>
         ${res.histNote ? `<div class="sp-hist-note">★ ${res.histNote}</div>` : ''}
         ${knownFindsHtml(loc, species_for_card().id)}
@@ -2103,7 +2140,7 @@
         </div>
         <div class="sp-access-box">
           <div>🚗 <b>Parkering:</b> ${escapeHtml(loc.parkeringNotat) || 'ikke oppgitt'}${parkWarn ? ' <span class="sp-access-warn">— bekreft selv at det ikke er privat grunn</span>' : ''}</div>
-          <div>🥾 <b>Sti/skogsbilvei i terrenget:</b> ${loc.stier==='ja'?'ja':loc.stier==='nei'?'nei, ingen kjent sti':'ukjent'}${loc.avstandParkeringM ? ` · ca ${loc.avstandParkeringM} m å gå fra parkering` : ''}</div>
+          <div>🥾 <b>Sti/skogsbilvei i terrenget:</b> ${loc.stier==='ja'?'ja':loc.stier==='nei'?'nei, ingen kjent sti':'ukjent'}${loc.avstandStiM != null ? ` (${loc.avstandStiM} m)` : ''}${loc.avstandParkeringM ? ` · ca ${loc.avstandParkeringM} m å gå fra parkering` : ''}</div>
         </div>
         ${res.histNote ? `<div class="sp-hist-note">★ ${res.histNote}</div>` : ''}
         ${knownFindsHtml(loc, topSpecies.id)}
@@ -2136,6 +2173,7 @@
     document.getElementById('sp-route-panel').style.display = routeEnabled ? '' : 'none';
     document.getElementById('sp-route-disabled-note').style.display = routeEnabled ? 'none' : '';
     document.getElementById('sp-toggle-quiet').classList.toggle('on', prioritizeQuiet);
+    document.getElementById('sp-toggle-sti').classList.toggle('on', weighTrailDistance);
     document.getElementById('sp-toggle-hogst').classList.toggle('on', hideHogst);
     document.getElementById('sp-toggle-artskart-recent').classList.toggle('on', artskartOnlyRecent);
 
@@ -2338,7 +2376,7 @@
       avstandVeiM: null, befolkning: 'ukjent', hogstAr: null,
       kjenteFunn: [], kjenteFunnDetaljer: [], custom: true,
       kilde: 'find-pending', enrichStatus: 'pending',
-      kjorbarVei: 'ukjent', parkeringNotat: null, stier: 'ukjent', avstandParkeringM: null,
+      kjorbarVei: 'ukjent', parkeringNotat: null, stier: 'ukjent', avstandStiM: null, avstandParkeringM: null,
     });
     return { locId: id, isNew: true };
   }
@@ -2708,6 +2746,7 @@
 
   // ---------- wiring ----------
   document.getElementById('sp-toggle-quiet').addEventListener('click', () => { prioritizeQuiet = !prioritizeQuiet; render(); });
+  document.getElementById('sp-toggle-sti').addEventListener('click', () => { weighTrailDistance = !weighTrailDistance; render(); });
   document.getElementById('sp-toggle-hogst').addEventListener('click', () => { hideHogst = !hideHogst; render(); });
   document.getElementById('sp-toggle-artskart-recent').addEventListener('click', () => { artskartOnlyRecent = !artskartOnlyRecent; render(); });
   document.getElementById('sp-fylke-filter').addEventListener('change', (e) => { fylkeFilter = e.target.value; clearRoute(); zoomToAreaSelection(); render(); });

@@ -1,5 +1,26 @@
 # Endringslogg
 
+## 0.19.4 — Ny preferanse: "Vektlegg avstand fra sti"
+Brukeren observerte at "stier" var en overraskende rikholdig datakilde
+(30–52 % av alle veigeometripunkter hentet fra Overpass er sti-/skogsbilvei)
+og spurte om nærhet til sti kunne bli en egen, valgfri nedprioritering i
+scoringen — begrunnet i at populære stier ofte betyr mer tråkk/konkurranse
+fra andre soppsankere, ikke bare lettere adkomst.
+
+- Ny opt-in-preferanse **"Vektlegg avstand fra sti"** (default av), samme
+  UI-mønster som "Vektlegg lav befolkningstetthet".
+- `js/app.js`: ny `stiavstandScore()` — gradert på faktisk avstand
+  (`loc.avstandStiM`, ikke bare ja/nei-terskelen), samme mønster som
+  `parkeringsavstandScore()`. Egen, separat scorekategori fra
+  `adkomstScore()`s eksisterende +3/-1 for stier — de to representerer
+  forskjellige egenskaper (reachability vs. populæritet/tråkk) som deler
+  samme underliggende OSM-data, og skal ikke kansellere hverandre.
+- `avstandStiM` vises nå også i "Sti/skogsbilvei i terrenget"-linjen på
+  stedskortet når kjent.
+- Krever `fetch_area.py`-endring i `fungifinder-db` (persisterer nå
+  `avstandStiM`, som tidligere ble beregnet men kastet bort før skriving —
+  se den CHANGELOG-en) + en backfill av eksisterende steder.
+
 ## 0.19.3 — "Målepunkter"-laget starter av som default
 Med hundrevis/tusenvis av scorede punkter samtidig (særlig etter at flere
 kommuner nå er analysert, se `fungifinder-db` CHANGELOG) dominerte

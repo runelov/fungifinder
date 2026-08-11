@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.19.3"/>
+<link rel="stylesheet" href="css/styles.css?v=0.19.4"/>
 </head>
 <body>
 
@@ -70,6 +70,10 @@
           <div class="sp-slider-row">
             <span>Vektlegg lav befolkningstetthet</span>
             <button class="sp-toggle on" id="sp-toggle-quiet"></button>
+          </div>
+          <div class="sp-slider-row">
+            <span>Vektlegg avstand fra sti</span>
+            <button class="sp-toggle" id="sp-toggle-sti"></button>
           </div>
           <div class="sp-slider-row">
             <span>Skjul flatehogde steder fra lista (i stedet for å vise nederst, grået ut)</span>
@@ -270,7 +274,7 @@
      worker/api/README.md). Testnøkkelen (1x00000000000000000000AA) hører
      kun hjemme i worker/api/.dev.vars for lokal utvikling, aldri her. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<script src="js/api-client.js?v=0.19.3"></script>
-<script src="js/app.js?v=0.19.3"></script>
+<script src="js/api-client.js?v=0.19.4"></script>
+<script src="js/app.js?v=0.19.4"></script>
 </body>
 </html>
