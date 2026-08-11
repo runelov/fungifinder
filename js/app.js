@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.19.7';
+  const APP_VERSION = '0.19.8';
   const APP_BUILD_DATE = '2026-08-11';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -388,6 +388,7 @@
       await window.ApiClient.loggUt();
       currentUser = null;
       artsfunn = []; // ikke la gamle Artskart-observasjoner bli stående synlige uten sesjon
+      artsfunnLoadedBounds = null; // tving et ekte nytt hent ved neste innlogging, se loadArtsfunn()
       reflectAccountUi();
       await loadLocations();
       await loadStorage();
@@ -552,15 +553,40 @@
   }
 
   // Ekte Artsdatabanken-observasjoner (art/koordinat/dato), hentet av
-  // fetch_area.py og akkumulert i data/artsfunn.json — se
-  // fetch_artskart_observations_for_fylke() i data-repoet.
+  // fetch_area.py og akkumulert i D1 (se fungifinder-db).
+  //
+  // RETTET (lastetid, steg 2/3 — se D1-MIGRASJON.md): bbox-filtrert
+  // server-side rundt kartets synlige utsnitt i stedet for å alltid laste
+  // hele det nasjonale datasettet (~31 000 rader, ~1,46 MB gzippet).
+  // artsfunnLoadedBounds er utsnittet (PADDET, se under) som faktisk ER
+  // hentet — et nytt kall gjøres kun når det synlige utsnittet beveger seg
+  // UTENFOR det, ikke ved hver eneste panorering (se moveend-lytteren i
+  // initMap()). Paddingen (50 % utover synlig utsnitt) er nettopp det som
+  // gjør små panoreringer gratis. renderArtskartLayer() filtrerer deretter
+  // dette (allerede reduserte) settet stramt til nøyaktig synlig utsnitt
+  // for selve visningen — uendret av dette.
+  let artsfunnLoadedBounds = null;
+  let artsfunnRequestSeq = 0;
   async function loadArtsfunn(){
-    if (!currentUser) { artsfunn = []; return; }
+    if (!currentUser) { artsfunn = []; artsfunnLoadedBounds = null; return; }
+    if (!leafletMap) { artsfunn = []; return; } // kartet ikke initialisert ennå — bør ikke skje gitt call-rekkefølgen i init()
+    const synlig = leafletMap.getBounds();
+    if (artsfunnLoadedBounds && artsfunnLoadedBounds.contains(synlig)) return; // allerede dekket, ingen ny nettverksrundtur
+    const hentUtsnitt = synlig.pad(0.5);
+    const seq = ++artsfunnRequestSeq;
     try {
-      artsfunn = await window.ApiClient.hentArtsfunn();
+      const data = await window.ApiClient.hentArtsfunn({
+        minLat: hentUtsnitt.getSouth(), maxLat: hentUtsnitt.getNorth(),
+        minLon: hentUtsnitt.getWest(), maxLon: hentUtsnitt.getEast(),
+      });
+      if (seq !== artsfunnRequestSeq) return; // et nyere kall (senere panorering) er allerede i gang
+      artsfunn = Array.isArray(data) ? data : [];
+      artsfunnLoadedBounds = hentUtsnitt;
     } catch (e) {
+      if (seq !== artsfunnRequestSeq) return;
       console.warn('Kunne ikke laste artsfunn.', e);
       artsfunn = [];
+      artsfunnLoadedBounds = null;
     }
   }
 
@@ -1675,11 +1701,17 @@
     // renderArtskartLayer) — må derfor oppdateres når du panorerer/zoomer,
     // ikke bare ved filter-/artsbytte. 'moveend' dekker begge deler i
     // Leaflet (zooming trigger også moveend). Debounces 300ms slik at et
-    // helt drag ikke filtrerer gjennom artsfunn (30 000+ oppføringer) for
-    // hver eneste mellomposisjon.
+    // helt drag ikke gjør dette for hver eneste mellomposisjon.
+    // RETTET (lastetid, steg 2/3): kaller nå loadArtsfunn() FØR re-render —
+    // den avgjør selv om et nytt bbox-hent faktisk trengs (se
+    // artsfunnLoadedBounds der), så dette er billig i det vanlige
+    // tilfellet (liten panorering innenfor allerede hentet utsnitt).
     leafletMap.on('moveend', () => {
       clearTimeout(artskartMoveDebounce);
-      artskartMoveDebounce = setTimeout(renderArtskartLayer, 300);
+      artskartMoveDebounce = setTimeout(async () => {
+        await loadArtsfunn();
+        renderArtskartLayer();
+      }, 300);
     });
   }
 

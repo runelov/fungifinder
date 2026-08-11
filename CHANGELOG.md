@@ -1,5 +1,30 @@
 # Endringslogg
 
+## 0.19.8 — Bbox-basert server-filtrering av artsfunn (lastetid, steg 2/3)
+Oppfølger til 0.19.7 (parallellisering) og hovedfiksen på de ~1,46 MB
+gzippet `/terrengdata/artsfunn` alltid lastet uansett hvor i landet
+brukeren var — se `fungifinder-db/D1-MIGRASJON.md`. Geolokasjon ved
+oppstart (steg 3/3) er en egen, senere sak.
+
+- `worker/api/src/lib/terrengDb.js`: `hentArtsfunnFraDb()` tar nå et
+  valgfritt bbox-filter (`minLat`/`maxLat`/`minLon`/`maxLon`, alle fire
+  eller ingen). Verifisert direkte mot produksjons-D1: en test-boks rundt
+  Østfold/Akershus ga 7559 av 31 378 rader.
+- `worker/api/src/routes/terreng.js`: `GET /terrengdata/artsfunn` leser
+  disse fra query-string.
+- `js/api-client.js`: `hentArtsfunn({minLat,maxLat,minLon,maxLon})`.
+- `js/app.js` sin `loadArtsfunn()` henter nå kun artsfunn innenfor kartets
+  synlige utsnitt, **paddet 50 % utover** — `artsfunnLoadedBounds` sporer
+  hva som faktisk er hentet, så et nytt kall skjer KUN når det synlige
+  utsnittet beveger seg utenfor det som allerede er lastet, ikke ved hver
+  eneste panorering. Koblet inn i den eksisterende `moveend`-lytteren
+  (300ms debounce, uendret) FØR `renderArtskartLayer()`, som fortsatt
+  filtrerer stramt til nøyaktig synlig utsnitt for selve visningen —
+  uendret av dette, kun kilden er nå allerede redusert.
+  `artsfunnRequestSeq` forkaster utdaterte svar ved rask panorering.
+  `artsfunnLoadedBounds` nullstilles ved utlogging (tvinger et ekte nytt
+  hent ved neste innlogging).
+
 ## 0.19.7 — Parallelliserte oppstartskallene (lastetid)
 Første steg av tre i en oppfølger om lastetid (bbox-basert artsfunn-
 filtrering og geolokasjon ved oppstart er egne, senere steg — se

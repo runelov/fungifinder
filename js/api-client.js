@@ -93,8 +93,17 @@ async function hentTerrengdata({ fylke, kommune } = {}){
 }
 
 // Ekte Artsdatabanken-observasjoner — driver "kjente funn"-kartlaget.
-async function hentArtsfunn(){
-  const res = await kall('/terrengdata/artsfunn');
+// minLat/maxLat/minLon/maxLon er et valgfritt bbox-filter (se
+// worker/api sin terrengDb.js) — sendes KUN når js/app.js faktisk har et
+// kartutsnitt å filtrere på (alle fire sammen, aldri delvis).
+async function hentArtsfunn({ minLat, maxLat, minLon, maxLon } = {}){
+  const qs = new URLSearchParams();
+  if (minLat != null) qs.set('minLat', minLat);
+  if (maxLat != null) qs.set('maxLat', maxLat);
+  if (minLon != null) qs.set('minLon', minLon);
+  if (maxLon != null) qs.set('maxLon', maxLon);
+  const sti = qs.toString() ? `/terrengdata/artsfunn?${qs}` : '/terrengdata/artsfunn';
+  const res = await kall(sti);
   if (!res.ok) throw new Error(`Kunne ikke hente artsfunn (${res.status}).`);
   return res.json();
 }

@@ -31,12 +31,27 @@ export async function hentTerrengdata({ request, env, url }) {
 // fetch_area.py i data/artsfunn.json — driver "kjente funn"-kartlaget
 // (renderArtskartLayer i app.js). Delt lesedata, samme tilgang og samme
 // D1-migrasjon (fase 3) som hentTerrengdata() over.
-export async function hentArtsfunn({ request, env }) {
+//
+// ?minLat=/?maxLat=/?minLon=/?maxLon= er et valgfritt bbox-filter (se
+// terrengDb.js) — speiler kartets synlige utsnitt (paddet), sendt av
+// js/app.js sin loadArtsfunn() ved oppstart og panorering/zooming. Krever
+// ALLE fire gyldige tall for å filtrere, ellers uendret oppførsel (hele
+// datasettet).
+export async function hentArtsfunn({ request, env, url }) {
   const cors = corsHeaders(env);
   const bruker = await requireSession(request, env);
   if (!bruker) return json({ error: 'Ikke innlogget.' }, 401, cors);
 
-  const data = await hentArtsfunnFraDb(env);
+  const tall = (nokkel) => {
+    const v = url.searchParams.get(nokkel);
+    if (v == null || v === '') return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const data = await hentArtsfunnFraDb(env, {
+    minLat: tall('minLat'), maxLat: tall('maxLat'),
+    minLon: tall('minLon'), maxLon: tall('maxLon'),
+  });
   return json(data, 200, cors);
 }
 

@@ -65,7 +65,24 @@ function radTilArtsfunn(rad) {
   };
 }
 
-export async function hentArtsfunnFraDb(env) {
-  const { results } = await env.DB.prepare('SELECT * FROM artsfunn').all();
+// minLat/maxLat/minLon/maxLon er et valgfritt bbox-filter (D1-migrasjon
+// "lastetid"-oppfølgeren) — brukes til å hente kun artsfunn innenfor (en
+// paddet versjon av) kartets synlige utsnitt, i stedet for hele det
+// nasjonale datasettet (~31 000 rader, ~1,46 MB gzippet) på hver
+// sideåpning/panorering. Krever ALLE fire for å filtrere (ellers uendret
+// oppførsel, hele datasettet) — speiler js/app.js sin loadArtsfunn(), som
+// alltid sender alle fire sammen (fra leafletMap.getBounds().pad(0.5)).
+// Normaliserer min/maks selv (Math.min/max) — defensivt mot en evt.
+// ombyttet forespørsel, koster ingenting.
+export async function hentArtsfunnFraDb(env, { minLat, maxLat, minLon, maxLon } = {}) {
+  const harBbox = [minLat, maxLat, minLon, maxLon].every((v) => typeof v === 'number' && Number.isFinite(v));
+  let sql = 'SELECT * FROM artsfunn';
+  const binds = [];
+  if (harBbox) {
+    sql += ' WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?';
+    binds.push(Math.min(minLat, maxLat), Math.max(minLat, maxLat), Math.min(minLon, maxLon), Math.max(minLon, maxLon));
+  }
+  const stmt = binds.length ? env.DB.prepare(sql).bind(...binds) : env.DB.prepare(sql);
+  const { results } = await stmt.all();
   return results.map(radTilArtsfunn);
 }
