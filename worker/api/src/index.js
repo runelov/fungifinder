@@ -12,6 +12,7 @@ import {
   listInvitasjoner, opprettInvitasjon, slettInvitasjon,
 } from './routes/admin.js';
 import { sjekkInvitasjon, registrerMedInvitasjon } from './routes/invitasjoner.js';
+import { importTerrengdata } from './routes/etlImport.js';
 
 const router = createRouter();
 router.post('/auth/be-om-lenke', beOmLenke);
@@ -37,6 +38,9 @@ router.post('/admin/invitasjoner', opprettInvitasjon);
 router.delete('/admin/invitasjoner/:id', slettInvitasjon);
 router.get('/invitasjon/:token', sjekkInvitasjon);
 router.post('/invitasjon/:token', registrerMedInvitasjon);
+// Maskin-til-maskin (GitHub Actions -> D1), IKKE brukersesjon — se
+// src/routes/etlImport.js sin autentisering (X-Etl-Secret).
+router.post('/admin/terrengdata/importer', importTerrengdata);
 
 export default {
   async fetch(request, env, ctx) {

@@ -18,6 +18,7 @@ npx wrangler kv namespace create RATE_LIMIT  # lim id inn i wrangler.toml
 npx wrangler d1 migrations apply fungifinder --remote
 npx wrangler secret put GITHUB_PAT
 npx wrangler secret put TURNSTILE_SECRET_KEY   # ekte Turnstile-hemmelighet, ikke testnøkkelen i .dev.vars
+npx wrangler secret put ETL_SHARED_SECRET      # se "D1-migrasjon av terrengdata" under
 npx wrangler deploy
 ```
 
@@ -111,6 +112,22 @@ await fetch('<API_BASE>/meg/data', {
 `data/personal.json` i `fungifinder-db` beholdes uendret som historisk
 arkiv, men brukes ikke lenger av verken appen eller denne workeren etter
 dette.
+
+## D1-migrasjon av terrengdata
+
+`src/routes/etlImport.js` (`POST /admin/terrengdata/importer`) er
+skrivevei­en `fungifinder-db/scripts/fetch_area.py` (GitHub Actions) bruker
+til å dobbel-skrive terrengdata til D1-tabellene `terreng_steder`/
+`artsfunn`/`fetched_areas` — se `fungifinder-db/D1-MIGRASJON.md` for hele
+fase­planen og sikkerhetsbegrunnelsen. Autentisert med `ETL_SHARED_SECRET`
+(delt hemmelighet i `X-Etl-Secret`-header), IKKE en admin-brukersesjon —
+GitHub Actions har ingen innlogget bruker. Samme secret settes som
+`ETL_SHARED_SECRET` i GitHub Actions-secrets på `fungifinder-db`-repoet
+(**ikke** dette repoet, som er offentlig).
+
+`GET /terrengdata`/`GET /terrengdata/artsfunn` (`src/routes/terreng.js`)
+leser fra D1 for admin-brukere og fra GitHub for øvrige, midlertidig — se
+kommentarene i filen og D1-MIGRASJON.md fase 2/3 for når grenen fjernes.
 
 ## Hvorfor én JSON-blob per bruker, ikke normaliserte tabeller?
 

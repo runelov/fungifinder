@@ -2,6 +2,7 @@ import { json } from '../lib/json.js';
 import { corsHeaders } from '../lib/cors.js';
 import { requireSession } from '../lib/session.js';
 import { loadFile } from '../lib/github.js';
+import { hentTerrengStederFraDb, hentArtsfunnFraDb } from '../lib/terrengDb.js';
 
 // Delt, allerede-analysert terrengdatasett — lesetilgang for BÅDE admin og
 // vanlige (inviterte) brukere, i motsetning til routes/omrader.js sine
@@ -11,6 +12,14 @@ export async function hentTerrengdata({ request, env }) {
   const cors = corsHeaders(env);
   const bruker = await requireSession(request, env);
   if (!bruker) return json({ error: 'Ikke innlogget.' }, 401, cors);
+
+  // MIDLERTIDIG (D1-migrasjon fase 2, se fungifinder-db/D1-MIGRASJON.md):
+  // kun admin leser fra D1 ennå, til det er verifisert i drift over en
+  // periode. Fjernes i fase 3, når alle brukere går over til D1-lesing.
+  if (bruker.rolle === 'admin') {
+    const data = await hentTerrengStederFraDb(env);
+    return json(data, 200, cors);
+  }
 
   const { data } = await loadFile('data/locations.json', env);
   return json(data || [], 200, cors);
@@ -24,6 +33,12 @@ export async function hentArtsfunn({ request, env }) {
   const cors = corsHeaders(env);
   const bruker = await requireSession(request, env);
   if (!bruker) return json({ error: 'Ikke innlogget.' }, 401, cors);
+
+  // MIDLERTIDIG — se samme fase 2-kommentar i hentTerrengdata() over.
+  if (bruker.rolle === 'admin') {
+    const data = await hentArtsfunnFraDb(env);
+    return json(data, 200, cors);
+  }
 
   const { data } = await loadFile('data/artsfunn.json', env);
   return json(data || [], 200, cors);
