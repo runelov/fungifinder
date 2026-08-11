@@ -1,5 +1,27 @@
 # Endringslogg
 
+## 0.19.5 — Tre nye preferanser: kjente funnsteder, egen historikk, værvindu
+Oppfølger til 0.19.4 — brukeren ba om å bygge inn alle tre gjenværende
+kandidatene fra gjennomgangen av scoringsmodellen.
+
+- **"Nedprioriter kjente offentlige funnsteder"** (default av). Speilvendt
+  motstykke til den eksisterende Artskart-funn-bonusen (som fortsatt
+  gjelder uansett, som korroborerende bevis) — samme designfilosofi som
+  "Vektlegg avstand fra sti": et velkjent, offentlig registrert funnsted er
+  ofte nettopp det, og dermed sannsynligvis mer nedplukket. Opptil -8.
+- **"La egne funn styrke forslag"** (default på). Lar deg skru av den
+  eksisterende bonusen (opptil +20) for egen funnhistorikk, for å få rene
+  terrengbaserte forslag i stedet for å bli dratt tilbake til kjente
+  steder — nyttig for bevisst å utforske nye områder.
+- **"Vektlegg værvindu"** (default på). Lar deg skru av både
+  14-dagersvinduet (+12/−10) og sesonghistorikken (±4) for planlegging
+  langt frem i tid, uavhengig av værvarsel. Rå værdata vises fortsatt
+  informativt i UI selv om vektingen er av.
+- Verifisert i browser: alle fem preferanser (inkl. de to fra 0.19.4)
+  har riktig default-tilstand, breakdown-modalen viser/skjuler riktige
+  linjer når hver preferanse skrus av/på, total stemmer, ingen
+  konsollfeil.
+
 ## 0.19.4 — Ny preferanse: "Vektlegg avstand fra sti"
 Brukeren observerte at "stier" var en overraskende rikholdig datakilde
 (30–52 % av alle veigeometripunkter hentet fra Overpass er sti-/skogsbilvei)

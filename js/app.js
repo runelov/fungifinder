@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.19.4';
+  const APP_VERSION = '0.19.5';
   const APP_BUILD_DATE = '2026-08-11';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -142,6 +142,22 @@
   // OSM-data. Default AV — de fleste vil fortsatt sette pris på stier for å
   // komme seg inn i terrenget. Se stiavstandScore().
   let weighTrailDistance = false;
+  // La egen funnhistorikk styrke forslag (opptil +20, se scoreLocation()).
+  // Default PÅ — de fleste vil at "jeg har funnet det her før" skal telle.
+  // Kan skrus av for å få rene terrengbaserte forslag, f.eks. for bevisst å
+  // utforske nye områder i stedet for å bli dratt tilbake til kjente steder.
+  let weighOwnFindHistory = true;
+  // Vektlegg værvindu (14-dagers nedbør/temp +12/-10, sesonghistorikk ±4).
+  // Default PÅ. Kan skrus av av folk som planlegger en tur langt frem i tid
+  // uavhengig av værvarsel, og vil ha en ren terrengscore.
+  let weighWeather = true;
+  // Nedprioriterer steder med mange/nære kjente Artsdatabanken-funn —
+  // speilvendt motstykke til densityScore-bonusen rett over i
+  // scoreLocation() (som fortsatt gjelder uansett, som korroborerende
+  // bevis). Samme designmønster som stiavstandScore(): et velkjent,
+  // offentlig registrert funnsted er ofte nettopp det — velkjent, og
+  // dermed sannsynligvis mer nedplukket. Default AV.
+  let deprioritizeKnownFinds = false;
   let hideHogst = false;
   let artskartOnlyRecent = false; // vis kun Artsdatabanken-funn siste år i kartlaget — se renderArtskartLayer
   // Skjuler kun LISTEN under en viss score — kartet fortsetter å vise alle
@@ -1161,6 +1177,18 @@
   // weighTrailDistance/stiavstandScore) — holdt UTENFOR "alltid
   // tilgjengelig"-budsjettet over med vilje, akkurat som ro/befolkning,
   // siden begge er brukerpreferanser en bruker selv kan skru av.
+  // 2026-08-11 (samme dag, del 2): vær (+12/-10, sesonghistorikk ±4) og
+  // egen historikk (+20) er nå OGSÅ brukerpreferanser (weighWeather/
+  // weighOwnFindHistory) — men default PÅ, så de teller fortsatt med i
+  // "alltid tilgjengelig"-budsjettet over i typisk bruk, akkurat som
+  // ro/befolkning (også default PÅ). Lagt til enda en opt-in,
+  // default-AV kategori: nedprioriter kjente Artskart-funnsteder (opptil
+  // -8, deprioritizeKnownFinds) — speilvendt motstykke til
+  // Artskart-funn-bonusen, som fortsatt gjelder uansett som korroborerende
+  // bevis. Samme designfilosofi som stiavstand: to ulike egenskaper
+  // (bevis for at arten finnes her / sannsynligheten for at stedet er
+  // nedplukket) kan dele samme underliggende datakilde uten å kansellere
+  // hverandre.
   // ---------------------------------------------------------------------
   function scoreLocation(species, loc){
     const cutRecent = loc.hogstAr !== null && loc.hogstAr !== undefined && (yearNow - loc.hogstAr) <= 3;
@@ -1195,13 +1223,23 @@
     // det gamle boolske kjenteFunn-feltet (fra før artsfunn-oppgraderingen
     // 2026-07-09) faller tilbake til den enkle, faste bonusen.
     const funnDetaljer = (loc.kjenteFunnDetaljer || []).filter(f => f.art === species.id);
+    let naerFunn = false;
     if (funnDetaljer.length) {
-      const naerFunn = funnDetaljer.some(f => f.avstandM < 300);
+      naerFunn = funnDetaljer.some(f => f.avstandM < 300);
       const densityScore = Math.min(10, funnDetaljer.length * 2 + (naerFunn ? 3 : 0));
       total += densityScore;
       breakdown.push([`${funnDetaljer.length} kjente Artsdatabanken-funn i nærheten${naerFunn ? ' (inkl. et svært nært)' : ''}`, densityScore]);
     } else if (loc.kjenteFunn && loc.kjenteFunn.includes(species.id)) {
       total += 5; breakdown.push(['Tidligere kjente funn i nærheten (database)', 5]);
+    }
+
+    // Egen preferanse (default av) — speilvendt motstykke til bonusen over.
+    // Gjelder kun kjenteFunnDetaljer (nøyaktig art/dato/avstand), ikke det
+    // gamle kjenteFunn-fallbacket, som er for upresist til å gradere ned.
+    if (deprioritizeKnownFinds && funnDetaljer.length) {
+      const kjentPenalty = -Math.min(8, Math.round(funnDetaljer.length * 1.5 + (naerFunn ? 2 : 0)));
+      total += kjentPenalty;
+      breakdown.push(['Nedprioritert — velkjent offentlig funnsted', kjentPenalty]);
     }
 
     // Ro/folketetthet — drives nå UTELUKKENDE av befolkning (se
@@ -1241,7 +1279,10 @@
 
     let weatherVerdict = null;
     const w = weatherBySpecies[loc.id];
-    if (weatherReady && w) {
+    // weighWeather (default PÅ): kun scoring-effekten er betinget — w selv
+    // beregnes uansett over, slik at rå værdata fortsatt kan vises
+    // informativt i UI selv om noen har skrudd av vær-vektingen.
+    if (weighWeather && weatherReady && w) {
       const prof = species.weather;
       let wScore = 0;
       if (w.precip14 >= prof.idealNedbor14) { wScore = 12; weatherVerdict = 'Godt fuktnivå — gode odds nå.'; }
@@ -1257,8 +1298,8 @@
     // (eller motsatt). idealNedbor14 brukes som et grovt ukentlig referansenivå
     // og skaleres opp til sesongens lengde — bevisst holdt upresist/lav vekt,
     // se samme resonnement som elevationScore om å ikke tallfeste mer presist
-    // enn datagrunnlaget faktisk tillater.
-    if (seasonWeatherReady && seasonWeather && species.weather.idealNedbor14) {
+    // enn datagrunnlaget faktisk tillater. Samme weighWeather-preferanse som over.
+    if (weighWeather && seasonWeatherReady && seasonWeather && species.weather.idealNedbor14) {
       const expectedSeasonPrecip = species.weather.idealNedbor14 * (seasonWeather.days / 14);
       const ratio = expectedSeasonPrecip > 0 ? seasonWeather.totalPrecip / expectedSeasonPrecip : 1;
       let seasonScore = 0, seasonNote = null;
@@ -1271,9 +1312,11 @@
       }
     }
 
+    // weighOwnFindHistory (default PÅ) — se erklæringen ved siden av state-
+    // variabelen for hvorfor dette er skrudd av-bart (bevisst utforsking).
     const myFinds = findsFor(loc.id, species.id);
     let histNote = null;
-    if (myFinds.length) {
+    if (weighOwnFindHistory && myFinds.length) {
       const avgM = myFinds.reduce((a,f)=>a+f.mengde,0) / myFinds.length;
       const histPts = Math.min(20, Math.round(5 + avgM*3 + Math.min(myFinds.length,5)));
       total += histPts;
@@ -2174,6 +2217,9 @@
     document.getElementById('sp-route-disabled-note').style.display = routeEnabled ? 'none' : '';
     document.getElementById('sp-toggle-quiet').classList.toggle('on', prioritizeQuiet);
     document.getElementById('sp-toggle-sti').classList.toggle('on', weighTrailDistance);
+    document.getElementById('sp-toggle-ownhistory').classList.toggle('on', weighOwnFindHistory);
+    document.getElementById('sp-toggle-weather').classList.toggle('on', weighWeather);
+    document.getElementById('sp-toggle-knownfinds').classList.toggle('on', deprioritizeKnownFinds);
     document.getElementById('sp-toggle-hogst').classList.toggle('on', hideHogst);
     document.getElementById('sp-toggle-artskart-recent').classList.toggle('on', artskartOnlyRecent);
 
@@ -2747,6 +2793,9 @@
   // ---------- wiring ----------
   document.getElementById('sp-toggle-quiet').addEventListener('click', () => { prioritizeQuiet = !prioritizeQuiet; render(); });
   document.getElementById('sp-toggle-sti').addEventListener('click', () => { weighTrailDistance = !weighTrailDistance; render(); });
+  document.getElementById('sp-toggle-ownhistory').addEventListener('click', () => { weighOwnFindHistory = !weighOwnFindHistory; render(); });
+  document.getElementById('sp-toggle-weather').addEventListener('click', () => { weighWeather = !weighWeather; render(); });
+  document.getElementById('sp-toggle-knownfinds').addEventListener('click', () => { deprioritizeKnownFinds = !deprioritizeKnownFinds; render(); });
   document.getElementById('sp-toggle-hogst').addEventListener('click', () => { hideHogst = !hideHogst; render(); });
   document.getElementById('sp-toggle-artskart-recent').addEventListener('click', () => { artskartOnlyRecent = !artskartOnlyRecent; render(); });
   document.getElementById('sp-fylke-filter').addEventListener('change', (e) => { fylkeFilter = e.target.value; clearRoute(); zoomToAreaSelection(); render(); });
