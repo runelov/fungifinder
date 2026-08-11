@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.19.8';
+  const APP_VERSION = '0.19.9';
   const APP_BUILD_DATE = '2026-08-11';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -1603,14 +1603,54 @@
     );
   }
 
-  function showMyLocationOnMap(lat, lon){
+  // openPopup/zoom er valgfrie (default = uendret oppførsel for den
+  // eksplisitte "min posisjon"-knappen) — geolocateStartupView() under
+  // bruker en videre zoom og hopper over popup-en, siden det skjer uten at
+  // brukeren ba om det.
+  function showMyLocationOnMap(lat, lon, { openPopup = true, zoom = 14 } = {}){
     if (!leafletMap) return;
     if (myLocationMarker) leafletMap.removeLayer(myLocationMarker);
     myLocationMarker = L.circleMarker([lat, lon], {
       radius: 9, color: '#fff', weight: 3, fillColor: '#2E6FE0', fillOpacity: 1
     }).bindPopup('📍 Du er her').addTo(leafletMap);
-    leafletMap.setView([lat, lon], Math.max(leafletMap.getZoom(), 14));
-    myLocationMarker.openPopup();
+    leafletMap.setView([lat, lon], Math.max(leafletMap.getZoom(), zoom));
+    if (openPopup) myLocationMarker.openPopup();
+  }
+
+  // ---------- geolokasjon ved oppstart (stille, kort timeout) ----------
+  // RETTET (lastetid, steg 3/3 — se D1-MIGRASJON.md): sentrerer kartet på
+  // brukerens posisjon FØR loadArtsfunn() sitt bbox-hent kjører (se init()),
+  // slik at den første, "gratis" artsfunn-hentingen faktisk er relevant for
+  // brukeren i stedet for det faste senterpunktet [60.5, 10.7]. Zoom 11 —
+  // videre enn knappens 14 (som forutsetter et bevisst "vis akkurat der jeg
+  // er"-klikk), gir heller en fornuftig regional oversikt å starte fra.
+  //
+  // Helt stille ved avslag/feil/timeout — INGEN alert (i motsetning til
+  // useMyLocation() over), siden dette skjer uten at brukeren ba om det;
+  // default senterpunktet er et helt greit utgangspunkt. Egen 4s-timeout i
+  // TILLEGG til geolocation-API-ets eget timeout-alternativ, fordi enkelte
+  // nettleser/OS-kombinasjoner (bl.a. iOS Safari) kan la
+  // tillatelsesdialogen stå åpen uten å kalle timeout-callbacken mens
+  // brukeren tenker seg om — denne garanterer at resten av oppstarten
+  // uansett fortsetter innen 4 sekunder. Et SENT svar (bruker godtar
+  // dialogen etter at vi ga opp) flytter fortsatt kartet når det kommer —
+  // setView() over trigger Leaflet sin egen 'moveend', som den allerede
+  // eksisterende lytteren i initMap() fanger opp helt av seg selv.
+  function geolocateStartupView(){
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) { resolve(false); return; }
+      let ferdig = false;
+      const ferdigstill = (lykkes) => { if (!ferdig) { ferdig = true; resolve(lykkes); } };
+      setTimeout(() => ferdigstill(false), 4000);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          showMyLocationOnMap(pos.coords.latitude, pos.coords.longitude, { openPopup: false, zoom: 11 });
+          ferdigstill(true);
+        },
+        () => ferdigstill(false), // avslått eller feilet — behold default senterpunkt
+        { timeout: 4000, maximumAge: 5 * 60 * 1000 }
+      );
+    });
   }
 
   // Rikelig margin rundt Norge (inkl. Svalbard) + naboland. Uten en grense her
@@ -2931,7 +2971,11 @@
     wireAdminPanel();
     wireFetchPanel();
     initMap();
-    await initAuth();
+    // geolocateStartupView() er uavhengig av initAuth() (ingen delt
+    // tilstand) — kjøres parallelt av samme grunn som Promise.all-blokken
+    // under, men MÅ være ferdig (eller ha gitt opp) FØR den, siden
+    // loadArtsfunn() der leser leafletMap.getBounds() for sitt bbox-hent.
+    await Promise.all([geolocateStartupView(), initAuth()]);
     await checkUrlInvitasjon();
     // RETTET (lastetid): disse fire var tidligere sekvensielle await-kall
     // uten noen reell avhengighet mellom dem — hver skriver til sin egen,

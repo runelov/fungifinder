@@ -1,5 +1,27 @@
 # Endringslogg
 
+## 0.19.9 — Geolokasjon ved oppstart (lastetid, steg 3/3)
+Siste av de tre lastetid-stegene (se 0.19.7/0.19.8 og
+`fungifinder-db/D1-MIGRASJON.md`).
+
+- `js/app.js` sin nye `geolocateStartupView()` sentrerer kartet på
+  brukerens posisjon (zoom 11, ingen popup) FØR `loadArtsfunn()` sitt
+  bbox-hent kjører, slik at den første artsfunn-hentingen faktisk er
+  relevant i stedet for det faste senterpunktet `[60.5, 10.7]`. Kjøres
+  parallelt med `initAuth()` (uavhengige), men avventes før
+  data-innlastingen (som trenger et ferdig kartutsnitt).
+- Helt stille ved avslag/feil/timeout (INGEN `alert`, i motsetning til den
+  eksplisitte "min posisjon"-knappen) — default senterpunktet er et greit
+  utgangspunkt uten geolokasjon. Egen 4s-timeout i tillegg til
+  geolocation-API-ets eget (enkelte nettleser/OS — bl.a. iOS Safari — kan
+  la tillatelsesdialogen stå åpen uten selv å kalle timeout-callbacken).
+  Et SENT svar (brukeren godtar dialogen etter at appen ga opp å vente)
+  flytter fortsatt kartet når det kommer — gjenbruker den eksisterende
+  `moveend`-lytteren (ingen særbehandling nødvendig).
+- `showMyLocationOnMap(lat, lon, {openPopup, zoom})` fikk to nye valgfrie
+  parametre (default = uendret oppførsel for knappen) for å dekke dette
+  uten kodeduplisering.
+
 ## 0.19.8 — Bbox-basert server-filtrering av artsfunn (lastetid, steg 2/3)
 Oppfølger til 0.19.7 (parallellisering) og hovedfiksen på de ~1,46 MB
 gzippet `/terrengdata/artsfunn` alltid lastet uansett hvor i landet
