@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.20.3"/>
+<link rel="stylesheet" href="css/styles.css?v=0.20.4"/>
 </head>
 <body>
 
@@ -38,9 +38,11 @@
     <details class="sp-collapsible sp-notice" id="sp-notice">
       <summary><b>Om dataene</b> <span class="sp-collapse-hint">(klikk for å skjule/vise)</span></summary>
       <div class="sp-collapsible-body">
-      Terreng- og adkomstdata hentes on-demand av admin når et område uten data ennå velges.
-      Værdata hentes <b>live</b>. Dine personlige data (funn, hogst-merker, egne steder) lagres på din innloggede
-      konto — logg inn under "Konto"-fanen i sidepanelet.
+      Terreng- og adkomstdata (treslag, fuktighet, vei/parkering/stier) hentes on-demand av admin for hvert nye
+      område. De blå prikkene i kartet er ekte, verifiserte artsobservasjoner fra Artsdatabanken sin
+      Artskart-database — ikke noe appen selv genererer. Værdata hentes <b>live</b>. Dine personlige data
+      (funn, hogst-merker, egne steder) lagres på din innloggede konto — logg inn under "Konto"-fanen i
+      sidepanelet.
       </div>
     </details>
 
@@ -287,7 +289,7 @@
      worker/api/README.md). Testnøkkelen (1x00000000000000000000AA) hører
      kun hjemme i worker/api/.dev.vars for lokal utvikling, aldri her. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<script src="js/api-client.js?v=0.20.3"></script>
-<script src="js/app.js?v=0.20.3"></script>
+<script src="js/api-client.js?v=0.20.4"></script>
+<script src="js/app.js?v=0.20.4"></script>
 </body>
 </html>

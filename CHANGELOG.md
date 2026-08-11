@@ -1,5 +1,24 @@
 # Endringslogg
 
+## 0.20.4 — "Om dataene" nevner nå Artsdatabanken-laget
+Gjennomgang av forklarende tekster i appen (bedt om av bruker) — de fleste
+var fortsatt presise (bl.a. GitHub Actions-fremdriftsmeldingene i
+admin-panelet: selve triggermekanismen er uendret av D1-migreringen, kun
+lagringen på slutten). Ett klart hull funnet:
+
+- "Om dataene" nevnte ikke Artsdatabanken/Artskart-laget i det hele tatt —
+  de blå prikkene i kartet, "kjente funn"-bonusen i scoringen, og
+  "Vis kun ferske Artsdatabanken-funn"-innstillingen er alle basert på
+  ekte, verifiserte observasjoner fra en offentlig database, trolig
+  appens sterkeste tillitssignal. Lagt til, samtidig lettere omskrevet
+  første setning (mer presis: nevner nå konkret treslag/fuktighet/
+  vei-parkering-stier i stedet for bare "terreng- og adkomstdata").
+
+**Ikke endret, notert for senere vurdering**: tomme-tilstanden for vanlige
+(ikke-admin) brukere i et helt udekket område antyder at løsningen er å
+justere filteret, selv om årsaken kan være at området rett og slett aldri
+er analysert ennå — en UX-avgjørelse, ikke en ren tekstjustering.
+
 ## 0.20.3 — Rettet: geolokasjon satte aldri radius-senteret
 Bruker meldte at 0.20.2 sitt "zoom til radius-sirkelen" tilsynelatende ikke
 virket. Riktig diagnostisert av brukeren selv: `radiusCenter` ble KUN satt

@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.20.3';
+  const APP_VERSION = '0.20.4';
   const APP_BUILD_DATE = '2026-08-11';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
