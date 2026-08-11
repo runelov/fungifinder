@@ -1,5 +1,25 @@
 # Endringslogg
 
+## 0.20.0 — Finere fargekoding + hover-tooltip for score, høyere default-terskel
+Oppfølger til vurderingen av om rød/gul/grønn-fargekodingen på
+målepunktene var for grovkornet (se samtalen 2026-08-11).
+
+- **Ny, delt `scoreColor(score)`-funksjon** — samme terskel-uttrykk lå
+  tidligere kopiert (og risikerte å komme ut av synk) tre steder:
+  `renderMap()`, `renderAreasOnMap()` og `gaugeSvg()`.
+- **4 nivåer i stedet for 3**: høy (≥75, `#5F7A3E`), god (55–74, `#8FA35C`
+  — ny), middels (35–54, `#C8974A`), lav/hogd (<35, `#A23E2E`). Bevisst
+  IKKE en kontinuerlig gradient — markørene er små (8px) og finere
+  fargeforskjeller er vanskeligere å skanne raskt og verre for fargeblinde
+  ved den størrelsen. Kartlegenden oppdatert med det nye "god"-nivået.
+- **Hover-tooltip på hovedmarkørene**: eksakt score vises nå ved hover
+  (`bindTooltip`), ikke bare ved klikk (`bindPopup`, uendret) — løser
+  "for grovkornet"-følelsen direkte uten å røre selve fargeskalaen.
+- **"Vis kun score ≥"-slideren sin default hevet fra 0 til 70** (både
+  `minScoreFilter` i `js/app.js` og slider-/label-verdien i `index.html`)
+  — kartet viser fortsatt alle steder uansett (uendret), kun LISTEN under
+  er nå forhåndsfiltrert til det som faktisk er verdt å vurdere først.
+
 ## 0.19.9 — Geolokasjon ved oppstart (lastetid, steg 3/3)
 Siste av de tre lastetid-stegene (se 0.19.7/0.19.8 og
 `fungifinder-db/D1-MIGRASJON.md`).

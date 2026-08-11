@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.19.9';
+  const APP_VERSION = '0.20.0';
   const APP_BUILD_DATE = '2026-08-11';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -163,7 +163,7 @@
   // Skjuler kun LISTEN under en viss score — kartet fortsetter å vise alle
   // steder i området (fargekodet etter score) slik at man kan oppdage og
   // klikke seg til lavere-scorende punkter der uten å måtte senke terskelen.
-  let minScoreFilter = 0;
+  let minScoreFilter = 70; // default hevet fra 0 — se samtalen 2026-08-11 om fargekodingens grovkornethet
   let filterMode = 'fylke'; // 'fylke' | 'kommune' | 'radius'
   let fylkeFilter = 'alle';
   let kommuneFilter = 'alle';
@@ -1378,6 +1378,25 @@
     return { total, breakdown, isCut, weatherVerdict, weather: w, histNote, accessTags: acc.tags };
   }
 
+  // Delt fargeskala for score — ÉN kilde til sannhet i stedet for at
+  // samme terskel-uttrykk lå kopiert tre steder (renderMap, renderAreasOnMap
+  // og gaugeSvg), som gjorde en fremtidig justering sårbar for å bli gjort
+  // ett sted og glemt de andre to.
+  //
+  // 4 nivåer i stedet for de opprinnelige 3 (se samtalen om vurdering av
+  // fargekodingens grovkornethet, 2026-08-11) — men bevisst IKKE en
+  // kontinuerlig gradient: markørene er små (8px), og finere
+  // fargeforskjeller er vanskeligere å skanne raskt og verre for
+  // fargeblinde ved den størrelsen. Eksakt tall vises uansett (tooltip på
+  // hovedmarkørene, se renderMap(); baket inn i gaugeSvg og
+  // områdepopup-ene) — fargen er et raskt triage-lag, ikke eneste signal.
+  function scoreColor(score){
+    if (score >= 75) return '#5F7A3E'; // høy
+    if (score >= 55) return '#8FA35C'; // god
+    if (score >= 35) return '#C8974A'; // middels
+    return '#A23E2E'; // lav
+  }
+
   // Finner hvilke av dine ANDRE favoritter (utenom den som allerede vises)
   // som også trolig passer på dette stedet, pluss et par gode matsopper som
   // ikke er favoritter — "ting du kan snuble over i samme terreng".
@@ -1808,7 +1827,7 @@
     markersById = {};
 
     scoredAll.forEach(({ loc, res }) => {
-      const color = res.isCut ? '#A23E2E' : (res.total>=65 ? '#5F7A3E' : res.total>=40 ? '#C8974A' : '#A23E2E');
+      const color = res.isCut ? '#A23E2E' : scoreColor(res.total);
       const marker = L.circleMarker([loc.lat, loc.lon], {
         radius: 8,
         color: loc.custom ? '#8C4A20' : '#232D1D',
@@ -1818,6 +1837,11 @@
         dashArray: loc.custom ? '3,3' : null
       });
       marker.bindPopup(`<b>${escapeHtml(loc.name)}</b><br/>${escapeHtml(loc.kommune)}, ${escapeHtml(loc.fylke)}<br/>Score: ${res.total}${res.isCut ? ' — flatehogd' : ''}`);
+      // Eksakt score synlig ved HOVER, ikke bare ved klikk (se vurderingen
+      // av fargekodingens grovkornethet) — tooltip er lettvekts sammenlignet
+      // med popup-en (åpnes ikke ved klikk, kolliderer ikke med
+      // handleMapMarkerClick under).
+      marker.bindTooltip(String(res.total), { direction: 'top', offset: [0, -6] });
       marker.on('click', () => handleMapMarkerClick(loc));
       marker.addTo(markerLayer);
       markersById[loc.id] = marker;
@@ -1962,7 +1986,7 @@
     const { areas } = suggestedRoute;
     areas.forEach((a, i) => {
       const score = a.anchor.res.total;
-      const color = score >= 65 ? '#5F7A3E' : score >= 40 ? '#C8974A' : '#A23E2E';
+      const color = scoreColor(score);
       const parkeringTekst = a.parking
         ? `🅿️ Mulig parkering ca ${a.parking.distM} m fra sentrum av området${a.parking.access ? ` (merket "${escapeHtml(a.parking.access)}" på kart — bekreft på stedet)` : ''}`
         : '🅿️ Ingen kjent parkeringsplass funnet i nærheten (OSM)';
@@ -2184,7 +2208,7 @@
 
   function gaugeSvg(score){
     const r = 26, c = 2*Math.PI*r, pct = score/100;
-    const color = score>=65 ? '#5F7A3E' : score>=40 ? '#C8974A' : '#A23E2E';
+    const color = scoreColor(score);
     return `<svg width="66" height="66" viewBox="0 0 66 66">
       <circle cx="33" cy="33" r="${r}" fill="none" stroke="rgba(38,48,31,0.12)" stroke-width="6"/>
       <circle cx="33" cy="33" r="${r}" fill="none" stroke="${color}" stroke-width="6" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-pct)}" stroke-linecap="round" transform="rotate(-90 33 33)"/>

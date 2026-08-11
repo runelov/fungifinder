@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.19.9"/>
+<link rel="stylesheet" href="css/styles.css?v=0.20.0"/>
 </head>
 <body>
 
@@ -206,6 +206,7 @@
           <div id="sp-leaflet-map" class="sp-leaflet-map"></div>
           <div class="sp-map-legend">
             <span><i class="sp-leg-dot" style="background:#5F7A3E"></i> høy score</span>
+            <span><i class="sp-leg-dot" style="background:#8FA35C"></i> god</span>
             <span><i class="sp-leg-dot" style="background:#C8974A"></i> middels</span>
             <span><i class="sp-leg-dot" style="background:#A23E2E"></i> lav / hogd</span>
             <span>◎ liten stiplet ring = eget sted</span>
@@ -246,8 +247,8 @@
           <span class="sp-count" id="sp-count"></span>
         </div>
         <div class="sp-score-filter-row">
-          <span>Vis kun score ≥ <b id="sp-score-filter-label">0</b></span>
-          <input type="range" id="sp-score-filter-slider" min="0" max="90" step="5" value="0"/>
+          <span>Vis kun score ≥ <b id="sp-score-filter-label">70</b></span>
+          <input type="range" id="sp-score-filter-slider" min="0" max="90" step="5" value="70"/>
           <span class="sp-score-filter-hint">alle steder i området vises fortsatt i kartet</span>
         </div>
         <div id="sp-results"></div>
@@ -286,7 +287,7 @@
      worker/api/README.md). Testnøkkelen (1x00000000000000000000AA) hører
      kun hjemme i worker/api/.dev.vars for lokal utvikling, aldri her. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<script src="js/api-client.js?v=0.19.9"></script>
-<script src="js/app.js?v=0.19.9"></script>
+<script src="js/api-client.js?v=0.20.0"></script>
+<script src="js/app.js?v=0.20.0"></script>
 </body>
 </html>
