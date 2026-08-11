@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.19.5';
+  const APP_VERSION = '0.19.6';
   const APP_BUILD_DATE = '2026-08-11';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -504,12 +504,36 @@
   }
 
   // ---------- lokasjonsdata (fra fungifinder-api, med innebygd demo-fallback) ----------
+
+  // Samme mønster som findFetchedAreaMatch()/currentAreaLabel() under —
+  // server-side filtrering (se worker/api sin terrengDb.js) speiler EKSAKT
+  // det fylke/kommune-filteret brukeren allerede har valgt, ikke et nytt,
+  // eget filter-konsept. 'radius'-modus og "alle" sender ingen parametre
+  // (helt datasett), siden radius-filtrering fortsatt skjer klient-side.
+  function currentServerFilterParams(){
+    if (filterMode === 'fylke' && fylkeFilter !== 'alle') return { fylke: fylkeFilter };
+    if (filterMode === 'kommune' && kommuneFilter !== 'alle') return { kommune: kommuneFilter };
+    return {};
+  }
+
+  // RETTET (server-side filtrering, se D1-MIGRASJON.md): kalles nå på nytt
+  // ved hvert filterbytte (se wiring-seksjonen nederst i filen), ikke bare
+  // én gang ved innlogging — locationsRequestSeq forkaster utdaterte svar
+  // hvis brukeren rekker å bytte filter igjen før forrige kall er ferdig.
+  let locationsRequestSeq = 0;
   async function loadLocations(){
     if (!currentUser) return; // beholder BASE_LOCATIONS-demofallbacken definert øverst i filen
+    const seq = ++locationsRequestSeq;
     try {
-      const data = await window.ApiClient.hentTerrengdata();
-      if (Array.isArray(data) && data.length) BASE_LOCATIONS = data;
+      const data = await window.ApiClient.hentTerrengdata(currentServerFilterParams());
+      if (seq !== locationsRequestSeq) return; // et nyere filterbytte har allerede startet et ferskere kall
+      // Tom liste er nå et GYLDIG svar (f.eks. en kommune uten analyserte
+      // steder ennå) — skal vise "ingenting her", ikke stille beholde
+      // forrige filters data. Kun ekte feil (fanget under) beholder gammel
+      // BASE_LOCATIONS.
+      if (Array.isArray(data)) BASE_LOCATIONS = data;
     } catch (e) {
+      if (seq !== locationsRequestSeq) return;
       console.warn('Kunne ikke laste terrengdata.', e);
     }
   }
@@ -2798,12 +2822,23 @@
   document.getElementById('sp-toggle-knownfinds').addEventListener('click', () => { deprioritizeKnownFinds = !deprioritizeKnownFinds; render(); });
   document.getElementById('sp-toggle-hogst').addEventListener('click', () => { hideHogst = !hideHogst; render(); });
   document.getElementById('sp-toggle-artskart-recent').addEventListener('click', () => { artskartOnlyRecent = !artskartOnlyRecent; render(); });
-  document.getElementById('sp-fylke-filter').addEventListener('change', (e) => { fylkeFilter = e.target.value; clearRoute(); zoomToAreaSelection(); render(); });
-  document.getElementById('sp-kommune-filter-input').addEventListener('change', (e) => {
+  // RETTET (server-side filtrering): fylke/kommune-filterbytte re-henter nå
+  // fra /terrengdata (se loadLocations()) i stedet for å kun filtrere et
+  // allerede fullt innlastet array — await FØR render() slik at kartet ikke
+  // et kort øyeblikk viser forrige filters steder.
+  document.getElementById('sp-fylke-filter').addEventListener('change', async (e) => {
+    fylkeFilter = e.target.value;
+    clearRoute();
+    zoomToAreaSelection();
+    await loadLocations();
+    render();
+  });
+  document.getElementById('sp-kommune-filter-input').addEventListener('change', async (e) => {
     const val = e.target.value.trim();
     kommuneFilter = val === '' ? 'alle' : val;
     clearRoute();
     zoomToAreaSelection();
+    await loadLocations();
     render();
   });
   document.getElementById('sp-kommune-filter-input').addEventListener('keydown', (e) => {
@@ -2813,10 +2848,11 @@
     kommuneNarrowFylke = e.target.value;
     renderFilterControls();
   });
-  document.getElementById('sp-kommune-clear').addEventListener('click', () => {
+  document.getElementById('sp-kommune-clear').addEventListener('click', async () => {
     kommuneFilter = 'alle';
     document.getElementById('sp-kommune-filter-input').value = '';
     clearRoute();
+    await loadLocations();
     render();
   });
   document.getElementById('sp-add-place').addEventListener('click', () => openFindModal(null, {}));
@@ -2827,7 +2863,17 @@
     markingHogstMode = !markingHogstMode;
     updateMarkHogstButton();
   });
-  document.querySelectorAll('#sp-mode-seg button').forEach(btn => btn.addEventListener('click', () => { filterMode = btn.dataset.mode; clearRoute(); render(); }));
+  // RETTET (server-side filtrering): filterMode avgjør HVILKET filter
+  // currentServerFilterParams() sender (se loadLocations()), så et
+  // modusbytte kan endre hvilket datasett som skal vises (f.eks. fra en
+  // valgt kommune til "hele fylket" ved bytte til fylke-fane) — må derfor
+  // re-hente, ikke bare re-rendre et allerede innlastet array.
+  document.querySelectorAll('#sp-mode-seg button').forEach(btn => btn.addEventListener('click', async () => {
+    filterMode = btn.dataset.mode;
+    clearRoute();
+    await loadLocations();
+    render();
+  }));
   document.querySelectorAll('#sp-viewmode-seg button').forEach(btn => btn.addEventListener('click', () => { viewMode = btn.dataset.viewmode; clearRoute(); render(); }));
   document.getElementById('sp-radius-slider').addEventListener('input', (e) => { radiusKm = parseInt(e.target.value); clearRoute(); render(); });
   document.getElementById('sp-radius-clear').addEventListener('click', () => { radiusCenter = null; clearRoute(); render(); });

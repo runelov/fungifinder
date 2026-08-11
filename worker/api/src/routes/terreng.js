@@ -6,42 +6,38 @@ import { hentTerrengStederFraDb, hentArtsfunnFraDb } from '../lib/terrengDb.js';
 
 // Delt, allerede-analysert terrengdatasett — lesetilgang for BÅDE admin og
 // vanlige (inviterte) brukere, i motsetning til routes/omrader.js sine
-// admin-only endepunkter som utvider datasettet. Erstatter loadLocations()
-// sitt direkte GitHub-kall i app.js.
-export async function hentTerrengdata({ request, env }) {
+// admin-only endepunkter som utvider datasettet. Leser fra D1 siden
+// D1-migrasjon fase 3 (se fungifinder-db/D1-MIGRASJON.md) — GitHub-JSON-en
+// er ikke lenger i lesevei for noen bruker, kun fetch_area.py sin
+// dobbel-skriving (fase 4 fjerner den også).
+//
+// ?fylke=/?kommune= er valgfrie — speiler js/app.js sin fylkeFilter/
+// kommuneFilter EKSAKT (se loadLocations() der), som nå re-henter fra
+// serveren ved filterbytte i stedet for å filtrere et allerede fullt
+// innlastet array klient-side. Ingen av dem satt = hele datasettet, samme
+// kontrakt som før filtrering ble lagt til.
+export async function hentTerrengdata({ request, env, url }) {
   const cors = corsHeaders(env);
   const bruker = await requireSession(request, env);
   if (!bruker) return json({ error: 'Ikke innlogget.' }, 401, cors);
 
-  // MIDLERTIDIG (D1-migrasjon fase 2, se fungifinder-db/D1-MIGRASJON.md):
-  // kun admin leser fra D1 ennå, til det er verifisert i drift over en
-  // periode. Fjernes i fase 3, når alle brukere går over til D1-lesing.
-  if (bruker.rolle === 'admin') {
-    const data = await hentTerrengStederFraDb(env);
-    return json(data, 200, cors);
-  }
-
-  const { data } = await loadFile('data/locations.json', env);
-  return json(data || [], 200, cors);
+  const fylke = url.searchParams.get('fylke') || undefined;
+  const kommune = url.searchParams.get('kommune') || undefined;
+  const data = await hentTerrengStederFraDb(env, { fylke, kommune });
+  return json(data, 200, cors);
 }
 
 // Ekte Artsdatabanken-observasjoner (art/koordinat/dato), akkumulert av
 // fetch_area.py i data/artsfunn.json — driver "kjente funn"-kartlaget
-// (renderArtskartLayer i app.js). Delt lesedata, samme tilgang som
-// hentTerrengdata() over.
+// (renderArtskartLayer i app.js). Delt lesedata, samme tilgang og samme
+// D1-migrasjon (fase 3) som hentTerrengdata() over.
 export async function hentArtsfunn({ request, env }) {
   const cors = corsHeaders(env);
   const bruker = await requireSession(request, env);
   if (!bruker) return json({ error: 'Ikke innlogget.' }, 401, cors);
 
-  // MIDLERTIDIG — se samme fase 2-kommentar i hentTerrengdata() over.
-  if (bruker.rolle === 'admin') {
-    const data = await hentArtsfunnFraDb(env);
-    return json(data, 200, cors);
-  }
-
-  const { data } = await loadFile('data/artsfunn.json', env);
-  return json(data || [], 200, cors);
+  const data = await hentArtsfunnFraDb(env);
+  return json(data, 200, cors);
 }
 
 // Leser ÉN oppføring fra data/enrichments.json (se fungifinder-db sin

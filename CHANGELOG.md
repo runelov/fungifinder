@@ -1,5 +1,33 @@
 # Endringslogg
 
+## 0.19.6 — Server-side filtrering av terrengdata (fylke/kommune)
+Oppfølger til D1-migrasjonen (se `fungifinder-db/D1-MIGRASJON.md`) — nå som
+`/terrengdata` leser fra D1 (fase 3), kan serveren filtrere FØR data sendes
+over nett, i stedet for at hele datasettet lastes én gang og filtreres
+client-side som før.
+
+- `GET /terrengdata` tar nå valgfrie `?fylke=`/`?kommune=`-parametre (se
+  `worker/api/src/lib/terrengDb.js`). Ingen av dem satt = uendret oppførsel
+  (hele datasettet).
+- `js/app.js` sin `loadLocations()` sender nå det aktive
+  fylke/kommune-filteret (samme `fylkeFilter`/`kommuneFilter` som
+  dropdownene alltid har styrt) og **re-henter fra serveren ved hvert
+  filterbytte** — fylke-dropdown, kommune-søkefelt, "nullstill kommune", og
+  fane-bytte mellom fylke/kommune/radius. Tidligere ble alt lastet én gang
+  og kun re-rendret client-side ved filterbytte.
+- Rettet samtidig en liten skjevhet dette avdekket: et tomt filtrert svar
+  (f.eks. en kommune uten analyserte steder ennå) beholdt tidligere stille
+  forrige filters data i stedet for å vise "ingenting her" — `loadLocations()`
+  behandler nå en tom liste som et gyldig svar, ikke som en feil.
+- `locationsRequestSeq` forkaster utdaterte svar hvis brukeren rekker å
+  bytte filter igjen før forrige kall er ferdig.
+- Merkbar konsekvens: filterbytte har nå litt nettverkslatens (før: instant,
+  siden alt allerede lå i minnet) — oppveies av mindre JSON over nett og
+  raskere parsing, særlig etter hvert som datasettet vokser videre.
+- `artsfunn`-laget (Artskart-observasjoner) er UTENFOR scope her — filtreres
+  fortsatt kun client-side på synlig kartutsnitt (`leafletMap.getBounds()`),
+  en annen akse enn fylke/kommune og en egen, større vurdering.
+
 ## 0.19.5 — Tre nye preferanser: kjente funnsteder, egen historikk, værvindu
 Oppfølger til 0.19.4 — brukeren ba om å bygge inn alle tre gjenværende
 kandidatene fra gjennomgangen av scoringsmodellen.

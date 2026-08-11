@@ -79,8 +79,15 @@ async function lagreMineData(payload){
 
 // Erstatter FungiStore.loadFile(locationsPath) — delt, allerede-analysert
 // terrengdatasett, lesbart for alle innloggede (admin og bruker).
-async function hentTerrengdata(){
-  const res = await kall('/terrengdata');
+// fylke/kommune er valgfrie server-side filtre (se worker/api sin
+// terrengDb.js) — speiler js/app.js sin fylkeFilter/kommuneFilter, sendes
+// KUN når ett av dem faktisk er valgt (ikke 'alle').
+async function hentTerrengdata({ fylke, kommune } = {}){
+  const qs = new URLSearchParams();
+  if (fylke) qs.set('fylke', fylke);
+  if (kommune) qs.set('kommune', kommune);
+  const sti = qs.toString() ? `/terrengdata?${qs}` : '/terrengdata';
+  const res = await kall(sti);
   if (!res.ok) throw new Error(`Kunne ikke hente terrengdata (${res.status}).`);
   return res.json();
 }

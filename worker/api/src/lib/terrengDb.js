@@ -36,8 +36,20 @@ function radTilSted(rad) {
   };
 }
 
-export async function hentTerrengStederFraDb(env) {
-  const { results } = await env.DB.prepare('SELECT * FROM terreng_steder').all();
+// fylke/kommune er valgfrie server-side filtre (D1-migrasjon "filtrering"-
+// oppfølgeren, se D1-MIGRASJON.md) — speiler EKSAKT samme to filtre som
+// js/app.js sin fylkeFilter/kommuneFilter allerede styrer klient-side (ikke
+// et nytt, tredje filter-konsept). Begge sendt samtidig = AND, men i
+// praksis sender app.js kun det ene, aldri begge. Ingen av dem satt =
+// uendret oppførsel (hele datasettet, som før filtrering ble lagt til).
+export async function hentTerrengStederFraDb(env, { fylke, kommune } = {}) {
+  const vilkar = [];
+  const binds = [];
+  if (fylke) { vilkar.push('fylke = ?'); binds.push(fylke); }
+  if (kommune) { vilkar.push('kommune = ?'); binds.push(kommune); }
+  const sql = 'SELECT * FROM terreng_steder' + (vilkar.length ? ` WHERE ${vilkar.join(' AND ')}` : '');
+  const stmt = binds.length ? env.DB.prepare(sql).bind(...binds) : env.DB.prepare(sql);
+  const { results } = await stmt.all();
   return results.map(radTilSted);
 }
 
