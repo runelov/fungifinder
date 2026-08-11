@@ -1,5 +1,21 @@
 # Endringslogg
 
+## 0.19.7 — Parallelliserte oppstartskallene (lastetid)
+Første steg av tre i en oppfølger om lastetid (bbox-basert artsfunn-
+filtrering og geolokasjon ved oppstart er egne, senere steg — se
+`fungifinder-db/D1-MIGRASJON.md`).
+
+- `init()` sitt `loadLocations()`/`loadFetchedAreas()`/`loadArtsfunn()`/
+  `loadStorage()` var fire sekvensielle `await`-kall uten noen reell
+  avhengighet mellom dem (hver skriver til sin egen, usammenhengende
+  globale tilstand, og svelger allerede sine egne feil internt). Kjøres nå
+  parallelt via `Promise.all` — kutter ventetiden fra summen av alle fire
+  til den tregeste av dem.
+- Målt bakgrunn: `/terrengdata/artsfunn` alene er ~1,46 MB gzippet (31 378
+  rader, usiktrert — filtreres foreløpig kun client-side på synlig
+  kartutsnitt), `/terrengdata` ~270 KB — begge lastes uansett hvor i landet
+  brukeren er, uendret av denne endringen alene (kommer i steg 2).
+
 ## 0.19.6 — Server-side filtrering av terrengdata (fylke/kommune)
 Oppfølger til D1-migrasjonen (se `fungifinder-db/D1-MIGRASJON.md`) — nå som
 `/terrengdata` leser fra D1 (fase 3), kan serveren filtrere FØR data sendes

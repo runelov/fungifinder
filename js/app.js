@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.19.6';
+  const APP_VERSION = '0.19.7';
   const APP_BUILD_DATE = '2026-08-11';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -2901,10 +2901,13 @@
     initMap();
     await initAuth();
     await checkUrlInvitasjon();
-    await loadLocations();
-    await loadFetchedAreas();
-    await loadArtsfunn();
-    await loadStorage();
+    // RETTET (lastetid): disse fire var tidligere sekvensielle await-kall
+    // uten noen reell avhengighet mellom dem — hver skriver til sin egen,
+    // usammenhengende globale tilstand (BASE_LOCATIONS/fetchedAreas/
+    // artsfunn/userFinds osv.) og svelger allerede sine egne feil internt
+    // (så en Promise.all her avviser aldri). Kjørt parallelt kutter
+    // ventetiden fra summen av alle fire til den TREGESTE av dem.
+    await Promise.all([loadLocations(), loadFetchedAreas(), loadArtsfunn(), loadStorage()]);
     loadKommuneRegister().then(() => renderFilterControls()); // ikke-blokkerende, oppdaterer UI når klar
     render();
     loadWeather();
