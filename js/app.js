@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.19.2';
+  const APP_VERSION = '0.19.3';
   const APP_BUILD_DATE = '2026-08-11';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -1533,7 +1533,13 @@
     [topoLayer, standardLayer, satelliteLayer].forEach(attachTileRetry);
     topoLayer.addTo(leafletMap);
 
-    markerLayer = L.layerGroup().addTo(leafletMap);
+    // Målepunkter-laget starter AV (ikke lagt til kartet her) — med
+    // hundrevis/tusenvis av scorede punkter samtidig dominerer det kartbildet
+    // fullstendig med det samme man åpner appen. Registreres likevel i
+    // lag-kontrollen under (L.control.layers viser avkrysningen som av når
+    // laget ikke er på kartet ennå), og locateOnMap()/handleMapMarkerClick()
+    // skrur det på automatisk igjen når man faktisk trenger å se et punkt.
+    markerLayer = L.layerGroup();
     radiusLayer = L.layerGroup().addTo(leafletMap);
     routeLayer = L.layerGroup().addTo(leafletMap);
     hogstLayer = L.layerGroup().addTo(leafletMap);

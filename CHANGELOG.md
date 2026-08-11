@@ -1,5 +1,18 @@
 # Endringslogg
 
+## 0.19.3 — "Målepunkter"-laget starter av som default
+Med hundrevis/tusenvis av scorede punkter samtidig (særlig etter at flere
+kommuner nå er analysert, se `fungifinder-db` CHANGELOG) dominerte
+Målepunkter-laget kartbildet fullstendig med det samme man åpnet appen.
+
+- `js/app.js`: `markerLayer` legges ikke lenger til kartet automatisk i
+  `initMap()` — kun `radiusLayer`/`routeLayer`/`hogstLayer`/`findsLayer`/
+  `artskartLayer` starter på. Fortsatt registrert i lag-kontrollen (vises
+  som avkrysset av), og skrus automatisk på igjen av `locateOnMap()` når man
+  faktisk klikker "Vis i kart" på et sted.
+- Verifisert i browser: lag-kontrollen viser "Målepunkter" som uavkrysset
+  ved lasting, øvrige lag uendret.
+
 ## worker/api — 2026-08-11 (produksjonshotfix, ingen APP_VERSION-bump nødvendig)
 Brukeren rapporterte at appen viste `v0.19.2` og var pålogget, men ingen
 artsobservasjoner vist i det hele tatt — DevTools viste 503 på
