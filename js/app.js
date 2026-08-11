@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.20.1';
+  const APP_VERSION = '0.20.2';
   const APP_BUILD_DATE = '2026-08-11';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -687,6 +687,31 @@
     const bb = await fetchAreaBbox(filterMode, name);
     if (!bb) return;
     leafletMap.fitBounds([[bb[0], bb[2]], [bb[1], bb[3]]], { maxZoom: 12, padding: [20, 20] });
+  }
+
+  // RETTET (bruker meldte at radius-sirkelen ofte falt helt eller delvis
+  // utenfor synlig kartutsnitt, uansett standardverdi på radiusKm — enhver
+  // fast standardstørrelse ville uansett bare tilfeldigvis passet ÉN gitt
+  // zoom, og radiusKm kan justeres fritt via glidebryteren uansett).
+  // Zoomer/panorerer i stedet ALLTID slik at hele sirkelen faktisk vises,
+  // for hvilken som helst radiusKm — kalles hver gang radiusCenter settes
+  // eller radiusKm endres mens et senter allerede er valgt.
+  function zoomToRadiusSelection(){
+    if (!leafletMap || !radiusCenter) return;
+    // RETTET: L.circle(...).getBounds() kaster ("Cannot read properties of
+    // undefined (reading 'layerPointToLatLng')") med mindre sirkelen først
+    // er lagt til kartet (getBounds() leser projiserte piksel-koordinater
+    // satt av _project(), som kun skjer ved addTo()) — fanget i preview før
+    // dette noensinne nådde produksjon. Ren lat/lng-matte i stedet, ingen
+    // kart-avhengighet: grader breddegrad per km er tilnærmet konstant
+    // (111,32 km), lengdegrad justeres for bredde-kompresjon via cos(lat).
+    const latOffset = radiusKm / 111.32;
+    const lonOffset = radiusKm / (111.32 * Math.cos(radiusCenter.lat * Math.PI / 180));
+    const bounds = L.latLngBounds(
+      [radiusCenter.lat - latOffset, radiusCenter.lon - lonOffset],
+      [radiusCenter.lat + latOffset, radiusCenter.lon + lonOffset]
+    );
+    leafletMap.fitBounds(bounds, { padding: [20, 20] });
   }
 
   function describeRunStatus(run){
@@ -1759,6 +1784,7 @@
       } else if (filterMode === 'radius') {
         radiusCenter = { lat: e.latlng.lat, lon: e.latlng.lng };
         clearRoute();
+        zoomToRadiusSelection();
         render();
       } else {
         openFindModal(null, { lat: e.latlng.lat, lon: e.latlng.lng });
@@ -1797,6 +1823,7 @@
       render();
     } else {
       radiusCenter = { lat: loc.lat, lon: loc.lon };
+      zoomToRadiusSelection();
       render();
     }
     setTimeout(() => {
@@ -1964,7 +1991,12 @@
   // (for terreng-beskrivelse og sirkelens utstrekning), OG som minste avstand
   // mellom to ankre i clusterIntoZones — de stiplede sirklene overlapper da
   // ikke for mye i tett-scorede områder.
-  const AREA_RADIUS_KM = 1.2;
+  //
+  // RETTET (bruker meldte at foreslåtte områder var for store til å
+  // realistisk dekke grundig til fots — opptil 1400 m radius/~6 km² gjorde
+  // det demotiverende å lete): senket fra 1.2 til 0.5 km, se radiusM under
+  // for den tilhørende senkingen av selve sirkel-radiusen (maks 600 m nå).
+  const AREA_RADIUS_KM = 0.5;
 
   // Grov terskel for "tynt datagrunnlag" i dekningslinjen over "Foreslå
   // områder" — bevisst rundt tall, ikke ment som noe presist mål, bare nok
@@ -2124,7 +2156,7 @@
     const areas = anchors.map(anchor => {
       const members = scoped.filter(s => haversineKm(anchor.loc.lat, anchor.loc.lon, s.loc.lat, s.loc.lon) <= AREA_RADIUS_KM);
       const spreadM = Math.max(0, ...members.map(m => haversineKm(anchor.loc.lat, anchor.loc.lon, m.loc.lat, m.loc.lon) * 1000));
-      const radiusM = Math.min(1800, Math.max(400, spreadM + 200)); // liten margin utenfor ytterste kjente punkt
+      const radiusM = Math.min(600, Math.max(400, spreadM + 100)); // liten margin utenfor ytterste kjente punkt — se AREA_RADIUS_KM for begrunnelse
       return { anchor, members, radiusM };
     });
 
@@ -2977,10 +3009,21 @@
     filterMode = btn.dataset.mode;
     clearRoute();
     await loadLocations();
+    if (filterMode === 'radius') zoomToRadiusSelection(); // vis hele sirkelen igjen om et senter allerede var valgt
     render();
   }));
   document.querySelectorAll('#sp-viewmode-seg button').forEach(btn => btn.addEventListener('click', () => { viewMode = btn.dataset.viewmode; clearRoute(); render(); }));
-  document.getElementById('sp-radius-slider').addEventListener('input', (e) => { radiusKm = parseInt(e.target.value); clearRoute(); render(); });
+  // Debounces zoomToRadiusSelection() — 'input' fyrer kontinuerlig under
+  // dragging, og fitBounds() på hver eneste mellomverdi ga en hakkete/
+  // urolig kartanimasjon i stedet for én jevn bevegelse til sluttverdien.
+  let radiusZoomDebounce = null;
+  document.getElementById('sp-radius-slider').addEventListener('input', (e) => {
+    radiusKm = parseInt(e.target.value);
+    clearRoute();
+    render();
+    clearTimeout(radiusZoomDebounce);
+    radiusZoomDebounce = setTimeout(zoomToRadiusSelection, 200);
+  });
   document.getElementById('sp-radius-clear').addEventListener('click', () => { radiusCenter = null; clearRoute(); render(); });
   document.getElementById('sp-route-km-slider').addEventListener('input', (e) => {
     areaCount = parseInt(e.target.value);

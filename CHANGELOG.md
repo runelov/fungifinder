@@ -1,5 +1,24 @@
 # Endringslogg
 
+## 0.20.2 — Radius-modus zoomer nå til sirkelen, mindre foreslåtte områder
+To brukertilbakemeldinger samme dag.
+
+- **Radius-modus zoomer/panorerer nå alltid til å vise hele sirkelen** —
+  uansett `radiusKm`-verdi (2–60 km) og uansett kartets utgangspunkt (fast
+  senterpunkt eller geolokalisert). Tidligere: å velge senter (klikk i
+  kartet, klikk et punkt, eller "min posisjon") endret ALDRI kartutsnittet,
+  så sirkelen kunne falle helt eller delvis utenfor synlig område. Ny
+  `zoomToRadiusSelection()`, koblet inn ved senter-valg, glidebryter-endring
+  (debounced 200ms) og fane-bytte tilbake til Radius.
+  **Rettet underveis**: første forsøk brukte `L.circle(...).getBounds()`
+  på en sirkel som ikke var lagt til kartet — kaster i praksis
+  (`Cannot read properties of undefined`), fanget i preview før det nådde
+  produksjon. Bruker nå ren lat/lng-matematikk i stedet, uten
+  kart-avhengighet.
+- **Foreslåtte områder er mindre**: maks-radius senket fra ~1400 m til
+  600 m (klyngeradius `AREA_RADIUS_KM` 1,2→0,5 km) — opptil ~6 km² var for
+  mye å realistisk dekke grundig til fots i én økt, ifølge bruker.
+
 ## 0.20.1 — Rettet: geolokasjon ved oppstart ble overstyrt av "zoom til alt"
 Bruker meldte at kartet ikke faktisk zoomet inn på geolokasjonen ved
 oppstart (0.19.9) — måtte trykke "min posisjon" på nytt for å få effekten.
