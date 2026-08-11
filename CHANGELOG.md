@@ -1,5 +1,26 @@
 # Endringslogg
 
+## 0.19.2 — suggestAreas() ekskluderer høy-befolkning-punkter som anker + versjonsopprydding
+Brukeren rapporterte at et foreslått søkeområde (skogpunkt 268, Lørenskog)
+i stor grad dekket bebyggelse — under halvparten av den foreslåtte
+sirkelen var faktisk skog. Se `fungifinder-db` CHANGELOG v22/v23 for
+rotårsaken i selve befolkningsdataene (`classify_befolkning()` så tidligere
+kun på nærmeste enkelt-tettsted, ikke det strengeste nærliggende).
+
+- `js/app.js`: `suggestAreas()` filtrerer nå bort scoped-punkter med
+  `loc.befolkning === 'hoy'` før `clusterIntoZones()` velger ankre — et
+  slikt punkt kan ikke lenger bli sentrum/anker i et foreslått område,
+  uansett score for øvrig for treslag/fuktighet/adkomst. Kan fortsatt
+  inngå som medlem i en sirkel sentrert på et annet, roligere anker.
+  Tydeligere feilmelding hvis alle kandidatene i valgt filter er
+  hoy-befolkning.
+- **Versjonsbump påkrevd, ikke bare kosmetisk**: både denne fiksen og
+  0.19.1 (artsfunn-fiksen under) ble committet uten å bumpe
+  `APP_VERSION`/`index.html`s `?v=`-cache-buster (se 0.16.2 om hvorfor det
+  betyr at PWA-er/nettlesere kan fortsette å servere en gammel, cachet
+  `app.js` på tross av at `main` var oppdatert). Rettet opp her —
+  `APP_VERSION`/`?v=` er nå `0.19.2` og dekker begge fiksene.
+
 ## 0.19.1 — Rettet: Artsdatabanken-funn kunne forbli tomt etter kodeinnlogging
 Brukeren rapporterte at "Artsdatabanken-funn"-laget av og til ikke viste
 noen prikker, selv om det sto avkrysset/aktivt i lagkontrollen. Rotårsak:
