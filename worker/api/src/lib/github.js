@@ -22,14 +22,33 @@ function headers(env, extra) {
   };
 }
 
-// Unicode-sikker base64-dekoding (GitHub API returnerer base64 av UTF-8-bytes)
+// Unicode-sikker base64-dekoding (GitHub API returnerer base64 av UTF-8-bytes).
+//
+// RETTET 2026-08-11: `Uint8Array.from(bin, c => c.charCodeAt(0))` kaller en
+// JS-funksjon PER BYTE — for data/locations.json (4,4 MB) og spesielt
+// data/artsfunn.json (10 MB, ~13M base64-tegn) var dette alene nok til at
+// Workeren traff CPU-tidsgrensen på HVERT kall til GET /terrengdata og
+// /terrengdata/artsfunn (produksjonsutfall: 503/"Exceeded CPU Limit",
+// oppdaget via `wrangler tail` — se samtalen 2026-08-11, ingen
+// artsobservasjoner vist i appen i det hele tatt). Bruker nå den native
+// `Uint8Array.fromBase64()` (tilgjengelig i denne Workers-runtimen, verifisert
+// lokalt) når den finnes — orders of magnitude raskere enn en JS-løkke for
+// filer i denne størrelsesordenen. Fallback til en enkel for-løkke (fortsatt
+// raskere enn den gamle Array.from-callback-varianten) hvis APIet skulle
+// mangle en dag.
 function base64ToUtf8(b64) {
-  const bin = atob(b64.replace(/\n/g, ''));
-  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  const cleaned = b64.replace(/\n/g, '');
+  if (typeof Uint8Array.fromBase64 === 'function') {
+    return new TextDecoder().decode(Uint8Array.fromBase64(cleaned));
+  }
+  const bin = atob(cleaned);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return new TextDecoder().decode(bytes);
 }
 function utf8ToBase64(str) {
   const bytes = new TextEncoder().encode(str);
+  if (typeof bytes.toBase64 === 'function') return bytes.toBase64();
   let bin = '';
   for (const b of bytes) bin += String.fromCharCode(b);
   return btoa(bin);

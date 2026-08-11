@@ -1,5 +1,35 @@
 # Endringslogg
 
+## worker/api — 2026-08-11 (produksjonshotfix, ingen APP_VERSION-bump nødvendig)
+Brukeren rapporterte at appen viste `v0.19.2` og var pålogget, men ingen
+artsobservasjoner vist i det hele tatt — DevTools viste 503 på
+`api.fungifinder.no/terrengdata`. `wrangler tail` mot produksjon viste
+rotårsaken direkte: `GET /terrengdata` og `GET /terrengdata/artsfunn` traff
+**"Exceeded CPU Limit"** på hvert eneste kall — et fullstendig, deterministisk
+utfall (ikke sporadisk).
+
+Rotårsak: `base64ToUtf8()` i `worker/api/src/lib/github.js` dekodet GitHub
+Contents/Blob-API sitt base64-svar via `Uint8Array.from(bin, c =>
+c.charCodeAt(0))` — én JS-funksjonskalls-overhead PER BYTE. `data/locations.json`
+(4,4 MB) og særlig `data/artsfunn.json` (10 MB, ~13M base64-tegn i
+fungifinder-db) er store nok til at dette alene sprengte Workerens
+CPU-tidsgrense på hvert kall — sannsynligvis en gradvis skaleringsgrense nådd
+etter hvert som begge datasettene har vokst over tid via ordinære
+ETL-kjøringer (ikke en regresjon fra en spesifikk commit).
+
+- `base64ToUtf8()` bruker nå den native `Uint8Array.fromBase64()` (verifisert
+  tilgjengelig i denne Workers-runtimen) i stedet for en JS-løkke, med
+  fallback til en optimalisert for-løkke (fortsatt raskere enn den gamle
+  `Array.from`-callback-varianten) hvis metoden skulle mangle.
+- Målt lokalt (ekte data fra fungifinder-db, workerd via `wrangler dev`):
+  `locations.json` 846ms → 22ms (identisk resultat, verifisert byte-for-byte);
+  `artsfunn.json` ~1900ms (estimert) → 64ms.
+- `utf8ToBase64()` fikk samme type fiks (native `toBase64()` når
+  tilgjengelig) for konsistens, selv om den for øyeblikket ikke kalles fra
+  noen aktiv rute.
+- Deployet direkte til produksjon (`wrangler deploy`) — se commit for
+  verifisering mot live `api.fungifinder.no` etter deploy.
+
 ## 0.19.2 — Pre-commit-hook for versjons-sync + suggestAreas() ekskluderer høy-befolkning-punkter som anker
 Ved forrige versjonsbump (se under) ble kun `APP_VERSION`/`js/app.js?v=`
 bumpet — `css/styles.css?v=` og `js/api-client.js?v=` ble stående på gamle
