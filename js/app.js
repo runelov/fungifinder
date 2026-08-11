@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.20.2';
+  const APP_VERSION = '0.20.3';
   const APP_BUILD_DATE = '2026-08-11';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -1698,6 +1698,15 @@
           // å faktisk få den innzoomede visningen. Markerer kartet som
           // allerede fittet — geolokasjonen ER det bevisste utgangspunktet.
           mapFittedOnce = true;
+          // RETTET: brukeren forventet at en kjent posisjon automatisk ble
+          // brukt som senter i Radius-modus — det gjorde den ikke,
+          // radiusCenter ble KUN satt via et eksplisitt kartklikk. Uten et
+          // senter tegnes ingen sirkel i det hele tatt (se renderMap()), så
+          // zoomToRadiusSelection() (fra forrige rettelse) hadde ingenting å
+          // vise selv om brukeren byttet til Radius-fanen. Setter nå
+          // radiusCenter direkte her — samme geolokasjon dekker altså både
+          // kartets startutsnitt OG radius-standarden i samme slengen.
+          radiusCenter = { lat: pos.coords.latitude, lon: pos.coords.longitude };
           ferdigstill(true);
         },
         () => ferdigstill(false), // avslått eller feilet — behold default senterpunkt
@@ -2994,7 +3003,17 @@
   });
   document.getElementById('sp-add-place').addEventListener('click', () => openFindModal(null, {}));
   document.getElementById('sp-map-fullscreen-toggle').addEventListener('click', () => toggleMapFullscreen());
-  document.getElementById('sp-my-location-btn').addEventListener('click', () => useMyLocation(showMyLocationOnMap));
+  // Samme forventning som ved oppstart-geolokasjon (se geolocateStartupView):
+  // hvis du allerede står i Radius-modus, oppdaterer "min posisjon" nå også
+  // selve radius-senteret, ikke bare kartvisningen.
+  document.getElementById('sp-my-location-btn').addEventListener('click', () => useMyLocation((lat, lon) => {
+    showMyLocationOnMap(lat, lon);
+    if (filterMode === 'radius') {
+      radiusCenter = { lat, lon };
+      zoomToRadiusSelection();
+      render();
+    }
+  }));
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && mapFullscreen) toggleMapFullscreen(); });
   document.getElementById('sp-mark-hogst').addEventListener('click', () => {
     markingHogstMode = !markingHogstMode;

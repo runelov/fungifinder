@@ -1,5 +1,19 @@
 # Endringslogg
 
+## 0.20.3 — Rettet: geolokasjon satte aldri radius-senteret
+Bruker meldte at 0.20.2 sitt "zoom til radius-sirkelen" tilsynelatende ikke
+virket. Riktig diagnostisert av brukeren selv: `radiusCenter` ble KUN satt
+via et eksplisitt kartklikk — geolokasjon ved oppstart satte kartutsnittet,
+men aldri selve radius-senteret. Uten et senter tegnes ingen sirkel i det
+hele tatt (se `renderMap()`), så `zoomToRadiusSelection()` (fra 0.20.2)
+hadde ingenting å vise selv ved bytte til Radius-fanen.
+
+- `geolocateStartupView()` setter nå `radiusCenter` direkte, i tillegg til
+  kartutsnittet — samme geolokasjon dekker begge deler.
+- "Min posisjon"-knappen oppdaterer nå også `radiusCenter` (+ zoomer/
+  re-rendrer) hvis du allerede står i Radius-modus når du trykker den —
+  samme forventning, manuell variant.
+
 ## 0.20.2 — Radius-modus zoomer nå til sirkelen, mindre foreslåtte områder
 To brukertilbakemeldinger samme dag.
 
