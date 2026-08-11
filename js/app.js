@@ -1882,13 +1882,27 @@
       return;
     }
 
+    // Et punkt med befolkning==='hoy' (tett bebyggelse like ved, se
+    // classify_befolkning i fetch_area.py) kan ALDRI bli sentrum i et
+    // foreslått område — uansett hvor bra det scorer på treslag/fuktighet/
+    // adkomst for øvrig (god adkomst og nærhet til folk er ofte nettopp
+    // samme underliggende egenskap, se scoreLocation()'s roScore/adkomstScore,
+    // så "hoy" befolkning alene holder ikke alltid score-summen nede nok til
+    // å luke ut slike punkter naturlig). Se samtalen 2026-08-11 om skogpunkt
+    // 268 i Lørenskog — under halvparten av den foreslåtte sirkelen var
+    // faktisk skog. Punktet kan fortsatt inngå som MEDLEM av en sirkel
+    // sentrert på et annet, roligere anker (se `members` under) — det er kun
+    // selve senteret/ankeret dette ekskluderer.
+    const anchorCandidates = scoped.filter(s => s.loc.befolkning !== 'hoy');
+
     // Velger inntil `areaCount` distinkte, topp-scorende anker-punkter, minst
     // AREA_RADIUS_KM fra hverandre. Grupperer deretter ALLE scorede punkter
-    // rundt sitt nærmeste anker for å bestemme sirkelens utstrekning og
-    // terreng-beskrivelsen (se describeRouteTerrain).
-    const anchors = clusterIntoZones(scoped, areaCount, AREA_RADIUS_KM);
+    // (inkl. evt. hoy-befolkning-punkter) rundt sitt nærmeste anker for å
+    // bestemme sirkelens utstrekning og terreng-beskrivelsen (se
+    // describeRouteTerrain).
+    const anchors = clusterIntoZones(anchorCandidates, areaCount, AREA_RADIUS_KM);
     if (!anchors.length) {
-      summary.textContent = 'Fant ingen gode områder i valgt filter.';
+      summary.textContent = 'Fant ingen gode områder i valgt filter — de best scorende punktene ligger alle tett på bebyggelse (høy befolkningstetthet).';
       return;
     }
 
