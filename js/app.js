@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.20.0';
+  const APP_VERSION = '0.20.1';
   const APP_BUILD_DATE = '2026-08-11';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -1664,6 +1664,15 @@
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           showMyLocationOnMap(pos.coords.latitude, pos.coords.longitude, { openPopup: false, zoom: 11 });
+          // RETTET: renderMap() sin "zoom til alle markører, kun første
+          // gang"-logikk (mapFittedOnce, se der) kjørte rett ETTER dette ved
+          // første render() i init() — den overstyrte geolokasjon-zoomen
+          // umiddelbart med et fitBounds() over HELE datasettet (siden
+          // filterMode/fylkeFilter fortsatt er default "alle" på dette
+          // tidspunktet). Brukeren måtte da trykke "min posisjon" på nytt for
+          // å faktisk få den innzoomede visningen. Markerer kartet som
+          // allerede fittet — geolokasjonen ER det bevisste utgangspunktet.
+          mapFittedOnce = true;
           ferdigstill(true);
         },
         () => ferdigstill(false), // avslått eller feilet — behold default senterpunkt

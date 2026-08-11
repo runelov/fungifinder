@@ -1,5 +1,19 @@
 # Endringslogg
 
+## 0.20.1 — Rettet: geolokasjon ved oppstart ble overstyrt av "zoom til alt"
+Bruker meldte at kartet ikke faktisk zoomet inn på geolokasjonen ved
+oppstart (0.19.9) — måtte trykke "min posisjon" på nytt for å få effekten.
+
+- Rotårsak: `renderMap()` sin "zoom til alle markører, kun første
+  gang"-logikk (`mapFittedOnce`) kjørte ved første `render()` i `init()`,
+  RETT ETTER at `geolocateStartupView()` hadde satt kartutsnittet — siden
+  `filterMode`/`fylkeFilter` fortsatt er default "alle" på det tidspunktet,
+  overstyrte `fitBounds()` umiddelbart geolokasjon-zoomen med en visning av
+  HELE datasettet.
+- `geolocateStartupView()` setter nå `mapFittedOnce = true` når
+  geolokasjon lykkes — geolokasjonen ER det bevisste utgangspunktet,
+  `renderMap()` sin egen fit-til-alt skal ikke overstyre den.
+
 ## 0.20.0 — Finere fargekoding + hover-tooltip for score, høyere default-terskel
 Oppfølger til vurderingen av om rød/gul/grønn-fargekodingen på
 målepunktene var for grovkornet (se samtalen 2026-08-11).
