@@ -1,17 +1,24 @@
 import { json } from '../lib/json.js';
 import { corsHeaders } from '../lib/cors.js';
 import { requireAdmin, requireSession } from '../lib/session.js';
-import { loadFile, triggerWorkflow, getLatestRun } from '../lib/github.js';
+import { triggerWorkflow, getLatestRun } from '../lib/github.js';
+import { hentFetchedAreasFraDb } from '../lib/terrengDb.js';
 
 // Admin-only: dette er nettopp "sette i gang analyse av nye områder", som
 // inviterte brukere eksplisitt IKKE skal ha tilgang til.
+//
+// RETTET (D1-migrasjon fase 4, se D1-MIGRASJON.md): leste tidligere
+// data/fetched-areas.json fra GitHub — glemt i fase 2/3 sin ellers
+// komplette migrering av terrengdata-lesesiden. fetch_area.py slutter å
+// skrive denne filen til GitHub i fase 4, så denne ruten ville stått
+// PERMANENT FASTFROSSET på gammel data uten denne fiksen.
 export async function hentDekning({ request, env }) {
   const cors = corsHeaders(env);
   const admin = await requireAdmin(request, env);
   if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
 
-  const { data } = await loadFile('data/fetched-areas.json', env);
-  return json(data || [], 200, cors);
+  const data = await hentFetchedAreasFraDb(env);
+  return json(data, 200, cors);
 }
 
 export async function startOmradeHenting({ request, env }) {

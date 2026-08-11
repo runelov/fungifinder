@@ -1,6 +1,7 @@
 import { json } from '../lib/json.js';
 import { corsHeaders } from '../lib/cors.js';
 import { timingSafeEqual } from '../lib/crypto.js';
+import { hentTerrengStederFraDb, hentArtsfunnFraDb, hentFetchedAreasFraDb } from '../lib/terrengDb.js';
 
 // D1-skrivevei for fetch_area.py (GitHub Actions), se
 // fungifinder-db/D1-MIGRASJON.md fase 1, alternativ B. `fetch_area.py`
@@ -77,11 +78,15 @@ const DEKNING_INSERT = `
   VALUES (?,?,?,?,?,?,?,?,?,?)
 `;
 
+function harGyldigEtlSecret(request, env) {
+  const secret = request.headers.get('X-Etl-Secret') || '';
+  return !!env.ETL_SHARED_SECRET && timingSafeEqual(secret, env.ETL_SHARED_SECRET);
+}
+
 export async function importTerrengdata({ request, env }) {
   const cors = corsHeaders(env);
 
-  const secret = request.headers.get('X-Etl-Secret') || '';
-  if (!env.ETL_SHARED_SECRET || !timingSafeEqual(secret, env.ETL_SHARED_SECRET)) {
+  if (!harGyldigEtlSecret(request, env)) {
     return json({ error: 'Ugyldig eller manglende X-Etl-Secret.' }, 401, cors);
   }
 
@@ -128,4 +133,31 @@ export async function importTerrengdata({ request, env }) {
   }
 
   return json({ ok: true, table, mode, count: rows.length }, 200, cors);
+}
+
+// D1-lesevei for fetch_area.py (D1-migrasjon fase 4, se D1-MIGRASJON.md):
+// GitHub-JSON-filene skrives ikke lenger til for terreng_steder/artsfunn/
+// fetched_areas, så ETL-skriptet må lese SIN egen "gjeldende tilstand" (for
+// dedup/oppfriskings-logikk) herfra i stedet for en lokal, git-sjekket-ut
+// fil som ellers ville stått PERMANENT FASTFROSSET på hva den var idet
+// dobbel-skrivingen sluttet. Samme X-Etl-Secret-auth som importTerrengdata()
+// over — symmetrisk lese/skrive-par, ett sted i systemet med denne tilgangen.
+export async function eksporterTerrengdata({ request, env, url }) {
+  const cors = corsHeaders(env);
+
+  if (!harGyldigEtlSecret(request, env)) {
+    return json({ error: 'Ugyldig eller manglende X-Etl-Secret.' }, 401, cors);
+  }
+
+  const table = url.searchParams.get('tabell');
+  if (!TABELLER.includes(table)) {
+    return json({ error: `Ukjent tabell: ${table}` }, 400, cors);
+  }
+
+  let data;
+  if (table === 'terreng_steder') data = await hentTerrengStederFraDb(env);
+  else if (table === 'artsfunn') data = await hentArtsfunnFraDb(env);
+  else data = await hentFetchedAreasFraDb(env);
+
+  return json(data, 200, cors);
 }

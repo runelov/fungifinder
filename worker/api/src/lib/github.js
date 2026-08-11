@@ -46,14 +46,6 @@ function base64ToUtf8(b64) {
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return new TextDecoder().decode(bytes);
 }
-function utf8ToBase64(str) {
-  const bytes = new TextEncoder().encode(str);
-  if (typeof bytes.toBase64 === 'function') return bytes.toBase64();
-  let bin = '';
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin);
-}
-
 // Henter en JSON-fil fra fungifinder-db. Returnerer { data: null, sha: null }
 // hvis filen ikke finnes ennå.
 export async function loadFile(path, env) {
@@ -77,26 +69,6 @@ export async function loadFile(path, env) {
   return { data: JSON.parse(base64ToUtf8(contentB64)), sha: json.sha };
 }
 
-// Lagrer en JSON-fil til fungifinder-db. previousSha kreves for å oppdatere
-// en eksisterende fil (unngår at to samtidige skriv overskriver hverandre
-// uten varsel).
-export async function saveFile(path, dataObj, previousSha, env) {
-  const body = {
-    message: `fungifinder-api: oppdater ${path} (${new Date().toISOString()})`,
-    content: utf8ToBase64(JSON.stringify(dataObj, null, 2)),
-    branch: BRANCH,
-  };
-  if (previousSha) body.sha = previousSha;
-  const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`;
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: headers(env, { 'Content-Type': 'application/json' }),
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`GitHub API-feil ved lagring av ${path} (${res.status}): ${await res.text()}`);
-  const json = await res.json();
-  return json.content.sha;
-}
 
 // Sjekker om GitHub faktisk kjenner igjen en gitt workflow-fil — brukes som
 // "preflight" før triggerWorkflow, for en presis feilmelding i stedet for

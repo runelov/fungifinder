@@ -86,3 +86,26 @@ export async function hentArtsfunnFraDb(env, { minLat, maxLat, minLon, maxLon } 
   const { results } = await stmt.all();
   return results.map(radTilArtsfunn);
 }
+
+function radTilDekning(rad) {
+  return {
+    mode: rad.mode,
+    value: rad.value,
+    lat: rad.lat,
+    lon: rad.lon,
+    radiusKm: rad.radius_km,
+    gridKm: rad.grid_km,
+    pointsChecked: rad.points_checked,
+    pointsAdded: rad.points_added,
+    fetchedAt: rad.fetched_at,
+    osmInfraRefreshedAt: rad.osm_infra_refreshed_at,
+  };
+}
+
+// Brukt av routes/omrader.js sin hentDekning() (admin "dekning"-panel) OG
+// av fetch_area.py sin fetch_from_d1() (D1-migrasjon fase 4) — samme
+// kontrakt som data/fetched-areas.json ga tidligere.
+export async function hentFetchedAreasFraDb(env) {
+  const { results } = await env.DB.prepare('SELECT * FROM fetched_areas').all();
+  return results.map(radTilDekning);
+}
