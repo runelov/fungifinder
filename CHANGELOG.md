@@ -1,5 +1,35 @@
 # Endringslogg
 
+## 0.21.4 — "Min posisjon" oppleves raskere + tydelig ventestatus
+Bruker meldte ~8 sek snitt-ventetid på "min posisjon"-klikket, uten noe
+visuelt tegn på at noe skjedde i mellomtiden — så ut som kartet hadde
+hengt seg. Selve GPS/WiFi-trianguleringen skjer i nettleser/OS og kan ikke
+gjøres raskere herfra, men tre reelle tiltak i `useMyLocation()` (delt av
+alle tre stedene som bruker "min posisjon": kartknappen, finn-modalens
+posisjonsvelger, og "flytt til min posisjon" for et registrert funn):
+
+- **`maximumAge`** var 0 (default) — hvert klikk tvang fram et helt ferskt
+  oppslag, selv rett etter at `geolocateStartupView()` allerede hadde gjort
+  nøyaktig samme oppslag for få sekunder siden. Kartknappen bruker nå
+  samme 5-minutters vindu som oppstart-geolokasjonen (kan gjenbruke samme
+  ferske posisjon momentant); posisjons-/funn-knappene bruker et kortere
+  30s-vindu (presisjon teller mer der).
+- **`enableHighAccuracy`** er nå per kall i stedet for alltid `true`.
+  Kartknappen (kun områdevalg — fylke/kommune-nærhet, radius-senter på
+  km-skala) ber nå om lav nøyaktighet, som kan gi et raskere svar
+  (spesielt på en laptop uten GPS-brikke, der høy nøyaktighet tvinger fram
+  et tregere WiFi-basert oppslag). De to funn-relaterte kallene beholder
+  høy nøyaktighet uendret.
+- **Ny synlig ventestatus**: knappen viser "⏳ Henter posisjon…" og
+  deaktiveres mens vi venter — uansett hvor lang selve ventetiden er, ser
+  den ikke lenger ut som et hengende kart.
+
+**Ikke verifisert mot ekte GPS/WiFi-triangulering** (kun kodesti/logikk
+verifisert i preview — automatiserte nettlesermiljøer avslår geolokasjon
+momentant, ingen reell posisjon tilgjengelig der). Verifisert: riktige
+`getCurrentPosition()`-opsjoner sendes per kall (konsoll-sjekk), knappen
+viser/skjuler ventestatus korrekt rundt et simulert forsinket kall.
+
 ## 0.21.3 — Fiks: tvetydige kommunenavn feilet alltid ved områdehenting
 Bruker meldte "Tvetydig via Nominatim (mode=kommune)" ved forsøk på å hente
 terrengdata for "Våler i Østfold" — selv med både fylke OG kommune valgt i

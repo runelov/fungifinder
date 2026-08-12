@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.21.3';
+  const APP_VERSION = '0.21.4';
   const APP_BUILD_DATE = '2026-08-12';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -1867,15 +1867,49 @@
   // for et funn jeg registrerer nå" uten batteribruk fra kontinuerlig sporing.
   let myLocationMarker = null;
 
-  function useMyLocation(onSuccess){
+  // RETTET 2026-08-12: bruker meldte ~8s snitt-ventetid på "min posisjon"
+  // uten noe visuelt tegn på at noe skjedde i mellomtiden (så ut som kartet
+  // hadde hengt seg). To reelle, uavhengige tiltak, ingen falsk "vi gjorde
+  // det raskere"-påstand — selve GPS/WiFi-triangulereingen skjer i
+  // nettleser/OS og kan IKKE gjøres raskere herfra:
+  //  1. `maximumAge` var 0 (default) — hvert eneste klikk tvang fram et
+  //     helt ferskt oppslag, selv rett etter at geolocateStartupView() (se
+  //     under) allerede hadde gjort nøyaktig samme oppslag for få sekunder
+  //     siden. Med `maximumAge` kan et klikk som skjer innenfor vinduet
+  //     gjenbruke en fersk posisjon momentant i stedet for å vente på nytt.
+  //  2. `enableHighAccuracy` er nå per kall — den delte kartknappen
+  //     ("min posisjon" for områdevalg) trenger ikke meter-presisjon, kun
+  //     riktig fylke/kommune-nærhet, så den ber om lav nøyaktighet (raskere
+  //     svar, spesielt på en laptop uten GPS-brikke der høy nøyaktighet
+  //     tvinger fram et tregere WiFi-basert oppslag). Kallene som fyller inn
+  //     et FAKTISK funnpunkt (finn-modalen, "flytt til min posisjon" for et
+  //     registrert funn) beholder høy nøyaktighet — presisjon er viktig der.
+  //  3. `buttonEl` (valgfri) viser "⏳ Henter posisjon…" og deaktiverer
+  //     knappen mens vi venter, så ventetiden (uansett hvor lang den er)
+  //     ikke lenger ser ut som et hengende kart.
+  // IKKE verifisert live mot en ekte GPS/WiFi-triangulering (sandkasse-
+  // nettleseren her avslår geolokasjon momentant, ingen reell posisjon
+  // tilgjengelig) — kun kodesti/logikk verifisert.
+  function useMyLocation(onSuccess, { enableHighAccuracy = true, maximumAge = 60000, buttonEl = null } = {}){
     if (!navigator.geolocation) {
       alert('Nettleseren din støtter ikke posisjonsdeling.');
       return;
     }
+    const originalLabel = buttonEl ? buttonEl.textContent : null;
+    if (buttonEl) {
+      buttonEl.disabled = true;
+      buttonEl.textContent = '⏳ Henter posisjon…';
+    }
+    const restoreButton = () => {
+      if (buttonEl) {
+        buttonEl.disabled = false;
+        buttonEl.textContent = originalLabel;
+      }
+    };
     navigator.geolocation.getCurrentPosition(
-      (pos) => onSuccess(pos.coords.latitude, pos.coords.longitude),
-      (err) => alert('Kunne ikke hente posisjonen din: ' + err.message),
-      { enableHighAccuracy: true, timeout: 10000 }
+      (pos) => { restoreButton(); onSuccess(pos.coords.latitude, pos.coords.longitude); },
+      (err) => { restoreButton(); alert('Kunne ikke hente posisjonen din: ' + err.message); },
+      { enableHighAccuracy, timeout: 10000, maximumAge }
     );
   }
 
@@ -2945,11 +2979,15 @@
     document.getElementById('sp-find-cancel').addEventListener('click', () => { slot.innerHTML=''; render(); });
     document.getElementById('sp-modal-backdrop').addEventListener('click', (e) => { if(e.target.id==='sp-modal-backdrop'){ slot.innerHTML=''; render(); } });
     if (needsPosition) {
-      document.getElementById('sp-find-use-my-position').addEventListener('click', () => {
+      document.getElementById('sp-find-use-my-position').addEventListener('click', (e) => {
+        // Høy nøyaktighet beholdt (skal bli et faktisk registrert funnpunkt),
+        // kort maximumAge (30s) — nok til å gjenbruke et akkurat innhentet
+        // oppslag ved et evt. dobbeltklikk, men ikke stort nok til å risikere
+        // en utdatert posisjon om brukeren har gått videre siden sist.
         useMyLocation((lat, lon) => {
           pendingLat = lat; pendingLon = lon;
           document.getElementById('sp-find-position-display').textContent = lat.toFixed(5) + ', ' + lon.toFixed(5);
-        });
+        }, { maximumAge: 30000, buttonEl: e.currentTarget });
       });
     }
     document.getElementById('sp-find-save').addEventListener('click', async () => {
@@ -3121,11 +3159,13 @@
     el.querySelectorAll('[data-move-find]').forEach(btn => btn.addEventListener('click', () => {
       const find = userFinds.find(f => f.id === btn.dataset.moveFind);
       if (!find) return;
+      // Høy nøyaktighet + kort maximumAge — samme begrunnelse som
+      // sp-find-use-my-position over (faktisk funnpunkt, presisjon teller).
       useMyLocation(async (lat, lon) => {
         find.lat = lat; find.lon = lon;
         await saveFinds();
         render();
-      });
+      }, { maximumAge: 30000, buttonEl: btn });
     }));
     el.querySelectorAll('[data-edit-find]').forEach(btn => btn.addEventListener('click', () => {
       const find = userFinds.find(f => f.id === btn.dataset.editFind);
@@ -3256,13 +3296,22 @@
   // Samme forventning som ved oppstart-geolokasjon (se geolocateStartupView):
   // hvis du allerede står i Radius-modus, oppdaterer "min posisjon" nå også
   // selve radius-senteret, ikke bare kartvisningen.
-  document.getElementById('sp-my-location-btn').addEventListener('click', () => useMyLocation((lat, lon) => {
+  document.getElementById('sp-my-location-btn').addEventListener('click', (e) => useMyLocation((lat, lon) => {
     showMyLocationOnMap(lat, lon);
     if (filterMode === 'radius') {
       radiusCenter = { lat, lon };
       zoomToRadiusSelection();
       render();
     }
+  }, {
+    // Lav nøyaktighet: dette klikket brukes kun til områdevalg (fylke/
+    // kommune-nærhet, radius-senter på km-skala) — meter-presisjon gir
+    // ingen merverdi her, men enableHighAccuracy=true kan gjøre oppslaget
+    // merkbart tregere på en laptop uten GPS-brikke. maximumAge matcher
+    // geolocateStartupView() sitt 5-minutters vindu, så et klikk kort tid
+    // etter sideinnlasting kan gjenbruke samme oppslag momentant i stedet
+    // for å vente på et helt nytt.
+    enableHighAccuracy: false, maximumAge: 5 * 60 * 1000, buttonEl: e.currentTarget,
   }));
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && mapFullscreen) toggleMapFullscreen(); });
   document.getElementById('sp-mark-hogst').addEventListener('click', () => {
