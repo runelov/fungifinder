@@ -1,5 +1,44 @@
 # Endringslogg
 
+## 0.21.5 — Alle 357 kommune-bbokser hardkodet (samme mønster som fylke)
+Oppfølger til punkt 2 fra en eksplisitt vurdering av tre alternativer
+2026-08-12 (status quo / sentral D1-lagring / statisk tabell) — statisk
+tabell valgt for best gevinst/innsats-forhold uten ny serverinfrastruktur.
+
+- `KOMMUNE_BBOX` (357 oppføringer) lagt til rett etter `FYLKE_BBOX`,
+  generert av et engangs Python-script mot Nominatims strukturerte søk
+  (`city=`+`county=` for de to eneste navnekollisjonene i dagens
+  kommuneregister — Herøy og Våler, verifisert mot Kartverkets
+  Kommuneinfo-API). `fetchAreaBbox()` sjekker denne tabellen for
+  kommune-modus FØR Nominatim-fallbacken (som beholdes uendret for et navn
+  som ikke finnes her, f.eks. etter en fremtidig reform).
+- **Manuell etterkontroll av alle 357** avdekket og fikset ett reelt feil
+  resultat: "Kvam" (Vestland) hadde ikke noe `municipality`-treff under det
+  vanlige søket — OSM sitt offisielle navn er "Kvam herad", ikke "Kvam
+  kommune" — søket plukket i stedet en bygd med samme navn i Steinkjer,
+  Trøndelag. Fikset manuelt med et fritekst-søk for akkurat denne ene
+  kommunen. 7 Buskerud-kommuner manglet fylkesnavn i Nominatims
+  `display_name` (sannsynlig etterlevning av Viken-sammenslåingen/
+  -oppløsningen i OSM), men hadde hver ett sikkert `municipality`-treff med
+  plausibel kommune-størrelse — vurdert som en visningstekst-kvirk, ikke
+  rettet.
+- **Gevinst**: samme som fylke-fiksen i v0.21.2 — null nettverksavhengighet,
+  ingen Safari ITP-cache-tap, delt "for alltid" på tvers av alle
+  enheter/brukere uten noen ny D1-tabell/endepunkt/cron-jobb.
+- Verifisert i preview: `fetchAreaBbox('kommune', 'Bergen')` (representativ
+  for 355 av 357 — entydige navn) traff tabellen direkte, null
+  Nominatim-kall, riktig bbox bekreftet via en `L.Map.prototype.
+  fitBounds`-hook. De to tvetydige navnene (Herøy/Våler) er verifisert
+  KORREKTE I TABELLEN (kryssjekket mot live Nominatim-data), men selve
+  UI-disambigueringsveien (`resolveKommuneNavn()`, upåvirket av denne
+  endringen) kunne ikke bekreftes ende-til-ende i denne statiske
+  forhåndsvisningen uten en kjørende Worker-backend —
+  `loadKommuneRegister()` rakk ikke fullføre innen rimelig ventetid uten
+  ekte auth/API-kall foran den i oppstartskøen. Anbefaler en rask manuell
+  sjekk i en ekte, innlogget økt: velg "Kommune" → skriv "Våler" → velg
+  "Østfold" i innsnevrings-nedtrekket → bekreft at kartet zoomer til
+  Østfold (59.4°N, 10.9°Ø), ikke Innlandet (60.8°N, 12.0°Ø).
+
 ## 0.21.4 — "Min posisjon" oppleves raskere + tydelig ventestatus
 Bruker meldte ~8 sek snitt-ventetid på "min posisjon"-klikket, uten noe
 visuelt tegn på at noe skjedde i mellomtiden — så ut som kartet hadde
