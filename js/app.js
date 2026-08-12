@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.21.0';
+  const APP_VERSION = '0.21.1';
   const APP_BUILD_DATE = '2026-08-12';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -517,9 +517,23 @@
       const fylkerDekket = s.malepunkter.perFylke.filter(f => f.fylke !== 'ukjent').length;
       const kommunerDekket = s.malepunkter.perKommune.filter(k => k.kommune !== 'ukjent').length;
 
+      const totalFunn = s.brukere.reduce((sum, b) => sum + b.funn, 0);
+      const totalHogst = s.brukere.reduce((sum, b) => sum + b.hogstMerket + b.hogstOmrader, 0);
+      const totalEgneSteder = s.brukere.reduce((sum, b) => sum + b.egneSteder, 0);
+
+      // "Egne steder" = customLocations i den enkelte brukers bruker_data
+      // (opprettes når et registrert funn ikke traff noe kjent/allerede
+      // hentet målepunkt — se customLocations.push() i openFindModal-flyten).
+      // IKKE det samme som terreng_steder.custom (delt, auto-hentet
+      // datasett) — den kolonnen settes aldri til 1 av noen kodesti i dag
+      // (fetch_area.py sin enrich_point() hardkoder custom:false), så den
+      // vises bevisst ikke som en egen boks her lenger (var alltid 0,
+      // forvekslet med brukernes egne steder — se samtalen 2026-08-12).
       const statBoxes = [
         [s.malepunkter.totalt, `målepunkt${s.malepunkter.totalt===1?'':'er'} (${fylkerDekket} fylke${fylkerDekket===1?'':'r'}, ${kommunerDekket} kommune${kommunerDekket===1?'':'r'})`],
-        [s.malepunkter.custom, 'egendefinerte steder (brukerregistrert)'],
+        [totalFunn, 'brukerregistrerte funn'],
+        [totalHogst, 'brukerregistrerte hogstfelt (merking + tegnede områder)'],
+        [totalEgneSteder, 'egne steder (brukerregistrert, utenfor kjente målepunkter)'],
         [s.artsfunn.totalt, `Artsdatabanken-funn (${s.artsfunn.arter} art${s.artsfunn.arter===1?'':'er'})`],
         [s.dekning.kjoringer, `områdehentinger${s.dekning.sisteHenting ? ' — siste ' + formatKortDato(s.dekning.sisteHenting) : ''}`],
       ];
@@ -529,10 +543,6 @@
 
       const kommuneRader = s.malepunkter.perKommune.map(k =>
         `<div class="sp-mine-row"><span>${escapeHtml(k.kommune)} <span style="opacity:.6">— ${escapeHtml(k.fylke)}</span></span><span>${k.antall}</span></div>`).join('');
-
-      const totalFunn = s.brukere.reduce((sum, b) => sum + b.funn, 0);
-      const totalHogst = s.brukere.reduce((sum, b) => sum + b.hogstMerket + b.hogstOmrader, 0);
-      const totalEgneSteder = s.brukere.reduce((sum, b) => sum + b.egneSteder, 0);
 
       const brukerRader = s.brukere.map(b => `
         <div class="sp-mine-row" style="align-items:flex-start;">
@@ -555,7 +565,7 @@
           <div class="sp-mine-list" style="margin-top:6px;">${kommuneRader || '<div class="sp-empty-mine">Ingen målepunkter ennå.</div>'}</div>
         </details>
 
-        <h4 style="margin:14px 0 6px;">Brukerbidrag <span style="font-weight:400;opacity:.6;">— totalt ${totalFunn} funn, ${totalHogst} hogstfelt-merkinger, ${totalEgneSteder} egne steder</span></h4>
+        <h4 style="margin:14px 0 6px;">Brukerbidrag <span style="font-weight:400;opacity:.6;">— per bruker (se totaler i boksene over)</span></h4>
         <div class="sp-mine-list">${brukerRader}</div>
       `;
     } catch (err) {

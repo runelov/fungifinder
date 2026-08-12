@@ -1,5 +1,21 @@
 # Endringslogg
 
+## 0.21.1 — Statistikk-fanen: brukerbidrag øverst, fjernet misvisende boks
+To presiseringer etter tilbakemelding på 0.21.0 sin nye admin-fane:
+
+- Oppsummeringsboksene øverst manglet totalt antall brukerregistrerte funn
+  og hogstfelt — måtte scrolle ned til "Brukerbidrag"-listen og summere
+  selv. Lagt til som egne bokser øverst (brukerregistrerte funn,
+  brukerregistrerte hogstfelt).
+- "Egendefinerte steder"-boksen viste `terreng_steder.custom`-telling, som
+  er en ANNEN, alltid-null kolonne i det delte auto-hentede datasettet
+  (ingen kodesti setter den til 1 — `fetch_area.py` sin `enrich_point()`
+  hardkoder `custom: false`) — ikke det brukeren naturlig leser inn i
+  "egendefinert sted", nemlig `customLocations` i egen `bruker_data` (satt
+  når et registrert funn ikke traff noe kjent målepunkt). Forvirrende nok
+  til at admin (7 egne steder i Brukerbidrag) så "0" øverst. Boksen viser
+  nå riktig tall — summen av brukernes egne `customLocations` — i stedet.
+
 ## 0.21.0 — Ny "Statistikk"-fane i admin-panelet
 Nå som all data (terreng, artsfunn, dekning, personlig brukerdata) faktisk
 bor i D1, hadde admin ingen samlet innsikt i datamengden — måtte gjette seg
