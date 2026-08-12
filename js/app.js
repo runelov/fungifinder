@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.21.6';
+  const APP_VERSION = '0.21.7';
   const APP_BUILD_DATE = '2026-08-12';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -588,9 +588,27 @@
   // det fylke/kommune-filteret brukeren allerede har valgt, ikke et nytt,
   // eget filter-konsept. 'radius'-modus og "alle" sender ingen parametre
   // (helt datasett), siden radius-filtrering fortsatt skjer klient-side.
+  // RETTET 2026-08-12: for et TVETYDIG kommunenavn (Herøy, Våler — se
+  // resolveKommuneNavn()) sendte denne KUN `kommune`, aldri `fylke`, selv om
+  // brukeren hadde disambiguert via "snevre inn"-menyen. Serveren sin
+  // hentTerrengStederFraDb() støtter allerede BEGGE filtrene samtidig (AND) —
+  // v0.21.3 disambiguerte kun selve HENTING/zoom/estimat (se der), aldri
+  // denne, den faktiske datalastingen. Konsekvens: valgte man "Våler,
+  // Østfold" viste appen likevel EVENTUELLE Innlandet-Våler-steder også
+  // (WHERE kommune='Våler' uten fylke-vilkår) — feil DATA vist, ikke bare
+  // feil kart-zoom. Sender nå `fylke` i tillegg til `kommune` når navnet
+  // faktisk er tvetydig OG disambiguert via kommuneNarrowFylke — uendret for
+  // de resterende ~355 entydige kommunenavnene.
   function currentServerFilterParams(){
     if (filterMode === 'fylke' && fylkeFilter !== 'alle') return { fylke: fylkeFilter };
-    if (filterMode === 'kommune' && kommuneFilter !== 'alle') return { kommune: kommuneFilter };
+    if (filterMode === 'kommune' && kommuneFilter !== 'alle') {
+      const params = { kommune: kommuneFilter };
+      const treff = kommunerMedNavn(kommuneFilter);
+      if (treff.length > 1 && kommuneNarrowFylke !== 'alle' && treff.some(t => t.fylkesnavn === kommuneNarrowFylke)) {
+        params.fylke = kommuneNarrowFylke;
+      }
+      return params;
+    }
     return {};
   }
 

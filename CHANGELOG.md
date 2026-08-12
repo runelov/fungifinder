@@ -1,5 +1,30 @@
 # Endringslogg
 
+## 0.21.7 — Fiks: server-filteret blandet data fra tvetydige kommuner
+Oppfølger til v0.21.6, samme rotårsaksklasse: `currentServerFilterParams()`
+(som styrer selve `/terrengdata`-kallet, se `loadLocations()`) sendte KUN
+`kommune`, aldri `fylke` — selv når brukeren hadde disambiguert "Våler,
+Østfold" via "snevre inn"-menyen. v0.21.3 disambiguerte kun
+henting/zoom/estimat (se der), aldri selve datalastingen. Konsekvens: valgte
+man Østfold-Våler, ville appen likevel vise EVENTUELLE Innlandet-Våler-steder
+også, siden serveren filtrerte `WHERE kommune='Våler'` uten noe fylke-vilkår
+— feil DATA vist, ikke bare feil kart-zoom.
+
+- Ingen Worker-endring nødvendig: `hentTerrengStederFraDb()`
+  (`worker/api/src/lib/terrengDb.js`) støttet allerede `fylke`+`kommune`
+  samtidig (AND) — kommentaren der sa det rett ut: "i praksis sender app.js
+  kun det ene, aldri begge". Ren klient-fiks.
+- `currentServerFilterParams()` sender nå `fylke` i tillegg til `kommune`
+  når kommunenavnet faktisk er tvetydig (finnes i `kommuneRegister` under
+  flere fylker) OG disambiguert via `kommuneNarrowFylke` — uendret for de
+  ~355 entydige kommunenavnene.
+- Verifisert: siden `loadLocations()` avslutter tidlig uten innlogget
+  bruker (umulig å teste ende-til-ende i en backend-løs preview), er
+  `currentServerFilterParams()`-logikken testet isolert i Node mot 6
+  representative tilfeller (begge disambiguerte fylker, uløst
+  tvetydighet, entydig kommune, tomt/ikke-lastet register, uendret
+  fylke-modus) — alle 6 korrekte.
+
 ## 0.21.6 — Fiks: fylkevalg for tvetydig kommune zoomet ikke; raskere kommuneliste
 To presiseringer fra bruker etter v0.21.4/0.21.5:
 
