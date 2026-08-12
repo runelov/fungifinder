@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.21.2';
+  const APP_VERSION = '0.21.3';
   const APP_BUILD_DATE = '2026-08-12';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -821,7 +821,10 @@
 
   async function estimateAreaKm2(){
     if (filterMode === 'radius') return Math.PI * radiusKm * radiusKm;
-    const name = filterMode === 'fylke' ? fylkeFilter : kommuneFilter;
+    // Best-effort disambiguering (se resolveKommuneNavn) — faller tilbake
+    // til det rå, ev. tvetydige navnet hvis uløst, siden dette bare er et
+    // areal-ESTIMAT, ikke noe som trigger en faktisk kostbar jobb.
+    const name = filterMode === 'fylke' ? fylkeFilter : (resolveKommuneNavn(kommuneFilter) || kommuneFilter);
     const bb = await fetchAreaBbox(filterMode, name);
     if (!bb) return null;
     const latKm = (bb[1] - bb[0]) * 111.32;
@@ -834,7 +837,10 @@
   // allerede sitt eget senter/zoom-flow (klikk i kartet), så den rører vi ikke.
   async function zoomToAreaSelection(){
     if (!leafletMap || filterMode === 'radius') return;
-    const name = filterMode === 'fylke' ? fylkeFilter : kommuneFilter;
+    // Best-effort disambiguering, samme begrunnelse som estimateAreaKm2() —
+    // rent kosmetisk kart-zoom, ikke en jobb-trigger, så et uløst tvetydig
+    // navn faller trygt tilbake til det rå navnet i stedet for å blokkere.
+    const name = filterMode === 'fylke' ? fylkeFilter : (resolveKommuneNavn(kommuneFilter) || kommuneFilter);
     if (!name || name === 'alle') return;
     const bb = await fetchAreaBbox(filterMode, name);
     if (!bb) return;
@@ -981,7 +987,26 @@
 
     const inputs = { gridKm: String(gridKm) };
     if (filterMode === 'fylke') { inputs.mode = 'fylke'; inputs.value = fylkeFilter; }
-    else if (filterMode === 'kommune') { inputs.mode = 'kommune'; inputs.value = kommuneFilter; }
+    else if (filterMode === 'kommune') {
+      // RETTET 2026-08-12: sendte tidligere kun det rå kommunenavnet, ALDRI
+      // disambiguert med fylke — feilet derfor 100% av tiden for de fåtallige
+      // tvetydige kommunenavnene (Våler, Bø, Os, …), UANSETT om brukeren
+      // hadde valgt fylke i "snevre inn"-menyen, siden det valget aldri ble
+      // lest her. Se resolveKommuneNavn() for selve oppslaget. Denne jobben
+      // er kostbar (ekte GitHub Actions-kjøring) — blokkerer heller HER med
+      // en tydelig beskjed enn å la den feile eksternt etter at brukeren
+      // trodde den var i gang.
+      const disambiguert = resolveKommuneNavn(kommuneFilter);
+      if (disambiguert === null) {
+        const fylker = kommunerMedNavn(kommuneFilter).map(k => k.fylkesnavn).join(' og ');
+        progress.textContent = `⚠ "${kommuneFilter}" finnes i flere fylker (${fylker}) — velg riktig fylke i "Snevre inn til ett fylke"-menyen ved siden av kommunefeltet først, så prøv igjen.`;
+        fetchInProgress = false;
+        document.getElementById('sp-fetch-start').disabled = false;
+        document.getElementById('sp-fetch-start').textContent = 'Hent data';
+        return;
+      }
+      inputs.mode = 'kommune'; inputs.value = disambiguert;
+    }
     else if (filterMode === 'radius') {
       inputs.mode = 'radius'; inputs.lat = String(radiusCenter.lat); inputs.lon = String(radiusCenter.lon); inputs.radiusKm = String(radiusKm);
     } else return;
@@ -1637,14 +1662,33 @@
   // noe som gjorde det umulig å velge et område i utgangspunktet.
   const FYLKER_STATISK = ['Østfold','Akershus','Oslo','Innlandet','Buskerud','Vestfold','Telemark','Agder','Rogaland','Vestland','Møre og Romsdal','Trøndelag','Nordland','Troms','Finnmark'];
 
+  // Fylkesnummer (de to første sifrene i et 4-sifret kommunenummer) →
+  // fylkesnavn, 2024-strukturen — samme tabell (motsatt vei) som
+  // FYLKE_TO_COUNTY_ID i fungifinder-db sin fetch_area.py. Brukt av
+  // loadKommuneRegister() under, se RETTET-kommentaren der for hvorfor.
+  const FYLKESNUMMER_TIL_NAVN = {
+    '03': 'Oslo', '11': 'Rogaland', '15': 'Møre og Romsdal', '18': 'Nordland',
+    '31': 'Østfold', '32': 'Akershus', '33': 'Buskerud', '34': 'Innlandet',
+    '39': 'Vestfold', '40': 'Telemark', '42': 'Agder', '46': 'Vestland',
+    '50': 'Trøndelag', '55': 'Troms', '56': 'Finnmark',
+  };
+
   // Henter hele fylke/kommune-registeret fra Kartverkets offisielle Kommuneinfo-API.
   // Brukes i stedet for en hardkodet kommuneliste — Kartverket er alltid oppdatert
   // ved reformer (f.eks. planlagt endring i 2028), og jeg kan ikke garantere at
   // en liste over alle 357 kommuner fra hukommelsen ville vært 100% korrekt.
-  // VERIFISER: nøyaktig endepunkt/feltnavn er satt opp basert på dokumentasjon,
-  // ikke testet med faktisk nettverkstilgang i miljøet dette ble bygget i.
-  // Feiler kallet, faller appen tilbake til kun å vise "Alle fylker" som filter
-  // og bygge kommunelisten fra allerede lastet stedsdata (som før).
+  //
+  // RETTET 2026-08-12 (bruker meldte at "snevre inn til fylke"-velgeren ikke
+  // faktisk filtrerte noe, og at tvetydige kommunenavn som "Våler" ikke lot
+  // seg disambiguere): den opprinnelige "VERIFISER"-antagelsen under viste
+  // seg å være feil idet den faktisk ble testet mot ekte nettverkstilgang —
+  // API-svaret har INGEN fylkesnavn/fylke-felt i det hele tatt (kun
+  // kommunenavn/kommunenavnNorsk/kommunenummer), så `fylkesnavn` ble ALLTID
+  // null, og enhver `k.fylkesnavn === X`-sammenligning (kommunerIFylke(),
+  // og nå resolveKommuneNavn()) var derfor alltid usann. Kommunenummerets to
+  // FØRSTE sifre ER offisielt fylkesnummeret (f.eks. "3419" → 34 →
+  // Innlandet) — utleder fylkesnavnet derfra i stedet for å stole på et felt
+  // som ikke finnes.
   async function loadKommuneRegister(){
     const CACHE_KEY = 'fungifinder-kommuneregister';
     const CACHE_MAX_AGE_DAYS = 30;
@@ -1667,7 +1711,8 @@
       const list = Array.isArray(json) ? json : (json.kommuner || []);
       kommuneRegister = list.map(k => ({
         kommunenavn: k.kommunenavnNorsk || k.kommunenavn || k.navn,
-        fylkesnavn: k.fylkesnavn || (k.fylke && k.fylke.fylkesnavn) || null
+        fylkesnavn: k.fylkesnavn || (k.fylke && k.fylke.fylkesnavn)
+          || FYLKESNUMMER_TIL_NAVN[String(k.kommunenummer || '').slice(0, 2)] || null
       })).filter(k => k.kommunenavn);
       if (kommuneRegister.length) {
         localStorage.setItem(CACHE_KEY, JSON.stringify({ fetchedAt: Date.now(), data: kommuneRegister }));
@@ -1697,6 +1742,41 @@
   function fylkeList(){
     const set = new Set([...FYLKER_STATISK, ...allLocations().map(l=>l.fylke).filter(Boolean)]);
     return Array.from(set).sort((a,b)=>a.localeCompare(b,'no'));
+  }
+
+  // RETTET 2026-08-12 (bruker meldte: "Tvetydig via Nominatim (mode=kommune)"
+  // ved trigging av en ny områdehenting for "Våler", OG "jeg ser ikke
+  // forskjell på kommuner av samme navn i kommunevelgeren"): kommunenavn er
+  // IKKE unike nasjonalt — "Våler" finnes i både Østfold og Innlandet, "Bø" i
+  // Nordland og Telemark, "Os" i Innlandet og Vestland, osv. (samme liste
+  // fetch_area.py sin resolve_area() advarer om server-side, se
+  // fungifinder-db sin CHANGELOG v23). "Snevre inn til ett fylke"-velgeren
+  // (kommuneNarrowFylke) fantes allerede i UI-et og filtrerte forslagslisten
+  // riktig, MEN ble aldri faktisk brukt til å disambiguere — verken i
+  // Nominatim-kallet (zoomToAreaSelection/estimateAreaKm2) eller i verdien
+  // sendt til /omrader/hent (startFetch), som begge sendte det rå,
+  // potensielt tvetydige kommunenavnet direkte. Dette var ROTÅRSAKEN til
+  // feilen, ikke bare et visningsproblem.
+  //
+  // kommunerMedNavn(): alle kommuneRegister-oppføringer med akkurat dette
+  // navnet (0, 1, eller — for de fåtallige tvetydige navnene — 2).
+  function kommunerMedNavn(navn){
+    return kommuneRegister.filter(k => k.kommunenavn === navn);
+  }
+
+  // Returnerer "<navn>, <fylke>" hvis vi faktisk KAN avgjøre hvilket fylke
+  // (navnet er unikt, ELLER brukeren har snevret inn via
+  // kommuneNarrowFylke) — ellers null hvis navnet er tvetydig og uløst.
+  // Brukes for ALT som går til et eksternt oppslag (Nominatim ELLER
+  // fetch_area.py sin --value), ikke bare visning.
+  function resolveKommuneNavn(navn){
+    if (!navn) return navn;
+    const treff = kommunerMedNavn(navn);
+    if (treff.length <= 1) return navn; // unikt (eller ukjent i registeret, f.eks. før loadKommuneRegister() er ferdig — send uendret, samme oppførsel som før denne rettelsen)
+    if (kommuneNarrowFylke !== 'alle' && treff.some(t => t.fylkesnavn === kommuneNarrowFylke)) {
+      return `${navn}, ${kommuneNarrowFylke}`;
+    }
+    return null;
   }
   function kommuneList(){
     const set = new Set(allLocations().map(l=>l.kommune).filter(Boolean));
@@ -2406,6 +2486,24 @@
     }
     const kommuner = kommuneNarrowFylke === 'alle' ? alleKommunerAlfabetisk() : kommunerIFylke(kommuneNarrowFylke);
     document.getElementById('sp-kommune-datalist').innerHTML = kommuner.map(k => `<option value="${escapeHtml(k)}">`).join('');
+    updateKommuneAmbiguousHint();
+  }
+
+  // Synlig varsel når det VALGTE kommunenavnet finnes i flere fylker og
+  // ikke er disambiguert ennå (se resolveKommuneNavn()) — løser at brukeren
+  // "ikke ser forskjell på kommuner av samme navn": <datalist> kan ikke vise
+  // to identiske forslag ulikt (nettleseren viser kun ett av dem uansett,
+  // siden begge har value="Våler"), så dette varselet + "Snevre inn til ett
+  // fylke"-menyen er den faktiske løsningen, ikke forslagslisten selv.
+  function updateKommuneAmbiguousHint(){
+    const hint = document.getElementById('sp-kommune-ambiguous-hint');
+    if (!hint) return;
+    if (filterMode !== 'kommune' || !kommuneFilter || kommuneFilter === 'alle') { hint.style.display = 'none'; return; }
+    const treff = kommunerMedNavn(kommuneFilter);
+    if (treff.length <= 1 || resolveKommuneNavn(kommuneFilter) !== null) { hint.style.display = 'none'; return; }
+    const fylker = treff.map(t => t.fylkesnavn).join(' og ');
+    hint.textContent = `⚠ "${kommuneFilter}" finnes i flere fylker (${fylker}) — velg riktig fylke i menyen til venstre for å vise/analysere riktig kommune.`;
+    hint.style.display = '';
   }
 
   function gaugeSvg(score){

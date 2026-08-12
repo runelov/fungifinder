@@ -1,5 +1,34 @@
 # Endringslogg
 
+## 0.21.3 — Fiks: tvetydige kommunenavn feilet alltid ved områdehenting
+Bruker meldte "Tvetydig via Nominatim (mode=kommune)" ved forsøk på å hente
+terrengdata for "Våler i Østfold" — selv med både fylke OG kommune valgt i
+UI-et — og at "snevre inn til fylke"-velgeren ikke synlig hjalp med å skille
+kommuner med samme navn (Våler finnes i både Østfold og Innlandet).
+
+- **To rotårsaker, begge fikset**:
+  1. `startFetch()` sendte alltid det RÅ kommunenavnet til
+     `/omrader/hent` — ALDRI disambiguert med fylke, uansett hva brukeren
+     hadde valgt i "snevre inn til fylke"-menyen. Den menyen filtrerte kun
+     forslagslisten lokalt, ble aldri lest ved selve trigging. Samme
+     problem rammet kart-zoom (`zoomToAreaSelection`) og areal-estimatet.
+  2. Enda dypere: `loadKommuneRegister()` sitt Kartverk-oppslag antok et
+     `fylkesnavn`-felt i API-svaret som **ikke finnes** (kun kommunenavn +
+     kommunenummer) — `fylkesnavn` var derfor alltid `null`, og selv om (1)
+     hadde vært fikset, ville "snevre inn til fylke" likevel aldri faktisk
+     truffet noe. Utleder nå fylket fra kommunenummerets to første sifre
+     (offisielt fylkesnummer, f.eks. "3419" → 34 → Innlandet — samme tabell
+     som `FYLKE_TO_COUNTY_ID` i fetch_area.py, bare motsatt vei).
+- Ny `resolveKommuneNavn()` er nå eneste kilde til disambiguering, brukt av
+  alle tre stedene (henting/zoom/estimat) — sender `"Våler, Østfold"` når
+  vi faktisk vet hvilken, ellers blokkerer `startFetch()` HER (før en ekte,
+  kostbar GitHub Actions-jobb trigges) med en tydelig beskjed om å velge
+  fylke, i stedet for å la den feile eksternt.
+- Nytt synlig varsel (`#sp-kommune-ambiguous-hint`) rett under
+  kommune-feltet når det valgte navnet er tvetydig og uløst — løser at
+  brukeren "ikke ser forskjell" (en `<datalist>` kan uansett ikke vise to
+  identiske forslag ulikt).
+
 ## 0.21.2 — Fiks: kart-zoom til fylke/kommune var ustabilt/tregt
 Bruker meldte at kartet ikke pålitelig zoomet til valgt fylke/kommune etter
 "min posisjon" — "virker som regel ikke, av og til virker det", og tar

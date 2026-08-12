@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.21.2"/>
+<link rel="stylesheet" href="css/styles.css?v=0.21.3"/>
 </head>
 <body>
 
@@ -203,6 +203,7 @@
                 <datalist id="sp-kommune-datalist"></datalist>
                 <button class="sp-mini-btn" id="sp-kommune-clear">Vis alle</button>
               </div>
+              <div id="sp-kommune-ambiguous-hint" style="display:none;width:100%;font-size:11.5px;color:var(--russet-deep);margin-top:2px;"></div>
               <div class="sp-radius-controls" id="sp-radius-controls" style="display:none;">
                 <span id="sp-radius-label">20 km</span>
                 <input type="range" id="sp-radius-slider" min="2" max="60" value="20" step="1"/>
@@ -294,7 +295,7 @@
      worker/api/README.md). Testnøkkelen (1x00000000000000000000AA) hører
      kun hjemme i worker/api/.dev.vars for lokal utvikling, aldri her. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<script src="js/api-client.js?v=0.21.2"></script>
-<script src="js/app.js?v=0.21.2"></script>
+<script src="js/api-client.js?v=0.21.3"></script>
+<script src="js/app.js?v=0.21.3"></script>
 </body>
 </html>
