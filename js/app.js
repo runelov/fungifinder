@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.21.5';
+  const APP_VERSION = '0.21.6';
   const APP_BUILD_DATE = '2026-08-12';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -3667,9 +3667,29 @@
   document.getElementById('sp-kommune-filter-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') e.target.blur(); // trigger 'change'
   });
-  document.getElementById('sp-kommune-narrow-fylke').addEventListener('change', (e) => {
+  // RETTET 2026-08-12 (bruker meldte: velger man kommunenavn FØR fylke i
+  // innsnevringen, "skjer det tilsynelatende ikke noe" når fylket velges;
+  // velger man fylke FØRST og kommunenavn ETTERPÅ, "virker det som det
+  // zoomes inn"). Rotårsak: denne handleren satte kun kommuneNarrowFylke og
+  // re-renderte FILTER-KONTROLLENE — den trigget aldri et nytt kart-zoom
+  // eller en ny data-henting. Rekkefølgen "fylke først" fungerte fordi
+  // resolveKommuneNavn() da allerede fant riktig fylke i det kommune-feltets
+  // EGEN change-handler (linje over) commitet navnet. Rekkefølgen "kommune
+  // først" zoomet (feil/tvetydig) idet feltet mistet fokus, og selve
+  // fylkevalget etterpå gjorde ingenting for å rette opp i det — helt stille,
+  // ingen feilmelding, kun det usynlige varselet som forsvant. Kjører nå
+  // samme zoom+data-oppfriskning som kommune-feltets commit, men KUN når et
+  // kommunenavn faktisk allerede er valgt (ellers er det ingenting å zoome
+  // til ennå).
+  document.getElementById('sp-kommune-narrow-fylke').addEventListener('change', async (e) => {
     kommuneNarrowFylke = e.target.value;
     renderFilterControls();
+    if (filterMode === 'kommune' && kommuneFilter !== 'alle') {
+      clearRoute();
+      zoomToAreaSelection();
+      await loadLocations();
+      render();
+    }
   });
   document.getElementById('sp-kommune-clear').addEventListener('click', async () => {
     kommuneFilter = 'alle';
@@ -3752,6 +3772,17 @@
     wireAdminPanel();
     wireFetchPanel();
     initMap();
+    // RETTET 2026-08-12 (bruker meldte lang ventetid før kommune-fanen var
+    // brukbar første gang): loadKommuneRegister() sto tidligere HELT SIST i
+    // denne kjeden — etter innlogging OG all terrengdata — selv om den
+    // henter fra en helt uavhengig, offentlig kilde (Kartverkets
+    // Kommuneinfo-API) uten noen reell avhengighet til auth/personlig data.
+    // Startes nå parallelt med det aller første kallet i stedet, slik at
+    // ventetiden for kommunelisten blir MAX(dette kallet, resten av
+    // oppstarten) i stedet for SUMMEN av alt som kom foran den. Fortsatt
+    // ikke-blokkerende (ingen await her) — renderFilterControls() i .then()
+    // oppdaterer UI når den er klar, uansett når det skjer.
+    loadKommuneRegister().then(() => renderFilterControls());
     // geolocateStartupView() er uavhengig av initAuth() (ingen delt
     // tilstand) — kjøres parallelt av samme grunn som Promise.all-blokken
     // under, men MÅ være ferdig (eller ha gitt opp) FØR den, siden
@@ -3765,7 +3796,6 @@
     // (så en Promise.all her avviser aldri). Kjørt parallelt kutter
     // ventetiden fra summen av alle fire til den TREGESTE av dem.
     await Promise.all([loadLocations(), loadFetchedAreas(), loadArtsfunn(), loadStorage()]);
-    loadKommuneRegister().then(() => renderFilterControls()); // ikke-blokkerende, oppdaterer UI når klar
     render();
     loadWeather();
     loadSeasonWeather();

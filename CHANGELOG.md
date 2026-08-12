@@ -1,5 +1,46 @@
 # Endringslogg
 
+## 0.21.6 — Fiks: fylkevalg for tvetydig kommune zoomet ikke; raskere kommuneliste
+To presiseringer fra bruker etter v0.21.4/0.21.5:
+
+1. **"Velger jeg Våler, og deretter Østfold, skjer det tilsynelatende ikke
+   noe. Velger jeg Våler i Innlandet, virker det som det zoomes inn."**
+   Rotårsak: "snevre inn til fylke"-nedtrekket (`sp-kommune-narrow-fylke`)
+   satte kun `kommuneNarrowFylke` og re-renderte filter-KONTROLLENE — det
+   trigget aldri et nytt kart-zoom eller en ny data-henting. Rekkefølgen
+   "fylke først, kommune etterpå" fungerte fordi kommune-feltets EGEN
+   commit da allerede leste riktig fylke. Rekkefølgen "kommune først"
+   zoomet (feil/tvetydig, samme som beskrevet i v0.21.3) idet feltet mistet
+   fokus, og selve fylkevalget etterpå gjorde ingenting for å rette det opp
+   — helt stille, kun det usynlige ⚠-varselet som forsvant uten noen synlig
+   effekt av at det forsvant. Fikset: fylke-nedtrekkets `change`-handler
+   kjører nå samme zoom+data-oppfriskning som kommune-feltets commit, men
+   kun når et kommunenavn faktisk allerede er valgt.
+   - Verifisert i preview (begge rekkefølger, `L.Map.prototype.fitBounds`-
+     hook): "kommune først" ga tidligere 0 nye `fitBounds()`-kall ved
+     fylkevalg — gir nå 1, med korrekt Østfold-bbox. "fylke først" var og
+     er fortsatt korrekt (Innlandet-bbox), ingen regresjon.
+2. **"Lang ventetid før jeg kan velge kommune første gang."**
+   `loadKommuneRegister()` (Kartverkets Kommuneinfo-API, 357 kommuner) sto
+   HELT SIST i oppstartskjeden — etter innlogging, geolokasjon OG all
+   terrengdata — selv om den er en helt uavhengig, offentlig kilde uten
+   noen reell avhengighet til resten. Startes nå parallelt med aller første
+   kall i stedet, så ventetiden blir MAX(dette kallet, resten av
+   oppstarten) i stedet for SUMMEN. Målt i preview: fra "ikke ferdig etter
+   19+ sekunder" til "ferdig på 3 sekunder" i samme (backend-løse)
+   testmiljø.
+
+**Kjent, beslektet, IKKE fikset i denne runden**: selve server-filteret
+(`hentTerrengStederFraDb()` i `worker/api/src/lib/terrengDb.js`) filtrerer
+kun på `WHERE kommune = ?` uten fylke — hvis terrengdata noensinne hentes
+for BEGGE Våler- eller Herøy-kommunene, ville et kommune-valg (uansett
+hvilket fylke som velges) vise en SAMMENBLANDET datamengde fra begge, siden
+selve datalastingen (ikke bare zoom/estimat/henting, som ble fikset i
+v0.21.3) aldri ble disambiguert med fylke. Mer alvorlig enn zoom-buggen
+(feil DATA vist, ikke bare feil kartutsnitt), men mer invasivt å fikse
+(krever endring i Worker API + en deploy) — tatt opp separat med bruker,
+ikke besluttet ennå om/når dette skal rettes.
+
 ## 0.21.5 — Alle 357 kommune-bbokser hardkodet (samme mønster som fylke)
 Oppfølger til punkt 2 fra en eksplisitt vurdering av tre alternativer
 2026-08-12 (status quo / sentral D1-lagring / statisk tabell) — statisk
