@@ -1,5 +1,29 @@
 # Endringslogg
 
+## 0.21.2 — Fiks: kart-zoom til fylke/kommune var ustabilt/tregt
+Bruker meldte at kartet ikke pålitelig zoomet til valgt fylke/kommune etter
+"min posisjon" — "virker som regel ikke, av og til virker det", og tar
+"ekstremt lang tid" de gangene det virker.
+
+- **Rotårsak funnet**: `fetchAreaBbox()` brukte et FRITEKST Nominatim-søk
+  (`q=<navn> fylke, Norge`, `limit=1`) og stolte blindt på mest "importante"
+  treff — nøyaktig samme bug som allerede ble funnet og fikset SERVER-side i
+  `fetch_area.py` sin `resolve_area()` (fungifinder-db, 2026-08-11), men
+  aldri portert til denne klient-side kopien. Konkret verifisert: "Innlandet
+  fylke, Norge" matchet IKKE selve fylket — Nominatim ga en ubetydelig
+  øy/bydel/grend med samme navn, og kartet zoomet til et par hundre meter
+  tomt hav i stedet. Ingen timeout på kallet heller, så en treg/hengende
+  Nominatim-respons forklarer trolig "ekstremt lang tid".
+- **Fiks**: 15 faste, verifiserte bounding boxes for alle fylker (Nominatim
+  structured `county=`-søk) hardkodet direkte i appen — ingen
+  nettverksavhengighet for fylke-modus i det hele tatt lenger (den klart
+  vanligste banen: brukeren har typisk allerede sett sin egen posisjon og
+  velger fylket de står i). Kommune-modus (357 kommuner, kan ikke
+  hardkodes) går fortsatt via Nominatim, men nå med samme strukturerte søk
+  (`city=`) for å unngå navnekollisjonsklassen av feil, pluss en 8s timeout
+  og en `localStorage`-cache på tvers av økter (samme mønster som
+  `loadKommuneRegister()`) — ett Nominatim-kall per kommunenavn, for godt.
+
 ## 0.21.1 — Statistikk-fanen: brukerbidrag øverst, fjernet misvisende boks
 To presiseringer etter tilbakemelding på 0.21.0 sin nye admin-fane:
 

@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.21.1';
+  const APP_VERSION = '0.21.2';
   const APP_BUILD_DATE = '2026-08-12';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -720,22 +720,97 @@
     }
   }
 
-  // Henter (og cacher) bounding box for et fylke/kommune-navn via Nominatim.
-  // Delt av areal-estimatet (Hent-data-panelet) og kart-zoom ved valg, slik
-  // at vi ikke gjør to separate Nominatim-kall for samme navn.
+  // RETTET 2026-08-12 (bruker meldte at kart-zoom til fylke/kommune etter
+  // "min posisjon" var "ekstremt ustabilt — virker som regel ikke, av og
+  // til virker det, og tar ekstremt lang tid de gangene det virker"):
+  //
+  // Faste bounding boxes for alle 15 fylker (Nominatim, structured
+  // county=-søk, verifisert 2026-08-12 — se boks-verdiene under). ELIMINERER
+  // Nominatim-avhengigheten helt for fylke-modus (den klart vanligste
+  // banen: brukeren har typisk allerede sett sin egen posisjon og velger
+  // fylket de står i) — ingen nettverkskall, ingen forsinkelse, ingen
+  // feilmulighet.
+  //
+  // Rotårsaken til at det "som regel ikke virket": den gamle koden brukte
+  // et FRITEKST-søk (`q=<navn> fylke, Norge`) med limit=1, og stolte blindt
+  // på Nominatims mest "importante" treff — nøyaktig samme bug som allerede
+  // ble funnet og fikset SERVER-side i fungifinder-db sin fetch_area.py
+  // (se resolve_area() der, rettet 2026-08-11), men aldri portert til denne
+  // klient-side kopien. Konkret verifisert: "Innlandet fylke, Norge" (et av
+  // Norges største/mest kjente fylker) matchet IKKE fylket i det hele tatt
+  // — Nominatim ga en ubetydelig øy/bydel/grend med samme navn i stedet,
+  // og fitBounds() zoomet til et par hundre meter tomt hav. Et strukturert
+  // søk (county=<navn>&country=Norway) unngår denne navnekollisjonen helt.
+  const FYLKE_BBOX = {
+    'Østfold':          [58.7609620, 59.7702660, 10.5366786, 11.8297963],
+    'Akershus':         [59.4573270, 60.6051478, 10.1942727, 11.9460044],
+    'Oslo':             [59.8093113, 60.1351064, 10.4891652, 10.9513894],
+    'Innlandet':        [59.8407846, 62.6969279,  7.3425305, 12.8708486],
+    'Buskerud':         [59.4078710, 61.0917205,  7.4388424, 10.6015377],
+    'Vestfold':         [58.7204550, 59.6740110,  9.7553357, 10.6750198],
+    'Telemark':         [58.6033109, 60.1882718,  7.0962875,  9.9697646],
+    'Agder':            [57.7590052, 59.6726869,  6.1496994,  9.6688766],
+    'Rogaland':         [58.0278534, 59.8445742,  4.4542745,  7.2146667],
+    'Vestland':         [59.4754202, 62.3823948,  4.0875274,  8.3220530],
+    'Møre og Romsdal':  [61.9233438, 63.7681691,  4.8166029,  9.3648315],
+    'Trøndelag':        [62.2557267, 65.4701752,  7.6480964, 14.3259858],
+    'Nordland':         [64.9394973, 69.5967006, 10.5780605, 18.1513549],
+    'Troms':            [68.3560138, 70.7036163, 15.5925416, 22.8944659],
+    'Finnmark':         [68.5545918, 71.3848787, 20.4797325, 31.7615929],
+  };
+
+  // Kommune-navn kan ikke hardkodes på samme måte (357 kommuner, og enkelte
+  // navn finnes i flere fylker, se fetch_area.py sin resolve_area()) — går
+  // fortsatt via Nominatim, men nå med SAMME strukturerte søk (city=) som
+  // fjerner navnekollisjonsklassen av feil, PLUSS en 8s timeout (den gamle
+  // koden hadde ingen — en treg/hengende Nominatim-respons er trolig
+  // forklaringen på "ekstremt lang tid de gangene det virker") og en
+  // localStorage-cache på tvers av økter (samme mønster som
+  // loadKommuneRegister() — ett treff per kommunenavn er nok for alltid,
+  // kommunegrenser endres ikke ofte).
+  const KOMMUNE_BBOX_CACHE_KEY = 'fungifinder-kommune-bbox-cache';
+  function lastKommuneBboxCache(){
+    try { return JSON.parse(localStorage.getItem(KOMMUNE_BBOX_CACHE_KEY) || '{}'); } catch(e) { return {}; }
+  }
+  function lagreKommuneBboxCache(cache){
+    try { localStorage.setItem(KOMMUNE_BBOX_CACHE_KEY, JSON.stringify(cache)); } catch(e) { /* full/blokkert lagring — ignorer, gjelder bare cache */ }
+  }
+
   async function fetchAreaBbox(mode, name){
     if (!name || name === 'alle') return null;
+    if (mode === 'fylke' && FYLKE_BBOX[name]) return FYLKE_BBOX[name];
+
     const key = mode + ':' + name;
     if (bboxAreaCache[key] !== undefined) return bboxAreaCache[key].bbox;
+    const persistCache = mode === 'kommune' ? lastKommuneBboxCache() : null;
+    if (persistCache && persistCache[name] !== undefined) {
+      bboxAreaCache[key] = { bbox: persistCache[name] };
+      return persistCache[name];
+    }
+
     try {
-      const q = mode === 'fylke' ? `${name} fylke, Norge` : `${name}, Norge`;
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=jsonv2&limit=1`, {
-        headers: { 'Accept-Language': 'no' }
-      });
+      const params = mode === 'fylke'
+        ? `county=${encodeURIComponent(name)}&country=Norway`
+        : `city=${encodeURIComponent(name)}&country=Norway`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      let res;
+      try {
+        res = await fetch(`https://nominatim.openstreetmap.org/search?${params}&format=jsonv2&limit=1`, {
+          headers: { 'Accept-Language': 'no' }, signal: controller.signal
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
       const json = await res.json();
       if (!json.length) { bboxAreaCache[key] = { bbox: null }; return null; }
       const bb = json[0].boundingbox.map(parseFloat); // [south, north, west, east]
       bboxAreaCache[key] = { bbox: bb };
+      if (mode === 'kommune') {
+        const cache = lastKommuneBboxCache();
+        cache[name] = bb;
+        lagreKommuneBboxCache(cache);
+      }
       return bb;
     } catch (e) {
       console.warn('Kunne ikke hente bbox via Nominatim', e);
