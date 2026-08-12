@@ -10,6 +10,7 @@ import { hentDekning, startOmradeHenting, omradeStatus, berikPunkt, punktStatus 
 import {
   listBrukere, oppdaterBrukerStatus, slettBrukerPermanent,
   listInvitasjoner, opprettInvitasjon, slettInvitasjon,
+  hentStatistikk,
 } from './routes/admin.js';
 import { sjekkInvitasjon, registrerMedInvitasjon } from './routes/invitasjoner.js';
 import { importTerrengdata, eksporterTerrengdata } from './routes/etlImport.js';
@@ -36,6 +37,7 @@ router.delete('/admin/brukere/:id', slettBrukerPermanent);
 router.get('/admin/invitasjoner', listInvitasjoner);
 router.post('/admin/invitasjoner', opprettInvitasjon);
 router.delete('/admin/invitasjoner/:id', slettInvitasjon);
+router.get('/admin/statistikk', hentStatistikk);
 router.get('/invitasjon/:token', sjekkInvitasjon);
 router.post('/invitasjon/:token', registrerMedInvitasjon);
 // Maskin-til-maskin (GitHub Actions -> D1), IKKE brukersesjon — se

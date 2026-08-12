@@ -141,3 +141,70 @@ export async function slettInvitasjon({ request, env, params }) {
   await env.DB.prepare('DELETE FROM invitasjoner WHERE id = ?').bind(params.id).run();
   return new Response(null, { status: 204, headers: cors });
 }
+
+// Oversikt over datamengden i D1, nå som ALT (terrengdata siden
+// D1-MIGRASJON.md fase 4, personlige data siden migrations/0001) faktisk
+// bor der — admin hadde ingen samlet innsikt i verken dekning
+// (hvilke fylker/kommuner har målepunkter) eller hvor mye brukerne selv
+// bidrar med (funn/hogstfelt-merking) før dette endepunktet. bruker_data
+// er én JSON-blob per bruker (se routes/data.js), så telling av
+// funn/cuts/hogstOmrader/customLocations/favoriteSpecies må skje i JS
+// etter henting — det finnes ingen SQL-kolonne å GROUP BY her.
+export async function hentStatistikk({ request, env }) {
+  const cors = corsHeaders(env);
+  const admin = await requireAdmin(request, env);
+  if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
+
+  const [totalRad, fylkeRader, kommuneRader, kildeRader, artsfunnRad, dekningRad, brukerRader] = await Promise.all([
+    env.DB.prepare('SELECT COUNT(*) AS antall FROM terreng_steder').first(),
+    env.DB.prepare('SELECT fylke, COUNT(*) AS antall FROM terreng_steder GROUP BY fylke ORDER BY antall DESC').all(),
+    env.DB.prepare('SELECT kommune, fylke, COUNT(*) AS antall FROM terreng_steder GROUP BY kommune, fylke ORDER BY antall DESC').all(),
+    env.DB.prepare('SELECT custom, COUNT(*) AS antall FROM terreng_steder GROUP BY custom').all(),
+    env.DB.prepare('SELECT COUNT(*) AS antall, COUNT(DISTINCT art) AS arter FROM artsfunn').first(),
+    env.DB.prepare('SELECT COUNT(*) AS antall, MAX(fetched_at) AS siste FROM fetched_areas').first(),
+    env.DB.prepare(
+      `SELECT b.id, b.kortnavn, b.epost, b.rolle, b.status, b.slettet_tidspunkt, bd.data, bd.oppdatert
+       FROM brukere b LEFT JOIN bruker_data bd ON bd.bruker_id = b.id
+       ORDER BY b.opprettet`
+    ).all(),
+  ]);
+
+  const kildeMap = Object.fromEntries(kildeRader.results.map((r) => [r.custom ? 'custom' : 'autoEtl', r.antall]));
+
+  // Bevisst ikke filtrert bort permanent slettede brukere — bruker_data-
+  // raden deres blir stående (kun sesjon/epost scrubbes, se
+  // slettBrukerPermanent over), så tallene ville vært misvisende lave uten
+  // dem. Frontend markerer dem i stedet med "slettet"-status.
+  const brukere = brukerRader.results.map((rad) => {
+    let d = {};
+    try { d = rad.data ? JSON.parse(rad.data) : {}; } catch { d = {}; }
+    const antall = (nokkel) => (Array.isArray(d[nokkel]) ? d[nokkel].length : 0);
+    return {
+      id: rad.id,
+      kortnavn: rad.kortnavn,
+      epost: rad.epost,
+      rolle: rad.rolle,
+      status: rad.status,
+      slettet: !!rad.slettet_tidspunkt,
+      funn: antall('finds'),
+      hogstMerket: antall('cuts'),
+      hogstOmrader: antall('hogstOmrader'),
+      egneSteder: antall('customLocations'),
+      favoritter: antall('favoriteSpecies'),
+      oppdatert: rad.oppdatert || null,
+    };
+  });
+
+  return json({
+    malepunkter: {
+      totalt: totalRad.antall,
+      autoEtl: kildeMap.autoEtl || 0,
+      custom: kildeMap.custom || 0,
+      perFylke: fylkeRader.results.map((r) => ({ fylke: r.fylke || 'ukjent', antall: r.antall })),
+      perKommune: kommuneRader.results.map((r) => ({ kommune: r.kommune || 'ukjent', fylke: r.fylke || 'ukjent', antall: r.antall })),
+    },
+    artsfunn: { totalt: artsfunnRad.antall, arter: artsfunnRad.arter },
+    dekning: { kjoringer: dekningRad.antall, sisteHenting: dekningRad.siste },
+    brukere,
+  }, 200, cors);
+}

@@ -1,5 +1,29 @@
 # Endringslogg
 
+## 0.21.0 — Ny "Statistikk"-fane i admin-panelet
+Nå som all data (terreng, artsfunn, dekning, personlig brukerdata) faktisk
+bor i D1, hadde admin ingen samlet innsikt i datamengden — måtte gjette seg
+til hvilke fylker/kommuner som hadde målepunkter, og hadde ingen oversikt
+over hvor mye brukerne selv bidrar med (registrerte funn, hogstfelt-
+merking, egne steder).
+
+- Nytt endepunkt `GET /admin/statistikk` (worker/api/src/routes/admin.js):
+  totalt antall målepunkter (+ auto-ETL vs. egendefinert), antall per
+  fylke/kommune, totalt antall Artsdatabanken-funn (+ antall arter),
+  antall/siste områdehenting, og — per bruker — antall funn, hogstfelt-
+  merkinger (både enkeltpunkt-`cuts` og tegnede `hogstOmrader`-soner) og
+  egne steder. Telling av brukerbidrag skjer i JS etter henting siden
+  `bruker_data` er én udelt JSON-blob per bruker, ikke normaliserte rader
+  å `GROUP BY`.
+- Ny "Statistikk"-fane i `#sp-admin-panel` (tredje fane, ved siden av
+  Brukere/Invitasjoner) — oppsummeringsbokser øverst, målepunkter per
+  fylke, en utvidbar liste over alle kommuner med målepunkter, og en
+  brukerbidrags-liste med totalsum. Rent lesevisning, ingen handlinger.
+- Bevisst tatt med permanent slettede brukere i brukerbidrags-tallene
+  (kun sesjon/epost scrubbes ved sletting, `bruker_data`-raden består) —
+  ellers ville totalsummene vært misvisende lave. Markert "slettet" i
+  UI-en i stedet for å skjules.
+
 ## 0.20.4 — "Om dataene" nevner nå Artsdatabanken-laget
 Gjennomgang av forklarende tekster i appen (bedt om av bruker) — de fleste
 var fortsatt presise (bl.a. GitHub Actions-fremdriftsmeldingene i

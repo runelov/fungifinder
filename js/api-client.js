@@ -210,6 +210,12 @@ async function slettInvitasjon(id){
   }
 }
 
+async function hentStatistikk(){
+  const res = await kall('/admin/statistikk');
+  if (!res.ok) throw new Error(`Kunne ikke hente statistikk (${res.status}).`);
+  return res.json();
+}
+
 // Uinnlogget-vennlig — sjekker gyldighet FØR registreringsskjemaet vises.
 async function sjekkInvitasjon(token){
   const res = await kall(`/invitasjon/${encodeURIComponent(token)}`);
@@ -236,5 +242,6 @@ window.ApiClient = {
   trigBerikelse, hentPunktStatus,
   hentBrukere, settBrukerStatus, slettBrukerPermanent,
   hentInvitasjoner, opprettInvitasjon, slettInvitasjon,
+  hentStatistikk,
   sjekkInvitasjon, registrerMedInvitasjon
 };
