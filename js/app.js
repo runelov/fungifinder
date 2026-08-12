@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.21.7';
+  const APP_VERSION = '0.21.8';
   const APP_BUILD_DATE = '2026-08-12';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -2078,10 +2078,148 @@
     '50': 'Trøndelag', '55': 'Troms', '56': 'Finnmark',
   };
 
-  // Henter hele fylke/kommune-registeret fra Kartverkets offisielle Kommuneinfo-API.
-  // Brukes i stedet for en hardkodet kommuneliste — Kartverket er alltid oppdatert
-  // ved reformer (f.eks. planlagt endring i 2028), og jeg kan ikke garantere at
-  // en liste over alle 357 kommuner fra hukommelsen ville vært 100% korrekt.
+  // RETTET 2026-08-12 (bruker spurte hvorfor kommunelisten måtte hentes fra
+  // Kartverket "hver gang" — svaret var at den IKKE ble det (30 dagers
+  // localStorage-cache fantes allerede), men det hjelper ikke ved første
+  // besøk (kald cache — akkurat det brukeren observerte som "lang
+  // ventetid") eller etter at Safari ITP sletter localStorage, samme
+  // kjente irritasjon som GitHub-PAT-en/været hadde). Samme resonnement
+  // som FYLKE_BBOX/KOMMUNE_BBOX over: dette er nesten-statisk offentlig
+  // data (neste kjente kommunereform er 2028, varslet år i forveien), så
+  // et engangs-generert øyeblikksbilde eliminerer nettverksavhengigheten
+  // for det vanlige tilfellet HELT, uten å ofre korrekthet — i motsetning
+  // til FYLKE_BBOX/KOMMUNE_BBOX (som KUN kan brukes når et navn matcher
+  // eksakt) beholdes selve Kartverket-oppslaget under fortsatt som en
+  // bakgrunns-oppfriskning (ikke bare en fallback ved feil), slik at en
+  // fremtidig reform plukkes opp automatisk innen CACHE_MAX_AGE_DAYS uten
+  // at noen må huske å regenerere denne tabellen manuelt med det samme.
+  // Generert 2026-08-12 fra ws.geonorge.no/kommuneinfo/v1/kommuner (357
+  // kommuner, verifisert 0 mangler fylke-utledning).
+  const KOMMUNE_REGISTER_STATISK = [
+    ["Alstahaug", "Nordland"], ["Alta", "Finnmark"], ["Alvdal", "Innlandet"],
+    ["Alver", "Vestland"], ["Andøy", "Nordland"], ["Aremark", "Østfold"],
+    ["Arendal", "Agder"], ["Asker", "Akershus"], ["Askvoll", "Vestland"],
+    ["Askøy", "Vestland"], ["Aukra", "Møre og Romsdal"], ["Aure", "Møre og Romsdal"],
+    ["Aurland", "Vestland"], ["Aurskog-Høland", "Akershus"], ["Austevoll", "Vestland"],
+    ["Austrheim", "Vestland"], ["Averøy", "Møre og Romsdal"], ["Balsfjord", "Troms"],
+    ["Bamble", "Telemark"], ["Bardu", "Troms"], ["Beiarn", "Nordland"],
+    ["Bergen", "Vestland"], ["Berlevåg", "Finnmark"], ["Bindal", "Nordland"],
+    ["Birkenes", "Agder"], ["Bjerkreim", "Rogaland"], ["Bjørnafjorden", "Vestland"],
+    ["Bodø", "Nordland"], ["Bokn", "Rogaland"], ["Bremanger", "Vestland"],
+    ["Brønnøy", "Nordland"], ["Bygland", "Agder"], ["Bykle", "Agder"],
+    ["Båtsfjord", "Finnmark"], ["Bærum", "Akershus"], ["Bø", "Nordland"],
+    ["Bømlo", "Vestland"], ["Dovre", "Innlandet"], ["Drammen", "Buskerud"],
+    ["Drangedal", "Telemark"], ["Dyrøy", "Troms"], ["Dønna", "Nordland"],
+    ["Eidfjord", "Vestland"], ["Eidskog", "Innlandet"], ["Eidsvoll", "Akershus"],
+    ["Eigersund", "Rogaland"], ["Elverum", "Innlandet"], ["Enebakk", "Akershus"],
+    ["Engerdal", "Innlandet"], ["Etne", "Vestland"], ["Etnedal", "Innlandet"],
+    ["Evenes", "Nordland"], ["Evje og Hornnes", "Agder"], ["Farsund", "Agder"],
+    ["Fauske", "Nordland"], ["Fedje", "Vestland"], ["Fitjar", "Vestland"],
+    ["Fjaler", "Vestland"], ["Fjord", "Møre og Romsdal"], ["Flakstad", "Nordland"],
+    ["Flatanger", "Trøndelag"], ["Flekkefjord", "Agder"], ["Flesberg", "Buskerud"],
+    ["Flå", "Buskerud"], ["Folldal", "Innlandet"], ["Fredrikstad", "Østfold"],
+    ["Frogn", "Akershus"], ["Froland", "Agder"], ["Frosta", "Trøndelag"],
+    ["Frøya", "Trøndelag"], ["Fyresdal", "Telemark"], ["Færder", "Vestfold"],
+    ["Gamvik", "Finnmark"], ["Gausdal", "Innlandet"], ["Gildeskål", "Nordland"],
+    ["Giske", "Møre og Romsdal"], ["Gjemnes", "Møre og Romsdal"], ["Gjerdrum", "Akershus"],
+    ["Gjerstad", "Agder"], ["Gjesdal", "Rogaland"], ["Gjøvik", "Innlandet"],
+    ["Gloppen", "Vestland"], ["Gol", "Buskerud"], ["Gran", "Innlandet"],
+    ["Grane", "Nordland"], ["Gratangen", "Troms"], ["Grimstad", "Agder"],
+    ["Grong", "Trøndelag"], ["Grue", "Innlandet"], ["Gulen", "Vestland"],
+    ["Hadsel", "Nordland"], ["Halden", "Østfold"], ["Hamar", "Innlandet"],
+    ["Hamarøy", "Nordland"], ["Hammerfest", "Finnmark"], ["Haram", "Møre og Romsdal"],
+    ["Hareid", "Møre og Romsdal"], ["Harstad", "Troms"], ["Hasvik", "Finnmark"],
+    ["Hattfjelldal", "Nordland"], ["Haugesund", "Rogaland"], ["Heim", "Trøndelag"],
+    ["Hemnes", "Nordland"], ["Hemsedal", "Buskerud"], ["Herøy", "Nordland"],
+    ["Herøy", "Møre og Romsdal"], ["Hitra", "Trøndelag"], ["Hjartdal", "Telemark"],
+    ["Hjelmeland", "Rogaland"], ["Hol", "Buskerud"], ["Hole", "Buskerud"],
+    ["Holmestrand", "Vestfold"], ["Holtålen", "Trøndelag"], ["Horten", "Vestfold"],
+    ["Hurdal", "Akershus"], ["Hustadvika", "Møre og Romsdal"], ["Hvaler", "Østfold"],
+    ["Hyllestad", "Vestland"], ["Hå", "Rogaland"], ["Hægebostad", "Agder"],
+    ["Høyanger", "Vestland"], ["Høylandet", "Trøndelag"], ["Ibestad", "Troms"],
+    ["Inderøy", "Trøndelag"], ["Indre Fosen", "Trøndelag"], ["Indre Østfold", "Østfold"],
+    ["Iveland", "Agder"], ["Jevnaker", "Akershus"], ["Karasjok", "Finnmark"],
+    ["Karlsøy", "Troms"], ["Karmøy", "Rogaland"], ["Kautokeino", "Finnmark"],
+    ["Kinn", "Vestland"], ["Klepp", "Rogaland"], ["Kongsberg", "Buskerud"],
+    ["Kongsvinger", "Innlandet"], ["Kragerø", "Telemark"], ["Kristiansand", "Agder"],
+    ["Kristiansund", "Møre og Romsdal"], ["Krødsherad", "Buskerud"], ["Kvam", "Vestland"],
+    ["Kvinesdal", "Agder"], ["Kvinnherad", "Vestland"], ["Kviteseid", "Telemark"],
+    ["Kvitsøy", "Rogaland"], ["Kvæfjord", "Troms"], ["Kvænangen", "Troms"],
+    ["Kåfjord", "Troms"], ["Larvik", "Vestfold"], ["Lavangen", "Troms"],
+    ["Lebesby", "Finnmark"], ["Leirfjord", "Nordland"], ["Leka", "Trøndelag"],
+    ["Lesja", "Innlandet"], ["Levanger", "Trøndelag"], ["Lier", "Buskerud"],
+    ["Lierne", "Trøndelag"], ["Lillehammer", "Innlandet"], ["Lillesand", "Agder"],
+    ["Lillestrøm", "Akershus"], ["Lindesnes", "Agder"], ["Lom", "Innlandet"],
+    ["Loppa", "Finnmark"], ["Lund", "Rogaland"], ["Lunner", "Akershus"],
+    ["Lurøy", "Nordland"], ["Luster", "Vestland"], ["Lyngdal", "Agder"],
+    ["Lyngen", "Troms"], ["Lærdal", "Vestland"], ["Lødingen", "Nordland"],
+    ["Lørenskog", "Akershus"], ["Løten", "Innlandet"], ["Malvik", "Trøndelag"],
+    ["Marker", "Østfold"], ["Masfjorden", "Vestland"], ["Melhus", "Trøndelag"],
+    ["Meløy", "Nordland"], ["Meråker", "Trøndelag"], ["Midt-Telemark", "Telemark"],
+    ["Midtre Gauldal", "Trøndelag"], ["Modalen", "Vestland"], ["Modum", "Buskerud"],
+    ["Molde", "Møre og Romsdal"], ["Moskenes", "Nordland"], ["Moss", "Østfold"],
+    ["Målselv", "Troms"], ["Måsøy", "Finnmark"], ["Namsos", "Trøndelag"],
+    ["Namsskogan", "Trøndelag"], ["Nannestad", "Akershus"], ["Narvik", "Nordland"],
+    ["Nes", "Akershus"], ["Nesbyen", "Buskerud"], ["Nesna", "Nordland"],
+    ["Nesodden", "Akershus"], ["Nesseby", "Finnmark"], ["Nissedal", "Telemark"],
+    ["Nittedal", "Akershus"], ["Nome", "Telemark"], ["Nord-Aurdal", "Innlandet"],
+    ["Nord-Fron", "Innlandet"], ["Nord-Odal", "Innlandet"], ["Nordkapp", "Finnmark"],
+    ["Nordre Follo", "Akershus"], ["Nordre Land", "Innlandet"], ["Nordreisa", "Troms"],
+    ["Nore og Uvdal", "Buskerud"], ["Notodden", "Telemark"], ["Nærøysund", "Trøndelag"],
+    ["Oppdal", "Trøndelag"], ["Orkland", "Trøndelag"], ["Os", "Innlandet"],
+    ["Osen", "Trøndelag"], ["Oslo", "Oslo"], ["Osterøy", "Vestland"],
+    ["Overhalla", "Trøndelag"], ["Porsanger", "Finnmark"], ["Porsgrunn", "Telemark"],
+    ["Rakkestad", "Østfold"], ["Rana", "Nordland"], ["Randaberg", "Rogaland"],
+    ["Rauma", "Møre og Romsdal"], ["Rendalen", "Innlandet"], ["Rennebu", "Trøndelag"],
+    ["Rindal", "Trøndelag"], ["Ringebu", "Innlandet"], ["Ringerike", "Buskerud"],
+    ["Ringsaker", "Innlandet"], ["Risør", "Agder"], ["Rollag", "Buskerud"],
+    ["Råde", "Østfold"], ["Rælingen", "Akershus"], ["Rødøy", "Nordland"],
+    ["Røros", "Trøndelag"], ["Røst", "Nordland"], ["Røyrvik", "Trøndelag"],
+    ["Salangen", "Troms"], ["Saltdal", "Nordland"], ["Samnanger", "Vestland"],
+    ["Sande", "Møre og Romsdal"], ["Sandefjord", "Vestfold"], ["Sandnes", "Rogaland"],
+    ["Sarpsborg", "Østfold"], ["Sauda", "Rogaland"], ["Sel", "Innlandet"],
+    ["Selbu", "Trøndelag"], ["Seljord", "Telemark"], ["Senja", "Troms"],
+    ["Sigdal", "Buskerud"], ["Siljan", "Telemark"], ["Sirdal", "Agder"],
+    ["Skaun", "Trøndelag"], ["Skien", "Telemark"], ["Skiptvet", "Østfold"],
+    ["Skjervøy", "Troms"], ["Skjåk", "Innlandet"], ["Smøla", "Møre og Romsdal"],
+    ["Snåsa", "Trøndelag"], ["Sogndal", "Vestland"], ["Sokndal", "Rogaland"],
+    ["Sola", "Rogaland"], ["Solund", "Vestland"], ["Sortland", "Nordland"],
+    ["Stad", "Vestland"], ["Stange", "Innlandet"], ["Stavanger", "Rogaland"],
+    ["Steigen", "Nordland"], ["Steinkjer", "Trøndelag"], ["Stjørdal", "Trøndelag"],
+    ["Stor-Elvdal", "Innlandet"], ["Stord", "Vestland"], ["Storfjord", "Troms"],
+    ["Strand", "Rogaland"], ["Stranda", "Møre og Romsdal"], ["Stryn", "Vestland"],
+    ["Sula", "Møre og Romsdal"], ["Suldal", "Rogaland"], ["Sunndal", "Møre og Romsdal"],
+    ["Sunnfjord", "Vestland"], ["Surnadal", "Møre og Romsdal"], ["Sveio", "Vestland"],
+    ["Sykkylven", "Møre og Romsdal"], ["Sømna", "Nordland"], ["Søndre Land", "Innlandet"],
+    ["Sør-Aurdal", "Innlandet"], ["Sør-Fron", "Innlandet"], ["Sør-Odal", "Innlandet"],
+    ["Sør-Varanger", "Finnmark"], ["Sørfold", "Nordland"], ["Sørreisa", "Troms"],
+    ["Tana", "Finnmark"], ["Time", "Rogaland"], ["Tingvoll", "Møre og Romsdal"],
+    ["Tinn", "Telemark"], ["Tjeldsund", "Troms"], ["Tokke", "Telemark"],
+    ["Tolga", "Innlandet"], ["Tromsø", "Troms"], ["Trondheim", "Trøndelag"],
+    ["Trysil", "Innlandet"], ["Træna", "Nordland"], ["Tvedestrand", "Agder"],
+    ["Tydal", "Trøndelag"], ["Tynset", "Innlandet"], ["Tysnes", "Vestland"],
+    ["Tysvær", "Rogaland"], ["Tønsberg", "Vestfold"], ["Ullensaker", "Akershus"],
+    ["Ullensvang", "Vestland"], ["Ulstein", "Møre og Romsdal"], ["Ulvik", "Vestland"],
+    ["Utsira", "Rogaland"], ["Vadsø", "Finnmark"], ["Vaksdal", "Vestland"],
+    ["Valle", "Agder"], ["Vang", "Innlandet"], ["Vanylven", "Møre og Romsdal"],
+    ["Vardø", "Finnmark"], ["Vefsn", "Nordland"], ["Vega", "Nordland"],
+    ["Vegårshei", "Agder"], ["Vennesla", "Agder"], ["Verdal", "Trøndelag"],
+    ["Vestby", "Akershus"], ["Vestnes", "Møre og Romsdal"], ["Vestre Slidre", "Innlandet"],
+    ["Vestre Toten", "Innlandet"], ["Vestvågøy", "Nordland"], ["Vevelstad", "Nordland"],
+    ["Vik", "Vestland"], ["Vindafjord", "Rogaland"], ["Vinje", "Telemark"],
+    ["Volda", "Møre og Romsdal"], ["Voss", "Vestland"], ["Vågan", "Nordland"],
+    ["Vågå", "Innlandet"], ["Våler", "Innlandet"], ["Våler", "Østfold"],
+    ["Værøy", "Nordland"], ["Åfjord", "Trøndelag"], ["Ål", "Buskerud"],
+    ["Ålesund", "Møre og Romsdal"], ["Åmli", "Agder"], ["Åmot", "Innlandet"],
+    ["Årdal", "Vestland"], ["Ås", "Akershus"], ["Åseral", "Agder"],
+    ["Åsnes", "Innlandet"], ["Øksnes", "Nordland"], ["Ørland", "Trøndelag"],
+    ["Ørsta", "Møre og Romsdal"], ["Østre Toten", "Innlandet"], ["Øvre Eiker", "Buskerud"],
+    ["Øyer", "Innlandet"], ["Øygarden", "Vestland"], ["Øystre Slidre", "Innlandet"],
+  ];
+
+  // Henter hele fylke/kommune-registeret — se KOMMUNE_REGISTER_STATISK over
+  // for hvorfor dette nå er en hybrid (statisk momentant + live
+  // bakgrunns-oppfriskning) i stedet for et rent nettverkskall.
   //
   // RETTET 2026-08-12 (bruker meldte at "snevre inn til fylke"-velgeren ikke
   // faktisk filtrerte noe, og at tvetydige kommunenavn som "Våler" ikke lot
@@ -2095,6 +2233,11 @@
   // Innlandet) — utleder fylkesnavnet derfra i stedet for å stole på et felt
   // som ikke finnes.
   async function loadKommuneRegister(){
+    // Momentant, synkront (ingen await ennå) — appen er brukbar med FULL
+    // kommuneliste + disambiguering fra og med selve kallet til denne
+    // funksjonen, uansett nettverksstatus/cache-tilstand under.
+    kommuneRegister = KOMMUNE_REGISTER_STATISK.map(([kommunenavn, fylkesnavn]) => ({ kommunenavn, fylkesnavn }));
+
     const CACHE_KEY = 'fungifinder-kommuneregister';
     const CACHE_MAX_AGE_DAYS = 30;
     try {
@@ -2107,7 +2250,7 @@
           return;
         }
       }
-    } catch(e) { /* ignorer korrupt cache */ }
+    } catch(e) { /* ignorer korrupt cache — behold den statiske tabellen over */ }
 
     try {
       const res = await fetch('https://ws.geonorge.no/kommuneinfo/v1/kommuner');
@@ -2125,8 +2268,11 @@
         throw new Error('Uventet responsformat fra Kommuneinfo-API');
       }
     } catch (e) {
-      console.warn('Kunne ikke hente kommuneregister fra Kartverket — faller tilbake til lokal stedsdata.', e);
-      kommuneRegister = [];
+      // RETTET 2026-08-12: satte tidligere kommuneRegister = [] her ved
+      // feil (f.eks. frakoblet/Kartverket nede) — tømte dermed den gode
+      // statiske tabellen momentant satt over, i stedet for å bare beholde
+      // den. Live-oppslaget er nå en RAFFINERING, ikke en forutsetning.
+      console.warn('Kunne ikke friske opp kommuneregisteret fra Kartverket — beholder den innebygde tabellen (357 kommuner, generert 2026-08-12).', e);
     }
   }
 

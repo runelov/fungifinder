@@ -1,5 +1,35 @@
 # Endringslogg
 
+## 0.21.8 — Kommuneregisteret (357 kommuner) hardkodet, samme mønster som bboksene
+Bruker spurte hvorfor kommunelisten måtte hentes fra Kartverket "hver
+gang", og om ikke en nesten-statisk liste burde kunne caches mer effektivt.
+Presist svar: den ble IKKE hentet hver gang (30-dagers `localStorage`-cache
+fantes allerede), men det hjelper ikke ved kaldt førstebesøk (akkurat det
+v0.21.6 målte 19+ sekunder for) eller etter at Safari ITP sletter
+`localStorage` — samme kjente irritasjon som GitHub-PAT-en/været hadde.
+D1 dekker det heller ikke i dag: `terreng_steder` har kun kommune/fylke for
+de ~20 kommunene med faktisk hentet terrengdata, ikke det fulle
+357-registeret dropdownen/disambigueringen trenger.
+
+- `KOMMUNE_REGISTER_STATISK` (357 `[navn, fylke]`-par) lagt til, generert
+  fra samme kilde som `KOMMUNE_BBOX` (ws.geonorge.no/kommuneinfo/v1,
+  fylke utledet fra kommunenummer-prefiks). `loadKommuneRegister()`
+  populerer nå `kommuneRegister` fra denne tabellen SYNKRONT som første
+  linje — appen er brukbar med full liste + Herøy/Våler-disambiguering
+  momentant, uansett nettverksstatus.
+- I motsetning til bboksene (som KUN virker ved eksakt navnetreff) beholdes
+  selve Kartverket-oppslaget som en ekte bakgrunns-OPPFRISKNING (ikke bare
+  en feil-fallback) — en fremtidig kommunereform (neste kjente: 2028)
+  plukkes opp automatisk innen `CACHE_MAX_AGE_DAYS`, ingen manuell
+  tabell-regenerering nødvendig for at appen skal forbli korrekt.
+- Fjernet en reell bug i samme slengen: feilhåndteringen satte tidligere
+  `kommuneRegister = []` ved et mislykket Kartverket-kall (f.eks.
+  frakoblet) — tømte dermed den gode statiske tabellen i stedet for å bare
+  beholde den. Live-oppslaget er nå en raffinering, aldri en forutsetning.
+- Verifisert i preview: `sp-kommune-datalist` hadde 357 `<option>`-
+  elementer praktisk talt momentant etter sideinnlasting (ingen bevisst
+  ventetid), både med og uten en fullført Kartverket-respons.
+
 ## 0.21.7 — Fiks: server-filteret blandet data fra tvetydige kommuner
 Oppfølger til v0.21.6, samme rotårsaksklasse: `currentServerFilterParams()`
 (som styrer selve `/terrengdata`-kallet, se `loadLocations()`) sendte KUN
