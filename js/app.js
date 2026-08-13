@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.22.0';
+  const APP_VERSION = '0.22.1';
   const APP_BUILD_DATE = '2026-08-13';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -164,6 +164,19 @@
   // steder i området (fargekodet etter score) slik at man kan oppdage og
   // klikke seg til lavere-scorende punkter der uten å måtte senke terskelen.
   let minScoreFilter = 70; // default hevet fra 0 — se samtalen 2026-08-11 om fargekodingens grovkornethet
+  // RETTET 2026-08-13 (bruker påpekte at ALLE kvalifiserende steder ble
+  // bygget som fulle kort — mikrotips, kryssart-tips, kjente funn osv. —
+  // og satt inn i DOM-et på én gang, selv om man bare ser de første uansett
+  // hvor mange som faktisk kvalifiserer): "Vis flere"-paginering av selve
+  // LISTEN (kun rendering, ikke scoring — score()-kallet skjer uansett for
+  // ALLE steder for å avgjøre rangeringen, det er selve HTML-byggingen for
+  // steder langt nede i lista som nå er lat). VISNING_STEG_LISTE styrer
+  // både startantallet og hvor mange "Vis flere"-knappen legger til.
+  // visningsAntallListe nullstilles automatisk i render() når resultat-
+  // grunnlaget (filter/art/terskel osv.) endres — se visningsSignatur der.
+  const VISNING_STEG_LISTE = 30;
+  let visningsAntallListe = VISNING_STEG_LISTE;
+  let visningsSignatur = null;
   let filterMode = 'fylke'; // 'fylke' | 'kommune' | 'radius'
   let fylkeFilter = 'alle';
   let kommuneFilter = 'alle';
@@ -3556,21 +3569,49 @@
     const hiddenByScore = scoped.filter(s => !s.res.isCut && s.res.total < minScoreFilter).length;
     const cutOnes = scoped.filter(s => s.res.isCut);
 
-    document.getElementById('sp-count').textContent = `${activeOnes.length + cutOnes.length} av ${scoped.length} steder vist${areaLabel}`
-      + (hiddenByScore ? ` — ${hiddenByScore} skjult under score ${minScoreFilter}` : '');
-
     if (!activeOnes.length && !cutOnes.length) {
+      document.getElementById('sp-count').textContent = `0 av ${scoped.length} steder vist${areaLabel}`
+        + (hiddenByScore ? ` — ${hiddenByScore} skjult under score ${minScoreFilter}` : '');
       container.innerHTML = `<div class="sp-empty">Ingen steder over valgt minimumsscore (${minScoreFilter})${areaLabel} — senk terskelen over, eller se kartet for alle ${scoped.length} steder i området.</div>`;
       return;
     }
 
+    // Nullstill "vis flere"-paginering når resultatgrunnlaget selv endrer
+    // seg (annet filter/art/terskel osv.) — men IKKE ved uendret grunnlag
+    // (f.eks. en uavhengig toggle som ikke rører scoped/activeOnes), slik
+    // at et "Vis flere"-klikk faktisk består av re-render()-kallet det
+    // selv trigger.
+    const naSignatur = JSON.stringify([filterMode, fylkeFilter, kommuneFilter, radiusKm, radiusCenter, selectedSpecies, viewMode, minScoreFilter, favoriteSpecies, hideHogst]);
+    if (naSignatur !== visningsSignatur) { visningsAntallListe = VISNING_STEG_LISTE; visningsSignatur = naSignatur; }
+
+    // Paginerer kun selve RENDERINGEN (HTML-bygging + DOM-innsetting) — ikke
+    // scoringen/rangeringen over, som uansett må skje for ALLE steder for at
+    // sorteringen/"X av Y"-tallene skal være riktige. Hvert kort involverer
+    // flere underberegninger (terrainMicrotips, crossSpeciesTipsHtml,
+    // knownFindsHtml) — å bygge dem for hundrevis av steder man uansett må
+    // scrolle forbi var unødvendig kostbart. Aktive (anbefalte) steder vises
+    // først; flatehogde steder telles med i SAMME paginerings-"budsjett" og
+    // dukker først opp når alle aktive er vist.
+    const aktiveViste = activeOnes.slice(0, visningsAntallListe);
+    const cutBudsjett = Math.max(0, visningsAntallListe - aktiveViste.length);
+    const cutViste = cutBudsjett > 0 ? cutOnes.slice(0, cutBudsjett) : [];
+    const totalKort = activeOnes.length + cutOnes.length;
+    const visteKort = aktiveViste.length + cutViste.length;
+
+    document.getElementById('sp-count').textContent = `${visteKort} av ${totalKort} steder vist${areaLabel}`
+      + (hiddenByScore ? ` — ${hiddenByScore} skjult under score ${minScoreFilter}` : '');
+
     const renderCard = viewMode === 'favorites'
       ? (s) => cardHtmlFavorites(s.loc, s.favResults)
       : (s) => cardHtml(s.loc, s.res);
-    let html = activeOnes.map(renderCard).join('');
-    if (cutOnes.length) {
+    let html = aktiveViste.map(renderCard).join('');
+    if (cutViste.length) {
       html += `<div class="sp-divider-excl">flatehogd — ikke anbefalt</div>`;
-      html += cutOnes.map(renderCard).join('');
+      html += cutViste.map(renderCard).join('');
+    }
+    if (visteKort < totalKort) {
+      const gjenstaende = totalKort - visteKort;
+      html += `<button class="sp-btn" id="sp-vis-flere" style="width:100%;margin-top:8px;">Vis ${Math.min(VISNING_STEG_LISTE, gjenstaende)} flere steder (${gjenstaende} igjen)</button>`;
     }
     container.innerHTML = html;
 
@@ -3584,6 +3625,8 @@
     container.querySelectorAll('[data-score-loc]').forEach(el => el.addEventListener('click', () => {
       openScoreBreakdownModal(el.dataset.scoreLoc, el.dataset.scoreSpecies);
     }));
+    const visFlereBtn = document.getElementById('sp-vis-flere');
+    if (visFlereBtn) visFlereBtn.addEventListener('click', () => { visningsAntallListe += VISNING_STEG_LISTE; render(); });
   }
 
   // scoreLocation() beregner allerede en full breakdown (tekst+poeng per

@@ -1,5 +1,46 @@
 # Endringslogg
 
+## 0.22.1 — "Vis flere"-paginering av resultatlisten
+Bruker påpekte at selv om ALLE steder må scores for å avgjøre rangeringen,
+er det ikke nødvendig å faktisk BYGGE og sette inn HTML for samtlige
+kvalifiserende steder med det samme — foreslo "hent flere" eller
+progressiv lasting ved scroll.
+
+Selve scoringen (`scoreLocation()` for alle steder, uendret av dette) må
+fortsatt skje for alle for at "X av Y"-tallene og sorteringen skal være
+riktige — det som endres er kun rendering-steget: hvert kort involverer
+flere underberegninger (`terrainMicrotips`, `crossSpeciesTipsHtml`,
+`knownFindsHtml`) som var unødvendig kostbare å bygge for hundrevis av
+steder ingen uansett rakk å scrolle forbi.
+
+- Ny `visningsAntallListe` (start: `VISNING_STEG_LISTE` = 30) styrer hvor
+  mange kort som faktisk bygges/settes inn i DOM-et. En "Vis X flere
+  steder (Y igjen)"-knapp nederst i lista øker den med 30 og re-rendrer
+  (billig, takket være scoreCache fra v0.21.15) når det er flere igjen.
+  Flatehogde steder telles i SAMME paginerings-"budsjett" som anbefalte —
+  dukker først opp når alle anbefalte er vist.
+- Nullstilles automatisk (ikke bare ved eksplisitt klikk) når selve
+  resultatgrunnlaget endrer seg — filter/fylke/kommune/radius/art/
+  visningsmodus/scoreterskel/favoritter/skjul-flatehogd — via en enkel
+  signatur-sammenligning i `render()`, slik at et helt NYTT søk alltid
+  starter på side 1, mens en uavhengig re-render (f.eks. en toggle som
+  ikke påvirker resultatlisten) ikke nullstiller paginering brukeren
+  aktivt har bygget opp.
+- "X av Y steder vist"-teksten viser nå det FAKTISK renderte antallet
+  (post-paginering), ikke bare antallet som kvalifiserer — mer ærlig
+  match mot det som faktisk står i lista.
+- Kjent, bevisst avveining: et "Vis flere"-klikk bygger foreløpig HTML for
+  ALLE viste kort på nytt (inkl. de som allerede var synlige), ikke bare
+  de nye — enkel, lav-risiko implementasjon fremfor inkrementell
+  DOM-appending. Bundet av totalt viste kort (ikke hele det nasjonale
+  datasettet), så kostnaden vokser proporsjonalt med hvor mange sider
+  brukeren faktisk har bedt om å se, ikke med datasettets størrelse.
+- Verifisert: pagineringsmatematikken (grensetilfeller — nøyaktig 30,
+  31, blandet anbefalte/flatehogde) kjørt isolert i Node med korrekt
+  resultat i alle tilfeller. I preview (kun 2 demo-steder, under
+  terskelen for paginering) bekreftet ingen regresjon — telletekst og
+  korttall uendret riktig, ingen "vis flere"-knapp der den ikke trengs.
+
 ## worker/api — 2026-08-13 (produksjonshotfix, ingen APP_VERSION-bump nødvendig)
 Kun `worker/api/wrangler.toml` — bruker meldte at `wrangler deploy` for v0.22.0 feilet med
 `Authentication error [code: 10000]` mot
