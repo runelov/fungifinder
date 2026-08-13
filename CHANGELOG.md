@@ -1,5 +1,18 @@
 # Endringslogg
 
+## 0.21.14 — Heve terskel for "godt analysert" (20 → 100)
+Bruker meldte at 20 punkter var for lavt: admin velger gjennomgående
+minste gridstørrelse ved analyse, som gir langt tettere punktdekning per
+kommune enn 20 antydet — en kommune med kun spredt/delvis dekning kunne
+dermed feilaktig telle som "godt analysert".
+
+- `KOMMUNE_GOD_DEKNING_MIN` (js/app.js, drives `renderDataNotice()` fra
+  v0.21.12) hevet fra 20 til 100. Ingen annen logikk endret.
+- Ikke observerbart i lokal preview (krever ekte, innlogget terrengdata) —
+  kun kodesti verifisert (syntaks OK, ingen nye konsollfeil, "Om dataene"
+  faller fortsatt korrekt tilbake til "logg inn for å se full oversikt"
+  for en ikke-innlogget besøkende).
+
 ## 0.21.13 — Fiks: nettverksfeil ved oppstart veltet HELE appen, ikke bare innlogging
 Oppdaget under verifisering av v0.21.12: `initAuth()` fanget ikke opp en
 nettverksfeil fra `ApiClient.meg()` (`fetch()` som feiler helt, f.eks.

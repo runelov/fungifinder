@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.21.13';
+  const APP_VERSION = '0.21.14';
   const APP_BUILD_DATE = '2026-08-13';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -3308,7 +3308,10 @@
   // customLocations (egne, manuelt lagt-til steder) — en bruker med mange
   // personlige steder i en kommune admin aldri har analysert skal ikke
   // gjøre den kommunen se "godt analysert" ut.
-  const KOMMUNE_GOD_DEKNING_MIN = 20; // terskel for "godt analysert" — justerbar, ingen fasit finnes ennå
+  // RETTET 2026-08-13: hevet 20 → 100 (bruker meldte at 20 var for lavt —
+  // admin velger gjennomgående minste gridstørrelse ved analyse, som gir
+  // langt tettere punktdekning per kommune enn 20 antydet).
+  const KOMMUNE_GOD_DEKNING_MIN = 100; // terskel for "godt analysert" — justerbar, ingen fasit finnes ennå
   function renderDataNotice(){
     const el = document.getElementById('sp-analyserte-kommuner');
     if (!el) return;
