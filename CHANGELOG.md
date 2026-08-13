@@ -1,5 +1,34 @@
 # Endringslogg
 
+## 0.21.9 — Fiks stale kommuneregister-cache (Våler/Østfold-disambiguering feilet fortsatt)
+Bruker meldte at v0.21.8 fortsatt ga "Våler finnes i flere fylker ( og )"
+— med TOMME fylkesnavn i parentesen — selv med Østfold valgt i
+"snevre inn"-menyen, og at kartet ikke zoomet inn.
+
+Rotårsak: `loadKommuneRegister()` setter `kommuneRegister` synkront fra den
+korrekte, hardkodede tabellen (v0.21.8), men leser deretter en
+`localStorage`-cache (`fungifinder-kommuneregister`, 30 dagers levetid) og
+overskriver den gode tabellen stille hvis en gyldig-etter-alder cache
+finnes. Alle som hadde besøkt appen FØR v0.21.6 (da Kommuneinfo-APIets
+`fylkesnavn`-utledning var ødelagt og alltid ga `null`) satt igjen med en
+alders-messig gyldig, men innholdsmessig ødelagt cache — den ble lastet
+inn igjen og gjorde enhver `fylkesnavn === valgtFylke`-sammenligning
+(`resolveKommuneNavn()`, `kommunerIFylke()`) permanent usann i opptil 30
+dager til, uavhengig av hva brukeren valgte i fylkevelgeren.
+
+- Cache-nøkkelen er versjonert (`fungifinder-kommuneregister` →
+  `-v2`) — ugyldiggjør automatisk alle caches skrevet før denne rettelsen,
+  uten å måtte stole på at alder alene fanger opp innholdsfeil.
+- I tillegg valideres selve innholdet før en cache stoles på (minst én
+  oppføring må ha et faktisk `fylkesnavn`, ikke bare riktig alder/
+  array-lengde) — vern mot at samme klasse feil kan snike seg forbi igjen
+  ved en fremtidig endring i hva som caches.
+- Verifisert i preview: satte en simulert gammel, ødelagt cache
+  (`fylkesnavn: null` for både Våler-oppføringene) under den gamle
+  nøkkelen, lastet siden på nytt — Østfold + Våler zoomet korrekt inn uten
+  feilmelding, og den nye `-v2`-nøkkelen ble skrevet med riktige
+  fylkesnavn mens den gamle, ubrukte nøkkelen ble stående urørt.
+
 ## 0.21.8 — Kommuneregisteret (357 kommuner) hardkodet, samme mønster som bboksene
 Bruker spurte hvorfor kommunelisten måtte hentes fra Kartverket "hver
 gang", og om ikke en nesten-statisk liste burde kunne caches mer effektivt.

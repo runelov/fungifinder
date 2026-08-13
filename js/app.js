@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.21.8';
-  const APP_BUILD_DATE = '2026-08-12';
+  const APP_VERSION = '0.21.9';
+  const APP_BUILD_DATE = '2026-08-13';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
   // kommentar der) — de to må holdes i sync manuelt siden repoet bevisst
@@ -2238,14 +2238,30 @@
     // funksjonen, uansett nettverksstatus/cache-tilstand under.
     kommuneRegister = KOMMUNE_REGISTER_STATISK.map(([kommunenavn, fylkesnavn]) => ({ kommunenavn, fylkesnavn }));
 
-    const CACHE_KEY = 'fungifinder-kommuneregister';
+    // RETTET 2026-08-13 (bruker meldte: "Våler"/Østfold ga fortsatt
+    // "finnes i flere fylker ( og )" med TOMME fylkesnavn i parentesen,
+    // selv på v0.21.8 med hardkodet register). Rotårsak: `fylkesnavn` var
+    // `null` i responsen fra Kommuneinfo-API FØR v0.21.6 fikset
+    // utledningen (kommunenummer-prefiks). Brukere som hadde besøkt appen
+    // før den fiksen satt igjen med en gyldig-etter-alder (<30 dager),
+    // men INNHOLDSMESSIG ødelagt cache i localStorage — den ble lastet her
+    // og overskrev den korrekte, synkront satte tabellen over, stille og
+    // uten feilmelding, i opptil 30 dager til. Cache-nøkkelen er nå
+    // versjonert (ugyldiggjør automatisk alle caches fra før denne
+    // rettelsen), OG selve innholdet sjekkes eksplisitt (minst én oppføring
+    // må ha et faktisk fylkesnavn) — ikke bare alder/array-lengde — som
+    // vern mot at samme klasse feil (en fremtidig endring i hva som caches)
+    // kan snike seg forbi neste gang.
+    const CACHE_KEY = 'fungifinder-kommuneregister-v2';
     const CACHE_MAX_AGE_DAYS = 30;
     try {
       const cachedRaw = localStorage.getItem(CACHE_KEY);
       if (cachedRaw) {
         const cached = JSON.parse(cachedRaw);
         const ageDays = (Date.now() - cached.fetchedAt) / (1000*60*60*24);
-        if (ageDays < CACHE_MAX_AGE_DAYS && Array.isArray(cached.data) && cached.data.length) {
+        const dataOk = Array.isArray(cached.data) && cached.data.length
+          && cached.data.some(k => k && k.fylkesnavn);
+        if (ageDays < CACHE_MAX_AGE_DAYS && dataOk) {
           kommuneRegister = cached.data;
           return;
         }
