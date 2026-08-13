@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.21.14';
+  const APP_VERSION = '0.21.15';
   const APP_BUILD_DATE = '2026-08-13';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -195,6 +195,32 @@
   // DEN filtrerte undermengden, se loadLocations()). null = ikke beregnet ennå.
   let analyserteKommunerCache = null;
 
+  // RETTET 2026-08-13 (bruker meldte at bytte "Én art" → "Mine favoritter"
+  // tar noen sekunder): scoreLocation(art, sted) er en ren funksjon av
+  // (art.id, sted.id) OG en håndfull delte, muterbare tilstander (userCuts,
+  // hogstOmrader, egen funnhistorikk, værdata, fem "vektlegg …"-toggles) —
+  // se scoreLocation() selv for hvilke. "Mine favoritter" beregner FULL
+  // score for HVER favoritt på HVERT sted (for å finne beste treff per
+  // sted), så kostnaden ganges med antall favoritter sammenlignet med "Én
+  // art" — med et nasjonalt (ufiltrert) datasett på flere tusen steder blir
+  // det fort mange tusen scoreLocation()-kall, synkront på hovedtråden.
+  // Cachen under gjenbruker et allerede beregnet (art,sted)-resultat i
+  // stedet for å regne det på nytt — koster ingenting første gang et par
+  // faktisk scores, men gjør GJENTATT bytte mellom visningsmodi (akkurat
+  // det brukeren meldte) og andre steder som scorer samme art/sted-par i
+  // samme økt (crossSpeciesTipsHtml, knownFindsHtml) tilnærmet gratis.
+  // scoreCache tømmes (bumpScoreCache()) ved ETHVERT av disse — se
+  // kallstedene: loadLocations() (BASE_LOCATIONS reassignert),
+  // loadStorage()/persistAll() (userCuts/hogstOmrader/userFinds/
+  // customLocations — persistAll() er FELLES for alle saveXxx()-kall og
+  // dermed ETT trygt sted å fange dem alle), loadWeather()/
+  // loadSeasonWeather() (værdata), og de fem vektlegg-togglene direkte i
+  // wiring-seksjonen. IKKE bumpet av hideHogst/artskartOnlyRecent —
+  // begge filtrerer kun ETTER at scoring er ferdig, påvirker ikke selve
+  // scoreLocation()-resultatet.
+  let scoreCache = new Map();
+  function bumpScoreCache(){ scoreCache = new Map(); }
+
   const monthNow = new Date().getMonth() + 1;
   const yearNow = new Date().getFullYear();
 
@@ -235,6 +261,7 @@
   async function loadStorage(){
     if (!currentUser) {
       userFinds = []; userCuts = []; hogstOmrader = []; customLocations = []; favoriteSpecies = [];
+      bumpScoreCache();
       return;
     }
     try {
@@ -244,6 +271,7 @@
       hogstOmrader = d.hogstOmrader || [];
       customLocations = d.customLocations || [];
       favoriteSpecies = d.favoriteSpecies || [];
+      bumpScoreCache();
       setSyncStatus(`✓ Innlogget som ${currentUser.kortnavn}`);
     } catch (e) {
       console.error(e);
@@ -253,6 +281,12 @@
 
   async function persistAll(){
     if (!currentUser) return;
+    // Bumpes synkront FØR nettverkskallet under (ikke etter) — den lokale
+    // mutasjonen (push/filter/enrichStatus-oppdatering) som utløste dette
+    // kallet har allerede skjedd i den kallende koden, og en påfølgende
+    // render() skal aldri kunne lese en scoreCache som ikke reflekterer
+    // den, uansett hvor lang tid selve lagringen tar.
+    bumpScoreCache();
     const payload = { finds: userFinds, cuts: userCuts, hogstOmrader: hogstOmrader, customLocations: customLocations, favoriteSpecies: favoriteSpecies };
     try {
       await window.ApiClient.lagreMineData(payload);
@@ -650,7 +684,7 @@
       // steder ennå) — skal vise "ingenting her", ikke stille beholde
       // forrige filters data. Kun ekte feil (fanget under) beholder gammel
       // BASE_LOCATIONS.
-      if (Array.isArray(data)) BASE_LOCATIONS = data;
+      if (Array.isArray(data)) { BASE_LOCATIONS = data; bumpScoreCache(); }
     } catch (e) {
       if (seq !== locationsRequestSeq) return;
       console.warn('Kunne ikke laste terrengdata.', e);
@@ -1657,6 +1691,7 @@
       weatherReady = false;
       box.innerHTML = `<span class="sp-wstatus">⚠ kunne ikke hente værdata</span><br/>Viser terrengscore uten tidsvurdering.`;
     }
+    bumpScoreCache(); // weatherBySpecies/weatherReady endret — se scoreLocation()
     render();
   }
 
@@ -1690,6 +1725,7 @@
         if ((Date.now() - cached.fetchedAt) < SEASON_WEATHER_CACHE_MAX_AGE_HOURS * 3600 * 1000 && cached.data) {
           seasonWeather = cached.data;
           seasonWeatherReady = true;
+          bumpScoreCache(); // seasonWeather endret — se scoreLocation()
           renderSeasonWeatherBox();
           return;
         }
@@ -1744,6 +1780,7 @@
       console.warn('Sesongvær feilet', e);
       seasonWeatherReady = false;
     }
+    bumpScoreCache(); // seasonWeather endret — se scoreLocation()
     renderSeasonWeatherBox();
     render();
   }
@@ -1896,6 +1933,10 @@
   // hverandre.
   // ---------------------------------------------------------------------
   function scoreLocation(species, loc){
+    const cacheKey = species.id + '|' + loc.id;
+    const cached = scoreCache.get(cacheKey);
+    if (cached) return cached;
+
     const cutRecent = loc.hogstAr !== null && loc.hogstAr !== undefined && (yearNow - loc.hogstAr) <= 3;
     const manuallyCut = userCuts.includes(loc.id) || isWithinHogstOmrade(loc);
     const isCut = cutRecent || manuallyCut;
@@ -2030,7 +2071,9 @@
     }
 
     total = Math.max(0, Math.min(100, Math.round(total)));
-    return { total, breakdown, isCut, weatherVerdict, weather: w, histNote, accessTags: acc.tags };
+    const result = { total, breakdown, isCut, weatherVerdict, weather: w, histNote, accessTags: acc.tags };
+    scoreCache.set(cacheKey, result);
+    return result;
   }
 
   // Delt fargeskala for score — ÉN kilde til sannhet i stedet for at
@@ -3945,11 +3988,14 @@
   }
 
   // ---------- wiring ----------
-  document.getElementById('sp-toggle-quiet').addEventListener('click', () => { prioritizeQuiet = !prioritizeQuiet; render(); });
-  document.getElementById('sp-toggle-sti').addEventListener('click', () => { weighTrailDistance = !weighTrailDistance; render(); });
-  document.getElementById('sp-toggle-ownhistory').addEventListener('click', () => { weighOwnFindHistory = !weighOwnFindHistory; render(); });
-  document.getElementById('sp-toggle-weather').addEventListener('click', () => { weighWeather = !weighWeather; render(); });
-  document.getElementById('sp-toggle-knownfinds').addEventListener('click', () => { deprioritizeKnownFinds = !deprioritizeKnownFinds; render(); });
+  // Disse fem påvirker selve scoreLocation()-resultatet (ikke bare
+  // visning/filtrering, som hideHogst/artskartOnlyRecent under) — bumper
+  // derfor scoreCache før re-render, se scoreCache sin deklarasjon.
+  document.getElementById('sp-toggle-quiet').addEventListener('click', () => { prioritizeQuiet = !prioritizeQuiet; bumpScoreCache(); render(); });
+  document.getElementById('sp-toggle-sti').addEventListener('click', () => { weighTrailDistance = !weighTrailDistance; bumpScoreCache(); render(); });
+  document.getElementById('sp-toggle-ownhistory').addEventListener('click', () => { weighOwnFindHistory = !weighOwnFindHistory; bumpScoreCache(); render(); });
+  document.getElementById('sp-toggle-weather').addEventListener('click', () => { weighWeather = !weighWeather; bumpScoreCache(); render(); });
+  document.getElementById('sp-toggle-knownfinds').addEventListener('click', () => { deprioritizeKnownFinds = !deprioritizeKnownFinds; bumpScoreCache(); render(); });
   document.getElementById('sp-toggle-hogst').addEventListener('click', () => { hideHogst = !hideHogst; render(); });
   document.getElementById('sp-toggle-artskart-recent').addEventListener('click', () => { artskartOnlyRecent = !artskartOnlyRecent; render(); });
   // RETTET (server-side filtrering): fylke/kommune-filterbytte re-henter nå

@@ -1,5 +1,38 @@
 # Endringslogg
 
+## 0.21.15 — Cache scoreLocation()-resultater (raskere bytte "Én art" ↔ "Mine favoritter")
+Bruker meldte at bytte fra "Én art" til "Mine favoritter" tok noen
+sekunder, og spurte om samme rekkefølge/venting-årsak som forrige
+melding (artsobservasjoner). Undersøkt: nei — visningsbytte er helt
+synkront, ingen `await`/nettverkskall involvert. Den faktiske årsaken:
+"Mine favoritter" beregner full score for HVER favoritt på HVERT sted (for
+å finne beste treff per sted), så kostnaden ganges med antall favoritter
+sammenlignet med "Én art" — med et nasjonalt (ufiltrert) datasett på
+flere tusen steder blir det fort mange tusen `scoreLocation()`-kall,
+synkront på hovedtråden.
+
+- `scoreLocation(art, sted)` cacher nå resultatet sitt (nøkkel
+  `art.id + '|' + sted.id`) — en ren funksjon av det paret OG en håndfull
+  delt, muterbar tilstand den leser (se scoreLocation() sin doc-kommentar
+  for full liste). Gjør GJENTATT bytte mellom visningsmodi tilnærmet
+  gratis (samme par regnes ikke om og om igjen), og gir samme gevinst for
+  andre steder som scorer samme art/sted-par i én økt
+  (`crossSpeciesTipsHtml`, `knownFindsHtml`) — ingen endring i FØRSTE
+  gangs kostnad, kun repetert arbeid som elimineres.
+- Cachen tømmes eksplisitt (`bumpScoreCache()`) ved ethvert av: ny
+  terrengdata lastet (`loadLocations()`), egne data lastet/lagret
+  (`loadStorage()`/`persistAll()` — FELLES sted for alle `saveXxx()`-kall,
+  inkl. flatehogd-merking, hogstfelt, funn, egne steder OG
+  enrichment-poll-oppdateringer), værdata (`loadWeather()`/
+  `loadSeasonWeather()`), og de fem "vektlegg …"-togglene som faktisk
+  påvirker scoren (ikke `hideHogst`/`artskartOnlyRecent`, som kun
+  filtrerer/viser — ikke scorer).
+- Verifisert i preview: 6× repetert bytte mellom "Én art"/"Mine
+  favoritter" (3 favoritter valgt) ga ingen nye konsoll-feil og korrekt,
+  uendret innhold. Selve tidsgevinsten er ikke målbar lokalt (demo-data
+  har kun 2 steder) — reell effekt forventes først med et fullt,
+  innlogget datasett.
+
 ## 0.21.14 — Heve terskel for "godt analysert" (20 → 100)
 Bruker meldte at 20 punkter var for lavt: admin velger gjennomgående
 minste gridstørrelse ved analyse, som gir langt tettere punktdekning per
