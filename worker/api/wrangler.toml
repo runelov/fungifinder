@@ -2,6 +2,20 @@ name = "fungifinder-api"
 main = "src/index.js"
 compatibility_date = "2026-07-12"
 
+# RETTET 2026-08-13 (deploy feilet: "Authentication error [code: 10000]"
+# mot .../workers/scripts/fungifinder-api/subdomain — se CHANGELOG). Selve
+# kodeopplastingen lyktes ("Uploaded fungifinder-api"), men wrangler
+# avbrøt DERETTER hele kommandoen (før ruten under ble bekreftet bundet)
+# fordi et helt SEPARAT, kosmetisk API-kall — sjekk av status på den
+# gamle workers.dev-underdomene-URL-en — fikk 401 fra Cloudflare. Kallet
+# skjedde i det hele tatt fordi `workers_dev` aldri var satt EKSPLISITT
+# her; kommentaren under stemte i sak (en egendefinert route SLÅR AV
+# workers.dev-URL-en når deployen fullfører), men wrangler prøvde
+# likevel å SJEKKE gjeldende status FØR den rakk dit. `workers_dev = false`
+# forteller wrangler å hoppe over hele det steget — vi bruker uansett
+# ALDRI workers.dev, kun egendefinert domene under.
+workers_dev = false
+
 # Merk: å legge til denne routen slår automatisk av den gamle
 # <name>.<konto>.workers.dev-URL-en for denne Workeren ved neste deploy —
 # samme oppførsel som Bondøyas api.bondoya.no. js/api-client.js sin

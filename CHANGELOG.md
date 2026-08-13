@@ -1,5 +1,30 @@
 # Endringslogg
 
+## worker/api — 2026-08-13 (produksjonshotfix, ingen APP_VERSION-bump nødvendig)
+Kun `worker/api/wrangler.toml` — bruker meldte at `wrangler deploy` for v0.22.0 feilet med
+`Authentication error [code: 10000]` mot
+`.../workers/scripts/fungifinder-api/subdomain`.
+
+Loggen (`~/Library/Preferences/.wrangler/logs/`) viste at selve
+kodeopplastingen lyktes ("Uploaded fungifinder-api"), men wrangler avbrøt
+DERETTER hele kommandoen — FØR den egendefinerte ruten
+(`api.fungifinder.no`) ble bekreftet bundet til den nye opplastingen —
+fordi et helt separat, kosmetisk API-kall (sjekk av status på den gamle
+`workers.dev`-underdomene-URL-en, som dette prosjektet bevisst ikke bruker)
+fikk 401 fra Cloudflare. Kallet skjedde fordi `workers_dev` aldri var satt
+eksplisitt — kommentaren i filen stemte i sak (en egendefinert route slår
+AV workers.dev NÅR deployen fullfører), men wrangler prøvde likevel å
+SJEKKE gjeldende status før den rakk dit.
+
+- La til `workers_dev = false` i `wrangler.toml` — forteller wrangler å
+  hoppe over hele det steget.
+- Verifisert: `wrangler deploy` kjørt på nytt fullførte denne gangen helt
+  uten feil ("Deployed fungifinder-api triggers — api.fungifinder.no
+  (custom domain)", ny Version ID). Bekreftet live med to ufarlige,
+  ikke-muterende kall: `GET /meg` → 200 (som alltid), `GET /delte/funn`
+  (v0.22.0 sitt nye endepunkt) → 401 (krever innlogging — bekrefter at
+  selve ruten faktisk er registrert og live, ikke 404).
+
 ## 0.22.0 — Del egne funn med andre påloggede brukere (opt-in)
 Bruker ba om at påloggede kan velge å dele egne funn med andre innloggede.
 Avklart før implementering (se samtalen 2026-08-13): (1) ÉN global
