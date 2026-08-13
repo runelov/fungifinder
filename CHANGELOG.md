@@ -1,5 +1,38 @@
 # Endringslogg
 
+## 0.21.10 — Hev geolokasjons-timeout ved oppstart (kartet viste "hele Norge" i stedet for posisjon)
+Bruker meldte at kartet innimellom mister fokus på "min posisjon" ved
+sideinnlasting, eller viser et større utsnitt av Norge som om posisjonen
+var ukjent — mistenkte at for mange arts-observasjoner ble hentet/tegnet.
+
+Undersøkt: Artskart-laget (`loadArtsfunn()`) er allerede kartutsnitt-
+begrenset siden D1-migrasjonen (steg 2/3) og er ikke synderen. Den faktiske,
+deterministiske rotårsaken lå i `geolocateStartupView()`:
+`getCurrentPosition()` fikk `{ timeout: 4000 }` — dette er en instruks til
+selve geolokasjons-APIet om å gi permanent TIMEOUT-feil (ingen ny sjanse)
+hvis en posisjon ikke er funnet innen 4 sek, helt uavhengig av appens egen
+"ikke blokkér oppstarten"-frist (en separat `setTimeout(4000)`, uendret).
+Forrige økt (2026-08-12, se memory) målte allerede ~8 sek reell ventetid
+for "Min posisjon" — godt over dette budsjettet. Når fristen sprakk, forble
+`mapFittedOnce` `false`, og appen falt tilbake til å `fitBounds()` over
+HELE det nasjonale datasettet (default `fylkeFilter='alle'`) — nøyaktig
+symptomet meldt, med ingen mulighet for et sent, men reelt, GPS/WiFi-svar
+å rette opp i det (suksess-callbacken var allerede designet for å håndtere
+et sent svar — den fikk bare aldri sjansen fordi selve API-kallet var dødt).
+
+- Hevet kun selve `getCurrentPosition()`-fristen (4000ms → 12000ms).
+  Appens EGEN frist for å slippe resten av oppstarten videre uten å vente
+  på geolokasjon er uendret (fortsatt 4 sek) — første maling forblir like
+  rask, men en treg-men-reell posisjonering får nå faktisk lov til å komme
+  gjennom og rette opp kartet i stedet for å bli drept for tidlig.
+- IKKE live-verifisert mot en ekte GPS/WiFi-triangulering (sandkasse-
+  nettleseren her avslår geolokasjon momentant, samme begrensning som
+  tidligere `useMyLocation()`-rettelser) — kun kodesti/logikk verifisert,
+  appen for øvrig uendret i preview.
+- Svarer på oppfølgingspunkt 1 fra 2026-08-12-økten ("min posisjon er
+  treigt, ~8 sek observert") — se memory
+  `fungifinder-oppfolgingspunkter` — som nå kan lukkes.
+
 ## 0.21.9 — Fiks stale kommuneregister-cache (Våler/Østfold-disambiguering feilet fortsatt)
 Bruker meldte at v0.21.8 fortsatt ga "Våler finnes i flere fylker ( og )"
 — med TOMME fylkesnavn i parentesen — selv med Østfold valgt i

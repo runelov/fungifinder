@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.21.9';
+  const APP_VERSION = '0.21.10';
   const APP_BUILD_DATE = '2026-08-13';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -2513,6 +2513,25 @@
   // dialogen etter at vi ga opp) flytter fortsatt kartet når det kommer —
   // setView() over trigger Leaflet sin egen 'moveend', som den allerede
   // eksisterende lytteren i initMap() fanger opp helt av seg selv.
+  // RETTET 2026-08-13 (bruker meldte: kartet viser innimellom "et større
+  // utsnitt av Norge" ved sideinnlasting, som om posisjonen var ukjent).
+  // Rotårsak: `getCurrentPosition()` fikk tidligere `{ timeout: 4000 }` —
+  // IKKE bare "hvor lenge VI venter" (det styres av setTimeout-en under,
+  // uendret), men en instruks til selve geolokasjons-APIet om å returnere
+  // en TIMEOUT-FEIL (ikke prøve på nytt) hvis en posisjon ikke er funnet
+  // innen 4 sek, UANSETT hvor travelt hovedtråden er med resten av
+  // oppstarten. Forrige økt (se memory "fungifinder-oppfolgingspunkter")
+  // målte allerede ~8 sek reell ventetid for "Min posisjon" — godt over
+  // dette budsjettet. Når fristen sprakk, feilet geolokasjonen PERMANENT
+  // (ingen ny sjanse), `mapFittedOnce` forble `false`, og appen falt
+  // tilbake til å fitBounds() over HELE det nasjonale datasettet (default
+  // `fylkeFilter='alle'`) — nøyaktig symptomet meldt. Den EGNE
+  // setTimeout(4000) under (som slipper resten av oppstarten videre uten
+  // å vente på geolokasjon) er UENDRET — kun selve API-fristen er hevet,
+  // slik at en treg-men-reell posisjonering fortsatt får lov til å komme
+  // gjennom og rette opp kartet (se suksess-callbacken under, som allerede
+  // var designet for å håndtere et SENT svar) i stedet for å bli drept før
+  // den i det hele tatt fikk sjansen.
   function geolocateStartupView(){
     return new Promise((resolve) => {
       if (!navigator.geolocation) { resolve(false); return; }
@@ -2543,7 +2562,7 @@
           ferdigstill(true);
         },
         () => ferdigstill(false), // avslått eller feilet — behold default senterpunkt
-        { timeout: 4000, maximumAge: 5 * 60 * 1000 }
+        { timeout: 12000, maximumAge: 5 * 60 * 1000 }
       );
     });
   }
