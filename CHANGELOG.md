@@ -1,5 +1,30 @@
 # Endringslogg
 
+## 0.21.16 — Statistikk-fanen viser mest populære favoritt-sopper
+Bruker ba om et sammendrag av mest populære favoritt-sopper på
+Statistikk-fanen (admin).
+
+- **Backend** (`worker/api/src/routes/admin.js`, `hentStatistikk()`): ny
+  `favoritter.topp` — teller `bruker_data.data.favoriteSpecies` PER ART på
+  tvers av alle brukere (samme JS-loop over `bruker_data` som allerede
+  telte antall favoritter per bruker, nå også tallfestet per art), sortert
+  synkende. Kun rå artsID-er returneres (SPECIES-navnene finnes kun i
+  frontend). Bevisst ikke filtrert bort permanent slettede brukere, samme
+  begrunnelse som resten av statistikken.
+- **Frontend** (`renderAdminStatistikk()` i `js/app.js`): ny seksjon
+  "Mest populære favoritt-sopper", samme listestil som
+  fylke/kommune-oversiktene. Slår opp artsnavn mot `SPECIES`, med fallback
+  til rå ID for en art som skulle bli fjernet fra `SPECIES` mens en bruker
+  fortsatt har den lagret som favoritt.
+- Verifisert mot lokal D1 (wrangler dev, seedet 3 testbrukere med
+  overlappende favoritter): `/admin/statistikk` ga korrekt aggregert og
+  sortert `favoritter.topp` (`kantarell: 3, steinsopp: 2,
+  traktkantarell: 2`, matcher forventet telling). Rendering-logikken
+  kjørt isolert i Node med samme data ga korrekt HTML, inkl. tomtilstand
+  og fallback for ukjent art-ID. IKKE verifisert i selve nettleser-UI-et
+  (krever en ekte innloggingsflyt for en HttpOnly-sesjonscookie, som ikke
+  lar seg simulere fra klient-JS).
+
 ## 0.21.15 — Cache scoreLocation()-resultater (raskere bytte "Én art" ↔ "Mine favoritter")
 Bruker meldte at bytte fra "Én art" til "Mine favoritter" tok noen
 sekunder, og spurte om samme rekkefølge/venting-årsak som forrige

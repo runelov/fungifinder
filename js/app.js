@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.21.15';
+  const APP_VERSION = '0.21.16';
   const APP_BUILD_DATE = '2026-08-13';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -609,6 +609,17 @@
           <span style="text-align:right;white-space:nowrap;">${b.funn} funn · ${b.hogstMerket + b.hogstOmrader} hogstfelt · ${b.egneSteder} egne steder</span>
         </div>`).join('') || '<div class="sp-empty-mine">Ingen brukere ennå.</div>';
 
+      // RETTET 2026-08-13 (bruker ba om et sammendrag av mest populære
+      // favoritt-sopper): s.favoritter.topp er allerede aggregert og
+      // sortert server-side (se hentStatistikk() i
+      // worker/api/src/routes/admin.js) — kun rå artsID-er, slås opp mot
+      // SPECIES her siden artsnavnene kun finnes i frontend. `?.name || id`
+      // dekker en art som skulle bli fjernet fra SPECIES-lista mens en
+      // bruker fortsatt har den lagret som favoritt — vises da med rå ID
+      // i stedet for å forsvinne stille fra tellingen.
+      const favorittRader = (s.favoritter?.topp || []).map(f =>
+        `<div class="sp-mine-row"><span>${escapeHtml(SPECIES.find(sp => sp.id === f.art)?.name || f.art)}</span><span>${f.antall}</span></div>`).join('');
+
       el.innerHTML = `
         <div class="sp-stat-grid">
           ${statBoxes.map(([tall, label]) => `<div class="sp-stat-box"><b>${tall}</b><span>${escapeHtml(label)}</span></div>`).join('')}
@@ -621,6 +632,9 @@
           <summary style="cursor:pointer;font-size:12.5px;color:var(--ink-soft);">Se alle ${kommunerDekket} kommuner med målepunkter</summary>
           <div class="sp-mine-list" style="margin-top:6px;">${kommuneRader || '<div class="sp-empty-mine">Ingen målepunkter ennå.</div>'}</div>
         </details>
+
+        <h4 style="margin:14px 0 6px;">Mest populære favoritt-sopper</h4>
+        <div class="sp-mine-list">${favorittRader || '<div class="sp-empty-mine">Ingen favoritter valgt av noen bruker ennå.</div>'}</div>
 
         <h4 style="margin:14px 0 6px;">Brukerbidrag <span style="font-weight:400;opacity:.6;">— per bruker (se totaler i boksene over)</span></h4>
         <div class="sp-mine-list">${brukerRader}</div>

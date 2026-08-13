@@ -150,6 +150,14 @@ export async function slettInvitasjon({ request, env, params }) {
 // er én JSON-blob per bruker (se routes/data.js), så telling av
 // funn/cuts/hogstOmrader/customLocations/favoriteSpecies må skje i JS
 // etter henting — det finnes ingen SQL-kolonne å GROUP BY her.
+//
+// RETTET 2026-08-13: `favoritter.topp` lagt til (bruker ba om et
+// sammendrag av mest populære favoritt-sopper i Statistikk-fanen) — samme
+// JS-loop over bruker_data.data.favoriteSpecies som allerede eksisterte
+// for antall('favoriteSpecies') per bruker, men nå OGSÅ tallfestet PER
+// ART på tvers av alle brukere. Kun rå artsID-er telles/returneres her
+// (SPECIES-navnene finnes kun i frontend) — navneoppslaget skjer i
+// renderAdminStatistikk() i js/app.js.
 export async function hentStatistikk({ request, env }) {
   const cors = corsHeaders(env);
   const admin = await requireAdmin(request, env);
@@ -175,10 +183,23 @@ export async function hentStatistikk({ request, env }) {
   // raden deres blir stående (kun sesjon/epost scrubbes, se
   // slettBrukerPermanent over), så tallene ville vært misvisende lave uten
   // dem. Frontend markerer dem i stedet med "slettet"-status.
+  // Telling per art (ikke bare antall FAVORITTER per bruker, som allerede
+  // fantes over) — brukes til "mest populære favoritt-sopper"-sammendraget
+  // i Statistikk-fanen. Kun rå artsID-er telles her; SPECIES-navnene finnes
+  // kun i frontend (js/app.js), så navneoppslaget skjer klient-side.
+  // Bevisst IKKE filtrert bort permanent slettede brukere sine favoritter —
+  // samme begrunnelse som brukere-listen under (misvisende lave tall ellers).
+  const favorittTelling = {};
+
   const brukere = brukerRader.results.map((rad) => {
     let d = {};
     try { d = rad.data ? JSON.parse(rad.data) : {}; } catch { d = {}; }
     const antall = (nokkel) => (Array.isArray(d[nokkel]) ? d[nokkel].length : 0);
+    if (Array.isArray(d.favoriteSpecies)) {
+      for (const art of d.favoriteSpecies) {
+        if (typeof art === 'string' && art) favorittTelling[art] = (favorittTelling[art] || 0) + 1;
+      }
+    }
     return {
       id: rad.id,
       kortnavn: rad.kortnavn,
@@ -195,6 +216,10 @@ export async function hentStatistikk({ request, env }) {
     };
   });
 
+  const favorittTopp = Object.entries(favorittTelling)
+    .map(([art, antall]) => ({ art, antall }))
+    .sort((a, b) => b.antall - a.antall);
+
   return json({
     malepunkter: {
       totalt: totalRad.antall,
@@ -205,6 +230,7 @@ export async function hentStatistikk({ request, env }) {
     },
     artsfunn: { totalt: artsfunnRad.antall, arter: artsfunnRad.arter },
     dekning: { kjoringer: dekningRad.antall, sisteHenting: dekningRad.siste },
+    favoritter: { topp: favorittTopp },
     brukere,
   }, 200, cors);
 }
