@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.21.12';
+  const APP_VERSION = '0.21.13';
   const APP_BUILD_DATE = '2026-08-13';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -309,8 +309,25 @@
   // ---------- auth (fungifinder-api: magic-link + sesjon + roller) ----------
   function isAdmin(){ return !!(currentUser && currentUser.rolle === 'admin'); }
 
+  // RETTET 2026-08-13 (oppdaget under verifisering av renderDataNotice()):
+  // `ApiClient.meg()` (dermed selve `fetch()`) kastet UFANGET ved en
+  // nettverksfeil (frakoblet, worker midlertidig nede, e.l.) — dette
+  // propagerte gjennom `await Promise.all([geolocateStartupView(),
+  // initAuth()])` i init() og VELTET resten av oppstarten (loadLocations,
+  // loadArtsfunn, loadStorage, render(), loadWeather() — ALT etter det
+  // punktet), slik at appen ble stående helt blank/ubrukelig i stedet for
+  // å falle tilbake til "ikke innlogget, viser eksempeldata"-modus (som
+  // f.eks. et 401/500-svar fra serveren allerede håndteres fint av —
+  // kun selve nettverkslaget manglet dekning). Samme
+  // fang-og-fortsett-mønster som loadLocations()/loadFetchedAreas()/
+  // loadArtsfunn() allerede bruker.
   async function initAuth(){
-    currentUser = await window.ApiClient.meg();
+    try {
+      currentUser = await window.ApiClient.meg();
+    } catch (e) {
+      console.warn('Kunne ikke sjekke innloggingsstatus (nettverksfeil?) — fortsetter som ikke innlogget.', e);
+      currentUser = null;
+    }
     reflectAccountUi();
   }
 

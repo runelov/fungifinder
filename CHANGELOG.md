@@ -1,5 +1,26 @@
 # Endringslogg
 
+## 0.21.13 — Fiks: nettverksfeil ved oppstart veltet HELE appen, ikke bare innlogging
+Oppdaget under verifisering av v0.21.12: `initAuth()` fanget ikke opp en
+nettverksfeil fra `ApiClient.meg()` (`fetch()` som feiler helt, f.eks.
+frakoblet enhet eller worker midlertidig nede — i motsetning til et
+vanlig HTTP-feilsvar som 401/500, som allerede håndteres fint). Dette
+kastet ufanget gjennom `await Promise.all([geolocateStartupView(),
+initAuth()])` i `init()` og VELTET resten av oppstart-kjeden
+(`loadLocations`, `loadArtsfunn`, `loadStorage`, `render()`,
+`loadWeather()` — bokstavelig talt alt etter det punktet). Appen ble
+stående helt blank/ubrukelig i stedet for å falle tilbake til
+"ikke innlogget, viser eksempeldata" slik den er designet for.
+
+- `initAuth()` fanger nå feilen og fortsetter som ikke innlogget (samme
+  fang-og-fortsett-mønster som `loadLocations()`/`loadFetchedAreas()`/
+  `loadArtsfunn()` allerede bruker).
+- Verifisert i preview: uten en tilgjengelig API-worker viste appen
+  tidligere en helt blank/ikke-oppdatert side (ingen artsliste, kart-data
+  aldri lastet); etter fiksen laster art-liste/kart/score normalt i
+  "ikke innlogget"-modus, og "Om dataene" sin nye kommuneliste (v0.21.12)
+  viser korrekt "logg inn for å se full oversikt".
+
 ## 0.21.12 — "Om dataene" viser nå faktisk hvilke kommuner som er godt analysert
 Bruker ba om oppdatert tekst i "Om dataene"-varselet: den gamle
 "hentes on-demand av admin for hvert nye område"-formuleringen var
