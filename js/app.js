@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.21.10';
+  const APP_VERSION = '0.21.11';
   const APP_BUILD_DATE = '2026-08-13';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -647,6 +647,30 @@
     }
   }
 
+  // RETTET 2026-08-13 (bruker meldte mistanke om at treg/rotete kart-
+  // oppstart skyldtes at for mange artsobservasjoner ble hentet/tegnet):
+  // "bbox-filtrert rundt synlig utsnitt" (steg 2/3 under) beskytter IKKE
+  // mot et vidt, uzoomet utsnitt — ved oppstart (default "Alle fylker",
+  // hele Norge synlig) ER det synlige utsnittet hele landet, så bbox-
+  // filteret alene gjorde ingenting for akkurat det tilfellet. Artskart-
+  // laget skal derfor nå kun eksistere når brukeren enten har valgt et
+  // konkret fylke/kommune/radius-senter, ELLER har zoomet inn til et nivå
+  // som tilsvarer det samme (typisk fylke-størrelse eller mindre) — se
+  // artskartOmradeErAvgrenset()/ARTSKART_MIN_ZOOM under. Ved en vid,
+  // ufiltrert nasjonal visning tegnes laget rett og slett ikke.
+  const ARTSKART_MIN_ZOOM = 9; // ca. tilsvarende et gjennomsnittlig fylke-utsnitt eller mindre
+  function artskartOmradeErAvgrenset(){
+    if (filterMode === 'fylke') return fylkeFilter !== 'alle';
+    if (filterMode === 'kommune') return kommuneFilter !== 'alle';
+    if (filterMode === 'radius') return !!radiusCenter;
+    return false;
+  }
+  function artskartSkalHentesOgVises(){
+    if (!leafletMap) return false;
+    if (artskartOmradeErAvgrenset()) return true;
+    return leafletMap.getZoom() >= ARTSKART_MIN_ZOOM;
+  }
+
   // Ekte Artsdatabanken-observasjoner (art/koordinat/dato), hentet av
   // fetch_area.py og akkumulert i D1 (se fungifinder-db).
   //
@@ -665,6 +689,7 @@
   async function loadArtsfunn(){
     if (!currentUser) { artsfunn = []; artsfunnLoadedBounds = null; return; }
     if (!leafletMap) { artsfunn = []; return; } // kartet ikke initialisert ennå — bør ikke skje gitt call-rekkefølgen i init()
+    if (!artskartSkalHentesOgVises()) { artsfunn = []; artsfunnLoadedBounds = null; return; } // for vidt/uavgrenset utsnitt — se begrunnelse over
     const synlig = leafletMap.getBounds();
     if (artsfunnLoadedBounds && artsfunnLoadedBounds.contains(synlig)) return; // allerede dekket, ingen ny nettverksrundtur
     const hentUtsnitt = synlig.pad(0.5);
@@ -3333,7 +3358,17 @@
     const coverageCount = scoped.length;
     updateCoverageLine(coverageCount);
     if (hideHogst) scoped = scoped.filter(s => !s.res.isCut);
+    // Tegner umiddelbart fra et evt. allerede innlastet datasett (billig,
+    // synkront), OG trigger i tillegg en (fire-and-forget) sjekk av om et
+    // NYTT hent nå er nødvendig — dekker tilfeller der filtervalget alene
+    // gjør laget synlig/usynlig uten at kartets synlige utsnitt faktisk
+    // beveger seg (f.eks. å nullstille et fylkevalg tilbake til "Alle
+    // fylker" endrer ikke kartutsnittet, kun om laget skal vises).
+    // loadArtsfunn() er selv billig å kalle for ofte — den gir umiddelbart
+    // opp (uten nettverkskall) både når området ikke er avgrenset nok OG
+    // når gjeldende utsnitt allerede er dekket av forrige hent.
     renderArtskartLayer();
+    loadArtsfunn().then(renderArtskartLayer);
     scoped.sort((a,b) => {
       if (a.res.isCut !== b.res.isCut) return a.res.isCut ? 1 : -1;
       return b.res.total - a.res.total;
@@ -3679,6 +3714,11 @@
   // samtidig.
   function renderArtskartLayer(){
     if (!artskartLayer || !leafletMap) return;
+    // For vidt/uavgrenset utsnitt (se artskartSkalHentesOgVises()) — tegn
+    // ingenting, selv om `artsfunn` skulle ha data hengende igjen fra en
+    // tidligere, mer avgrenset visning (f.eks. rett etter at brukeren
+    // nullstiller fylkevalget til "Alle fylker" igjen).
+    if (!artskartSkalHentesOgVises()) { artskartLayer.clearLayers(); return; }
     artskartLayer.clearLayers();
     if (!artsfunn.length) return;
     const activeIds = new Set(activeSpeciesIds());

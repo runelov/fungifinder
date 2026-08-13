@@ -1,5 +1,39 @@
 # Endringslogg
 
+## 0.21.11 — Artsdatabanken-laget tegnes ikke lenger ved en vid, uavgrenset visning
+Bruker ba om at artsobservasjoner ikke skal hentes/tegnes før fylke/kommune
+er valgt, eller kartet er zoomet inn til et nivå tilsvarende det — mistanke
+fra forrige melding (kartet "mister fokus på min posisjon") om at for mange
+observasjoner ble hentet/tegnet, som riktignok viste seg å ha en annen,
+deterministisk rotårsak (se v0.21.10), men selve mistanken var likevel
+delvis treffende: `loadArtsfunn()`s bbox-filter er bundet til kartets
+SYNLIGE utsnitt — ved default oppstart (Alle fylker, hele Norge synlig,
+zoom 6) ER det synlige utsnittet hele landet, så bbox-filteret alene
+beskyttet ikke mot akkurat det tilfellet.
+
+- Ny `artskartOmradeErAvgrenset()`: sann når et konkret fylke/kommune/
+  radius-senter er valgt (uansett zoomnivå).
+- Ny `artskartSkalHentesOgVises()`: sann når området over er avgrenset,
+  ELLER kartets zoomnivå er ≥ `ARTSKART_MIN_ZOOM` (9 — ca. tilsvarende et
+  gjennomsnittlig fylke-utsnitt eller mindre, uavhengig av om et filter
+  faktisk er valgt — dekker "zoomet manuelt inn uten å bruke
+  fylke/kommune-velgeren").
+- `loadArtsfunn()` gir nå opp FØR noe nettverkskall hvis dette er usant
+  (ingen henting), og `renderArtskartLayer()` tegner ingenting (selv om
+  `artsfunn` skulle ha data hengende igjen fra en tidligere, mer avgrenset
+  visning — f.eks. rett etter å nullstille et fylkevalg).
+- `render()` trigger nå i tillegg en fire-and-forget
+  `loadArtsfunn().then(renderArtskartLayer)` — dekker tilfeller der et
+  filtervalg alene endrer om laget skal vises UTEN at kartets synlige
+  utsnitt faktisk beveger seg (og dermed ikke ville trigget den eksisterende
+  `moveend`-lytteren). `loadArtsfunn()` er billig å kalle for ofte —
+  gir umiddelbart opp uten nettverkskall både når området ikke er avgrenset
+  nok, og når gjeldende utsnitt allerede er dekket av forrige hent.
+- IKKE end-to-end-verifisert mot ekte innlogget sesjon/ekte Artskart-data
+  (denne økten manglet en kjørende `fungifinder-api`-worker og ekte
+  D1-innhold) — kun kodesti/logikk lest og resonnert gjennom, samt
+  bekreftet at appen fortsatt laster uten nye konsoll-feil.
+
 ## 0.21.10 — Hev geolokasjons-timeout ved oppstart (kartet viste "hele Norge" i stedet for posisjon)
 Bruker meldte at kartet innimellom mister fokus på "min posisjon" ved
 sideinnlasting, eller viser et større utsnitt av Norge som om posisjonen
