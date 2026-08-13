@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.21.16';
+  const APP_VERSION = '0.22.0';
   const APP_BUILD_DATE = '2026-08-13';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -179,6 +179,8 @@
                           // uavhengig av om det finnes et eksisterende målepunkt i dem (se scoreLocation)
   let markingHogstMode = false;
   let customLocations = [];
+  let delFunn = false; // "del mine funn med andre påloggede brukere" — se persistAll()/loadStorage() og sp-toggle-del-funn
+  let delteFunn = []; // ANDRE brukeres delte funn ({art,dato,lat,lon,kortnavn}) — se loadDelteFunn()
   let fetchedAreas = [];
   let artsfunn = []; // ekte Artsdatabanken-observasjoner — se loadArtsfunn()
   let gridKm = 1.5;
@@ -260,7 +262,7 @@
   // ---------- storage (fungifinder-api, sesjonsbasert) ----------
   async function loadStorage(){
     if (!currentUser) {
-      userFinds = []; userCuts = []; hogstOmrader = []; customLocations = []; favoriteSpecies = [];
+      userFinds = []; userCuts = []; hogstOmrader = []; customLocations = []; favoriteSpecies = []; delFunn = false;
       bumpScoreCache();
       return;
     }
@@ -271,6 +273,7 @@
       hogstOmrader = d.hogstOmrader || [];
       customLocations = d.customLocations || [];
       favoriteSpecies = d.favoriteSpecies || [];
+      delFunn = d.delFunn === true;
       bumpScoreCache();
       setSyncStatus(`✓ Innlogget som ${currentUser.kortnavn}`);
     } catch (e) {
@@ -287,7 +290,7 @@
     // render() skal aldri kunne lese en scoreCache som ikke reflekterer
     // den, uansett hvor lang tid selve lagringen tar.
     bumpScoreCache();
-    const payload = { finds: userFinds, cuts: userCuts, hogstOmrader: hogstOmrader, customLocations: customLocations, favoriteSpecies: favoriteSpecies };
+    const payload = { finds: userFinds, cuts: userCuts, hogstOmrader: hogstOmrader, customLocations: customLocations, favoriteSpecies: favoriteSpecies, delFunn };
     try {
       await window.ApiClient.lagreMineData(payload);
       setSyncStatus(`✓ Lagret (${new Date().toLocaleTimeString('no')})`);
@@ -301,6 +304,7 @@
   async function saveHogstOmrader(){ await persistAll(); }
   async function saveFavorites(){ await persistAll(); }
   async function saveCustomLocations(){ await persistAll(); }
+  async function saveDelFunn(){ await persistAll(); }
 
   function setSyncStatus(text){
     const el = document.getElementById('sp-sync-status');
@@ -431,6 +435,7 @@
         // "Artsdatabanken-funn"-laget sto da som aktivt, men tomt.
         await loadArtsfunn();
         await loadStorage();
+        await loadDelteFunn(); // samme begrunnelse som loadArtsfunn() over — ingen sideomlasting her
         render();
       } catch (err) {
         statusEl.textContent = '⚠ ' + err.message;
@@ -446,6 +451,7 @@
       currentUser = null;
       artsfunn = []; // ikke la gamle Artskart-observasjoner bli stående synlige uten sesjon
       artsfunnLoadedBounds = null; // tving et ekte nytt hent ved neste innlogging, se loadArtsfunn()
+      delteFunn = []; // samme begrunnelse — ikke la andres delte funn bli stående synlige uten sesjon
       reflectAccountUi();
       await loadLocations();
       await loadStorage();
@@ -481,6 +487,7 @@
           await initAuth();
           await loadLocations();
           await loadStorage();
+          await loadDelteFunn();
           render();
         } catch (err) {
           statusEl.textContent = '⚠ ' + err.message;
@@ -778,6 +785,24 @@
       console.warn('Kunne ikke laste artsfunn.', e);
       artsfunn = [];
       artsfunnLoadedBounds = null;
+    }
+  }
+
+  // Andre brukeres DELTE funn (se delFunn/hentDelteFunn()) — i motsetning
+  // til loadArtsfunn() over er dette datasettet begrenset av ANTALL
+  // brukere som faktisk har skrudd på deling (typisk noen få, ikke et
+  // nasjonalt ~31 000-rads datasett), så det hentes i sin helhet én gang
+  // per innlogget økt i stedet for kartutsnitt-begrenset — ingen av
+  // begrunnelsene for artsfunnLoadedBounds/artskartSkalHentesOgVises
+  // (v0.21.11) gjelder her i praksis.
+  async function loadDelteFunn(){
+    if (!currentUser) { delteFunn = []; return; }
+    try {
+      const data = await window.ApiClient.hentDelteFunn();
+      delteFunn = Array.isArray(data) ? data : [];
+    } catch (e) {
+      console.warn('Kunne ikke laste delte funn fra andre brukere.', e);
+      delteFunn = [];
     }
   }
 
@@ -2512,6 +2537,7 @@
   let hogstLayer = null;
   let findsLayer = null;
   let artskartLayer = null;
+  let delteFunnLayer = null; // andre brukeres delte funn — se loadDelteFunn()/renderDelteFunnLayer()
   let artskartMoveDebounce = null; // se moveend-lytteren i initMap()
   let findMarkersById = {};
   let mapFittedOnce = false;
@@ -2734,13 +2760,14 @@
     hogstLayer = L.layerGroup().addTo(leafletMap);
     findsLayer = L.layerGroup().addTo(leafletMap);
     artskartLayer = L.layerGroup().addTo(leafletMap);
+    delteFunnLayer = L.layerGroup().addTo(leafletMap);
 
     // Lag-kontroll: bytt bakgrunnskart (radioknapper) og skru målepunkter/
     // rundtur/hogstfelt/funn av/på (avkrysning) — praktisk når man vil se
     // rent terreng for å merke seg egne funnsteder uten at prikkene er i veien.
     L.control.layers(
       { 'Topografisk (Kartverket)': topoLayer, 'Standard': standardLayer, 'Satellitt': satelliteLayer },
-      { 'Målepunkter': markerLayer, 'Foreslåtte områder': routeLayer, 'Mine hogstfelt': hogstLayer, 'Mine funn': findsLayer, 'Artsdatabanken-funn': artskartLayer },
+      { 'Målepunkter': markerLayer, 'Foreslåtte områder': routeLayer, 'Mine hogstfelt': hogstLayer, 'Mine funn': findsLayer, 'Artsdatabanken-funn': artskartLayer, 'Delte funn (andre brukere)': delteFunnLayer },
       { collapsed: true }
     ).addTo(leafletMap);
 
@@ -3412,6 +3439,7 @@
     document.getElementById('sp-toggle-knownfinds').classList.toggle('on', deprioritizeKnownFinds);
     document.getElementById('sp-toggle-hogst').classList.toggle('on', hideHogst);
     document.getElementById('sp-toggle-artskart-recent').classList.toggle('on', artskartOnlyRecent);
+    document.getElementById('sp-toggle-del-funn').classList.toggle('on', delFunn);
 
     document.querySelectorAll('#sp-viewmode-seg button').forEach(b => b.classList.toggle('active', b.dataset.viewmode === viewMode));
     document.getElementById('sp-fav-count').textContent = favoriteSpecies.length;
@@ -3472,6 +3500,7 @@
     renderMap(scoredAll);
     renderHogstZones();
     renderFindsLayer();
+    renderDelteFunnLayer();
 
     let scoped = scoredAll.filter(s => {
       if (filterMode === 'fylke') return fylkeFilter === 'alle' || s.loc.fylke === fylkeFilter;
@@ -3813,6 +3842,27 @@
     });
   }
 
+  // Andre brukeres delte funn (se delFunn/loadDelteFunn()) — egen visuell
+  // farge (fiolett) forskjellig fra BÅDE egne funn (#8C4A20, brunt) og
+  // Artsdatabanken-laget (#4C7BE1, blått), slik at alle tre kan skilles fra
+  // hverandre i kartet. Filtreres på aktiv(e) art(er) akkurat som de to
+  // andre lagene (se activeSpeciesIds()). Ingen redigeringsknapp i popup-en
+  // (i motsetning til renderFindsLayer over) — det er ikke ditt funn.
+  function renderDelteFunnLayer(){
+    if (!delteFunnLayer) return;
+    delteFunnLayer.clearLayers();
+    if (!delteFunn.length) return;
+    const activeIds = new Set(activeSpeciesIds());
+    delteFunn.filter(f => activeIds.has(f.art)).forEach(f => {
+      const sp = SPECIES.find(s => s.id === f.art);
+      const marker = L.circleMarker([f.lat, f.lon], {
+        radius: 6, color: '#fff', weight: 1.5, fillColor: '#8451C7', fillOpacity: 0.85
+      });
+      marker.bindPopup(`<b>${escapeHtml(sp ? sp.name : f.art)}</b><br/>${escapeHtml(f.dato || 'ukjent dato')}<br/>Funnet av ${escapeHtml(f.kortnavn)}`);
+      marker.addTo(delteFunnLayer);
+    });
+  }
+
   function locateFindOnMap(findId){
     const find = userFinds.find(f => f.id === findId);
     const pos = find && findLatLon(find);
@@ -4012,6 +4062,14 @@
   document.getElementById('sp-toggle-knownfinds').addEventListener('click', () => { deprioritizeKnownFinds = !deprioritizeKnownFinds; bumpScoreCache(); render(); });
   document.getElementById('sp-toggle-hogst').addEventListener('click', () => { hideHogst = !hideHogst; render(); });
   document.getElementById('sp-toggle-artskart-recent').addEventListener('click', () => { artskartOnlyRecent = !artskartOnlyRecent; render(); });
+  // Påvirker IKKE min egen scoring/kart (kun hva ANDRE ser av mine funn),
+  // så ingen bumpScoreCache() her — kun lagring + re-render for å
+  // oppdatere selve bryteren sin visuelle "on"-tilstand.
+  document.getElementById('sp-toggle-del-funn').addEventListener('click', async () => {
+    delFunn = !delFunn;
+    render();
+    await saveDelFunn();
+  });
   // RETTET (server-side filtrering): fylke/kommune-filterbytte re-henter nå
   // fra /terrengdata (se loadLocations()) i stedet for å kun filtrere et
   // allerede fullt innlastet array — await FØR render() slik at kartet ikke
@@ -4162,7 +4220,7 @@
     // artsfunn/userFinds osv.) og svelger allerede sine egne feil internt
     // (så en Promise.all her avviser aldri). Kjørt parallelt kutter
     // ventetiden fra summen av alle fire til den TREGESTE av dem.
-    await Promise.all([loadLocations(), loadFetchedAreas(), loadArtsfunn(), loadStorage()]);
+    await Promise.all([loadLocations(), loadFetchedAreas(), loadArtsfunn(), loadStorage(), loadDelteFunn()]);
     render();
     loadWeather();
     loadSeasonWeather();

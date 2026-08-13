@@ -1,5 +1,56 @@
 # Endringslogg
 
+## 0.22.0 — Del egne funn med andre påloggede brukere (opt-in)
+Bruker ba om at påloggede kan velge å dele egne funn med andre innloggede.
+Avklart før implementering (se samtalen 2026-08-13): (1) ÉN global
+av/på-bryter, ikke per-funn, (2) andre ser art/sted/dato + hvem som fant
+det (ikke anonymt), (3) rent informativt kartlag — påvirker IKKE
+score-beregningen for andre brukere.
+
+- **Ny D1-fri innstilling**: `delFunn` (boolsk, default false) lagt til i
+  samme personlige JSON-blob som finds/cuts/hogstOmrader/customLocations/
+  favoriteSpecies (`bruker_data`-tabellen, ingen migrasjon nødvendig).
+  `worker/api/src/routes/data.js` sin rensk-logikk skiller nå eksplisitt
+  ARRAY_NOKLER fra dette ene boolske feltet.
+- **Ny endepunkt `GET /delte/funn`** (`hentDelteFunn()` i samme fil, kun
+  `requireSession`, ingen admin-krav): finner alle AKTIVE, ikke-slettede
+  brukere med `delFunn=true` (utenom deg selv), og løser hvert funns
+  `locId` mot ENTEN et delt `terreng_steder`-punkt ELLER den delende
+  brukerens EGNE `customLocations` (aldri delt i sin helhet — kun de
+  spesifikt refererte koordinatene slippes ut). Returnerer kun
+  `{art, dato, lat, lon, kortnavn}` — ALDRI mengde/notat/finn-id.
+- **Nytt kartlag "Delte funn (andre brukere)"** (fiolett, `#8451C7` —
+  skilt fra egne funn/brunt og Artsdatabanken/blått), lastet én gang per
+  økt (`loadDelteFunn()`) siden datasettet er begrenset av antall
+  DELENDE brukere, ikke et nasjonalt datasett — ingen kartutsnitt-
+  begrensning nødvendig (i motsetning til Artskart-laget, v0.21.11).
+  Filtreres på aktiv(e) art(er) som de to andre funn-lagene.
+  Popup viser art, dato og "Funnet av `<kortnavn>`" — ingen redigering
+  (det er ikke ditt funn).
+- **Ny bryter i Konto-fanen**: "Del mine funn med andre påloggede
+  brukere", med forklarende tekst om nøyaktig hva som deles. Påvirker
+  ikke egen scoreCache (kun hva ANDRE ser), så ingen `bumpScoreCache()`
+  ved klikk — kun lagring (`saveDelFunn()` → `persistAll()`) + re-render.
+- `loadDelteFunn()` kjøres parallelt med de andre oppstartslastingene i
+  `init()`, samt i kode-basert innlogging og invitasjonsregistrering
+  (samme steder som allerede måtte dekke `loadArtsfunn()` sitt
+  "ingen sideomlasting"-tilfelle) — og nullstilles ved utlogging.
+- **Verifisert mot lokal D1** (wrangler dev, seedet to testbrukere): satte
+  `delFunn=true` og to funn (ett mot et delt `terreng_steder`-punkt, ett
+  mot en egen `customLocations`-oppføring, inkl. et notatfelt) for én
+  bruker, hentet `/delte/funn` fra en ANNEN brukers sesjon — ga korrekt
+  begge funnene med riktig kortnavn/koordinater, notat/mengde ALDRI med.
+  Bekreftet egne funn ALLTID ekskluderes fra egen `/delte/funn`-respons,
+  at `delFunn=false` umiddelbart skjuler funnene for andre (dynamisk, ikke
+  cachet), og at en ugyldig verdi (streng i stedet for boolsk) trygt
+  coerces til `false`. Frontend verifisert uten regresjon (ingen nye
+  konsoll-feil, ny bryter/kartlag-oppføring til stede i DOM-et) — selve
+  UI-flyten IKKE kjørt gjennom en ekte innlogget nettleserøkt (samme
+  begrensning som v0.21.16, krever ekte sesjonscookie).
+- **NB: krever `npx wrangler deploy`** fra `worker/api/` for å ta
+  endepunktet i bruk i produksjon — pushes ikke automatisk slik
+  GitHub Pages-frontend-delen gjør.
+
 ## 0.21.16 — Statistikk-fanen viser mest populære favoritt-sopper
 Bruker ba om et sammendrag av mest populære favoritt-sopper på
 Statistikk-fanen (admin).

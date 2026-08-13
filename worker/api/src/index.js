@@ -4,7 +4,7 @@ import { json } from './lib/json.js';
 import { rullerSesjonHvisNodvendig, sesjonCookieHeader } from './lib/session.js';
 import { beOmLenke, verifiser, verifiserKode, loggUt } from './routes/auth.js';
 import { meg } from './routes/meg.js';
-import { hentMineData, lagreMineData } from './routes/data.js';
+import { hentMineData, lagreMineData, hentDelteFunn } from './routes/data.js';
 import { hentTerrengdata, hentArtsfunn, hentBerikelse } from './routes/terreng.js';
 import { hentDekning, startOmradeHenting, omradeStatus, berikPunkt, punktStatus } from './routes/omrader.js';
 import {
@@ -23,6 +23,7 @@ router.post('/auth/logg-ut', loggUt);
 router.get('/meg', meg);
 router.get('/meg/data', hentMineData);
 router.put('/meg/data', lagreMineData);
+router.get('/delte/funn', hentDelteFunn);
 router.get('/terrengdata', hentTerrengdata);
 router.get('/terrengdata/artsfunn', hentArtsfunn);
 router.get('/terrengdata/berikelse/:locationId', hentBerikelse);

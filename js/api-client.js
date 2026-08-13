@@ -77,6 +77,16 @@ async function lagreMineData(payload){
   return data;
 }
 
+// Funn fra ANDRE innloggede brukere som selv har skrudd på "del mine funn"
+// (se sp-toggle-del-funn i js/app.js) — {art, dato, lat, lon, kortnavn} per
+// funn, aldri egne funn (ekskludert server-side). Krever kun innlogging,
+// ingen admin-rolle.
+async function hentDelteFunn(){
+  const res = await kall('/delte/funn');
+  if (!res.ok) throw new Error(`Kunne ikke hente delte funn (${res.status}).`);
+  return res.json();
+}
+
 // Erstatter FungiStore.loadFile(locationsPath) — delt, allerede-analysert
 // terrengdatasett, lesbart for alle innloggede (admin og bruker).
 // fylke/kommune er valgfrie server-side filtre (se worker/api sin
@@ -236,7 +246,7 @@ async function registrerMedInvitasjon(token, kortnavn){
 
 window.ApiClient = {
   meg, beOmLenke, verifiserKode, loggUt,
-  hentMineData, lagreMineData,
+  hentMineData, lagreMineData, hentDelteFunn,
   hentTerrengdata, hentArtsfunn, hentBerikelse,
   hentOmraderDekning, startOmradeHenting, hentOmradeStatus,
   trigBerikelse, hentPunktStatus,

@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.21.16"/>
+<link rel="stylesheet" href="css/styles.css?v=0.22.0"/>
 </head>
 <body>
 
@@ -120,6 +120,11 @@
             <div style="font-size:13px;margin-bottom:8px;">
               Innlogget som <b id="sp-account-name"></b> <span class="sp-tag" id="sp-account-role"></span>
             </div>
+            <div class="sp-slider-row">
+              <span>Del mine funn med andre påloggede brukere</span>
+              <button class="sp-toggle" id="sp-toggle-del-funn"></button>
+            </div>
+            <p class="sp-account-hint" style="margin-top:4px;">Andre innloggede ser da art, sted og dato for funnene dine i kartet (lag "Delte funn"), sammen med kortnavnet ditt. Gjelder alle dine funn, av og på for alle samtidig.</p>
             <button class="sp-btn" id="sp-logout-btn">Logg ut</button>
           </div>
           <div class="sp-config-version" id="sp-config-version"></div>
@@ -296,7 +301,7 @@
      worker/api/README.md). Testnøkkelen (1x00000000000000000000AA) hører
      kun hjemme i worker/api/.dev.vars for lokal utvikling, aldri her. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<script src="js/api-client.js?v=0.21.16"></script>
-<script src="js/app.js?v=0.21.16"></script>
+<script src="js/api-client.js?v=0.22.0"></script>
+<script src="js/app.js?v=0.22.0"></script>
 </body>
 </html>
