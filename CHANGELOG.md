@@ -1,5 +1,32 @@
 # Endringslogg
 
+## 0.21.12 — "Om dataene" viser nå faktisk hvilke kommuner som er godt analysert
+Bruker ba om oppdatert tekst i "Om dataene"-varselet: den gamle
+"hentes on-demand av admin for hvert nye område"-formuleringen var
+misvisende for en vanlig bruker (kun admin kan faktisk trigge nye
+hentinger, se `requireAdmin` i `worker/api/src/routes/omrader.js`), og
+nevnte ikke hvilke kommuner som faktisk har god dekning. Listen er bevisst
+IKKE hardkodet i HTML-en — datasettet vokser etter hvert som admin
+analyserer flere kommuner (se `D1-MIGRASJON.md`), og en statisk liste ville
+blitt stille utdatert.
+
+- Ny `renderDataNotice()`: teller `BASE_LOCATIONS` (server-hentet grid-data,
+  IKKE `customLocations` — egne personlige steder skal ikke gjøre en
+  kommune admin aldri har analysert se "godt analysert" ut) per kommune,
+  og lister alle med ≥ `KOMMUNE_GOD_DEKNING_MIN` (20, justerbar terskel,
+  ingen fasit finnes ennå) punkter, alfabetisk (`localeCompare('no')`).
+- Beregnes kun på nytt når HELE datasettet faktisk er lastet
+  (`fylkeFilter==='alle'`) — `analyserteKommunerCache` husker forrige
+  nasjonale snapshot uendret mens brukeren filtrerer til ett fylke/én
+  kommune (der `BASE_LOCATIONS` kun er DEN filtrerte undermengden, se
+  `loadLocations()`), i stedet for å feilaktig vise kun det filtrerte
+  utvalgets kommuner. Viser "logg inn for å se full oversikt" for en
+  ikke-innlogget besøkende (samme begrensning som all annen terrengdata —
+  `/terrengdata` krever sesjon).
+- Teksten for øvrig oppdatert: nevner nå eksplisitt at egne funn vises
+  annerledes enn Artsdatabanken-prikkene, og at artsobservasjoner først
+  vises ved et mindre kartutsnitt (jf. v0.21.11).
+
 ## 0.21.11 — Artsdatabanken-laget tegnes ikke lenger ved en vid, uavgrenset visning
 Bruker ba om at artsobservasjoner ikke skal hentes/tegnes før fylke/kommune
 er valgt, eller kartet er zoomet inn til et nivå tilsvarende det — mistanke

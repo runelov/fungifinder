@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.21.11';
+  const APP_VERSION = '0.21.12';
   const APP_BUILD_DATE = '2026-08-13';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -188,6 +188,12 @@
   let fetchPollTimer = null;
   let bboxAreaCache = {}; // cache av Nominatim bbox-areal per fylke/kommune-navn
   let currentUser = null; // { epost, kortnavn, rolle } fra ApiClient.meg(), eller null hvis ikke innlogget
+  // "Om dataene"-teksten sin dynamiske kommuneliste — se renderDataNotice().
+  // Huskes fra siste gang HELE datasettet var lastet (fylkeFilter==='alle'),
+  // slik at teksten fortsatt viser riktig NASJONAL oversikt selv etter at
+  // brukeren filtrerer til ett fylke/én kommune (BASE_LOCATIONS blir da kun
+  // DEN filtrerte undermengden, se loadLocations()). null = ikke beregnet ennå.
+  let analyserteKommunerCache = null;
 
   const monthNow = new Date().getMonth() + 1;
   const yearNow = new Date().getFullYear();
@@ -3269,9 +3275,51 @@
   let _currentSpecies = null;
   function species_for_card(){ return _currentSpecies; }
 
+  // RETTET 2026-08-13 (bruker ba om at "Om dataene"-teksten viser HVILKE
+  // kommuner som faktisk har god dekning, i stedet for en generisk "hentes
+  // on-demand"-formulering — misvisende for en vanlig bruker, som ikke selv
+  // kan trigge nye hentinger, kun admin kan det, se requireAdmin i
+  // worker/api/src/routes/omrader.js). Listen er bevisst IKKE hardkodet i
+  // HTML-en — datasettet vokser etter hvert som admin analyserer flere
+  // kommuner (se D1-MIGRASJON.md), og en statisk liste ville blitt stille
+  // utdatert. Beregnes i stedet her, fra samme terreng_steder-datasett som
+  // allerede er lastet inn for ENHVER innlogget bruker (admin ELLER
+  // bruker, se hentTerrengdata() — i motsetning til /omrader/dekning, som
+  // er admin-only server-side og derfor IKKE kunne brukes som kilde her).
+  //
+  // Teller kun BASE_LOCATIONS (server-hentet grid-data), ikke
+  // customLocations (egne, manuelt lagt-til steder) — en bruker med mange
+  // personlige steder i en kommune admin aldri har analysert skal ikke
+  // gjøre den kommunen se "godt analysert" ut.
+  const KOMMUNE_GOD_DEKNING_MIN = 20; // terskel for "godt analysert" — justerbar, ingen fasit finnes ennå
+  function renderDataNotice(){
+    const el = document.getElementById('sp-analyserte-kommuner');
+    if (!el) return;
+    if (!currentUser) { el.textContent = 'logg inn for å se full oversikt'; return; }
+    // Kun beregnet på nytt når HELE datasettet faktisk er lastet (uendret
+    // filter) — ellers gjenbrukes forrige nasjonale snapshot uendret (se
+    // analyserteKommunerCache sin deklarasjon).
+    if (filterMode === 'fylke' && fylkeFilter === 'alle') {
+      const counts = {};
+      for (const loc of BASE_LOCATIONS) {
+        if (!loc.kommune) continue;
+        counts[loc.kommune] = (counts[loc.kommune] || 0) + 1;
+      }
+      analyserteKommunerCache = Object.keys(counts)
+        .filter(k => counts[k] >= KOMMUNE_GOD_DEKNING_MIN)
+        .sort((a, b) => a.localeCompare(b, 'no'));
+    }
+    if (analyserteKommunerCache === null) { el.textContent = 'henter oversikt …'; return; }
+    if (!analyserteKommunerCache.length) { el.textContent = 'ingen ennå'; return; }
+    el.textContent = analyserteKommunerCache.length === 1
+      ? analyserteKommunerCache[0]
+      : analyserteKommunerCache.slice(0, -1).join(', ') + ' og ' + analyserteKommunerCache[analyserteKommunerCache.length - 1];
+  }
+
   function render(){
     renderSpeciesList();
     renderMyFindsList();
+    renderDataNotice();
     renderFilterControls();
     // "Foreslå områder" gir ingen mening uten ekte terrengdata (kun 2
     // demo-punkter uten tilkobling), og gjør et ekte, levende Overpass-kall
