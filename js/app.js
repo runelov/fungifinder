@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.22.4';
+  const APP_VERSION = '0.22.5';
   const APP_BUILD_DATE = '2026-08-14';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -1863,7 +1863,8 @@
   // Sikkerhet: all fritekst brukeren selv skriver inn (stedsnavn, kommune,
   // parkeringsnotat osv.) MÅ escapes før den settes inn i innerHTML — ellers
   // kan noen (eller en feil) plante script-tagger som kjører i samme
-  // nettleserkontekst som GitHub-tokenet ditt ligger lagret i (localStorage).
+  // nettleserkontekst som den innloggede sesjonen din (session-cookien mot
+  // fungifinder-api).
   function escapeHtml(str){
     if (str === null || str === undefined) return '';
     return String(str).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));

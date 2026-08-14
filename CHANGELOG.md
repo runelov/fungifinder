@@ -1,5 +1,21 @@
 # Endringslogg
 
+## 0.22.5 — Tekstgjennomgang: rettet utdatert innloggingshenvisning
+Full gjennomgang av alle bruker-synlige tekster i appen (index.html +
+js/app.js), bedt om av bruker etter å ha lagt merke til en utdatert
+formulering.
+
+- "Om dataene"-boksen sa fortsatt "logg inn under 'Konto'-fanen i
+  sidepanelet" — en rest fra før Konto-fanen flyttet inn under
+  "⚙ Preferanser & Config". Alle andre innloggingsoppfordringer i appen
+  (funn-registrering, områdeforslag, Mine funn-lista) sier allerede
+  "Logg inn under ⚙ Preferanser & Config → Konto" — rettet denne til å
+  matche.
+- Resten av gjennomgangen (alle alert/confirm-tekster, skjema-/
+  modaltekster, statusmeldinger, admin-panelet, kart-hint og
+  score-forklaringer) fant ingen ytterligere utdaterte eller
+  misvisende tekster.
+
 ## 0.22.4 — UX-gjennomgang: fullfør mobil-restrukturering (mockup-oppfølging)
 0.22.3 sin Liste/Kart-bryter løste kart+tegnforklaring-delen av
 scroll-problemet, men Velg sopp/Artsprofil/Mine funn/Vær fulgte fortsatt
