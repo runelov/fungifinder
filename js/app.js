@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.22.5';
+  const APP_VERSION = '0.22.6';
   const APP_BUILD_DATE = '2026-08-14';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -3533,17 +3533,30 @@
       scoredAll = locsAll.map(loc => ({ loc, res: scoreLocation(species, loc) }));
     }
 
-    renderMap(scoredAll);
-    renderHogstZones();
-    renderFindsLayer();
-    renderDelteFunnLayer();
-
+    // RETTET 2026-08-14 (bruker påpekte at "alle steder i området vises
+    // fortsatt i kartet"-hintet under score-filteret var upresist i
+    // radius-modus): dette område-filteret (fylke/kommune/radius) ble
+    // tidligere beregnet ETTER renderMap(scoredAll) — kartet fikk dermed
+    // hele scoredAll UFILTRERT på område. I fylke-/kommune-modus var det
+    // uskadelig (BASE_LOCATIONS er allerede server-filtrert til akkurat det
+    // fylket/kommunen, se currentServerFilterParams()), men i radius-modus
+    // sender currentServerFilterParams() ALDRI noe filter — BASE_LOCATIONS
+    // er da HELE det nasjonale datasettet, og kartet tegnet dermed absolutt
+    // alle punkter i Norge, ikke bare de innenfor valgt radius, hver gang
+    // "Målepunkter"-laget ble skrudd på. Beregnes nå FØR renderMap(), slik
+    // at kartet faktisk viser nøyaktig "området" — samme mengde som
+    // resultatlisten før score-/hogst-filteret tynner den videre ned.
     let scoped = scoredAll.filter(s => {
       if (filterMode === 'fylke') return fylkeFilter === 'alle' || s.loc.fylke === fylkeFilter;
       if (filterMode === 'kommune') return kommuneFilter === 'alle' || s.loc.kommune === kommuneFilter;
       if (filterMode === 'radius' && radiusCenter) return haversineKm(radiusCenter.lat, radiusCenter.lon, s.loc.lat, s.loc.lon) <= radiusKm;
       return true;
     });
+
+    renderMap(scoped);
+    renderHogstZones();
+    renderFindsLayer();
+    renderDelteFunnLayer();
 
     const coverageCount = scoped.length;
     updateCoverageLine(coverageCount);

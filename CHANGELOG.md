@@ -1,5 +1,25 @@
 # Endringslogg
 
+## 0.22.6 — Rettet radius-modus: kartet viste hele Norge, ikke bare valgt område
+Bruker påpekte at hintet "alle steder i området vises fortsatt i kartet"
+(under score-filteret) var en sannhet med modifikasjoner — gjennomgang
+avdekket to sammenvevde problemer:
+
+- **Reell funksjonsfeil (radius-modus):** `render()` sendte det UFILTRERTE
+  datasettet til `renderMap()`, FØR område-filteret (fylke/kommune/radius)
+  ble beregnet. I fylke-/kommune-modus var det uskadelig (allerede
+  server-filtrert der), men i radius-modus laster `loadLocations()` alltid
+  HELE det nasjonale datasettet (`currentServerFilterParams()` sender aldri
+  noe filter for radius) — kartet tegnet dermed absolutt alle punkter i
+  Norge, ikke bare de innenfor valgt radius, hver gang "Målepunkter"-laget
+  ble skrudd på. Område-filteret beregnes nå FØR `renderMap()`, som får det
+  filtrerte settet i stedet.
+- **Upresis hint-tekst:** samme hint sa "vises fortsatt i kartet" uten å
+  nevne at "Målepunkter"-laget er AV som default (bevisst, for å unngå at
+  tusenvis av punkter dominerer kartbildet ved åpning) — for en bruker som
+  ikke har funnet det kollapsede lag-ikonet oppe til høyre, "vises" rett og
+  slett ingenting. Teksten nevner nå eksplisitt hvor laget skrus på.
+
 ## 0.22.5 — Tekstgjennomgang: rettet utdatert innloggingshenvisning
 Full gjennomgang av alle bruker-synlige tekster i appen (index.html +
 js/app.js), bedt om av bruker etter å ha lagt merke til en utdatert
