@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.22.1';
-  const APP_BUILD_DATE = '2026-08-13';
+  const APP_VERSION = '0.22.3';
+  const APP_BUILD_DATE = '2026-08-14';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
   // kommentar der) — de to må holdes i sync manuelt siden repoet bevisst
@@ -649,7 +649,7 @@
         <div class="sp-mine-list">${fylkeRader || '<div class="sp-empty-mine">Ingen målepunkter ennå.</div>'}</div>
 
         <details style="margin-bottom:10px;">
-          <summary style="cursor:pointer;font-size:12.5px;color:var(--ink-soft);">Se alle ${kommunerDekket} kommuner med målepunkter</summary>
+          <summary style="cursor:pointer;font-size:var(--fs-sm);color:var(--ink-soft);">Se alle ${kommunerDekket} kommuner med målepunkter</summary>
           <div class="sp-mine-list" style="margin-top:6px;">${kommuneRader || '<div class="sp-empty-mine">Ingen målepunkter ennå.</div>'}</div>
         </details>
 
@@ -861,6 +861,7 @@
       const link = document.getElementById('sp-coverage-fetch-link');
       if (link) link.addEventListener('click', (e) => {
         e.preventDefault();
+        setMobileView('kart');
         document.getElementById('sp-fetch-panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
       });
     } else if (count < AREA_COVERAGE_THIN_THRESHOLD) {
@@ -2572,6 +2573,26 @@
     setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 260);
   }
 
+  // UX-gjennomgang 2026-08-14: Liste/Kart-bryter for mobil (se
+  // .sp-mobile-view-toggle i index.html/styles.css) — kun kosmetisk
+  // display:none/flex på desktop (CSS-en er scopet til @media max-width:760px,
+  // så klassebyttet under er en no-op der). setMobileView('kart') kalles
+  // ikke bare fra selve bryteren, men også fra ethvert sted som scroller
+  // brukeren til kartet (locateOnMap/locateFindOnMap/fetch-nudge-lenkene)
+  // — er kartet skjult via display:none når det skjer, er scrollIntoView
+  // meningsløst OG Leaflet har regnet ut fliser mot en 0×0-container, derfor
+  // invalidateSize() etter at panelet faktisk er synlig igjen (samme
+  // mønster som toggleMapFullscreen over).
+  function setMobileView(view){
+    const layout = document.querySelector('.sp-layout');
+    const toggle = document.getElementById('sp-mobile-view-toggle');
+    if (!layout || !toggle) return;
+    layout.classList.toggle('sp-mobile-view-liste', view === 'liste');
+    layout.classList.toggle('sp-mobile-view-kart', view === 'kart');
+    toggle.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mobileview === view));
+    if (view === 'kart' && leafletMap) setTimeout(() => leafletMap.invalidateSize(), 60);
+  }
+
   // ---------- min posisjon (GPS, engangs) ----------
   // Bevisst engangs (getCurrentPosition), ikke løpende sporing (watchPosition)
   // — dekker "jeg har parkert, vis meg oversikten" og "fyll inn koordinatene
@@ -2857,6 +2878,7 @@
     // virker ikke) hvis laget er skrudd av via "Målepunkter"-avkrysningen —
     // skru det på igjen, ellers skjer det tilsynelatende ingenting.
     if (markerLayer && !leafletMap.hasLayer(markerLayer)) leafletMap.addLayer(markerLayer);
+    setMobileView('kart');
     document.getElementById('sp-leaflet-map').scrollIntoView({ behavior:'smooth', block:'center' });
     leafletMap.setView([loc.lat, loc.lon], Math.max(leafletMap.getZoom(), 13));
     if (marker) setTimeout(() => marker.openPopup(), 350);
@@ -3178,7 +3200,7 @@
     summary.innerHTML = `
       ${overskrift} i valgt område (stiplede sirkler i kartet, farget etter score — klikk en sirkel eller 🅿️-markøren for detaljer).<br/>
       ${areas.map((a, i) => `<div class="sp-route-area-item">Område ${i+1}: <b>${escapeHtml(a.anchor.loc.name)}</b> (${escapeHtml(a.anchor.loc.kommune || 'ukjent kommune')}) — beste score ${a.anchor.res.total}, ${a.members.length} kjent${a.members.length===1?'':'e'} punkt${a.members.length===1?'':'er'} i området. ${a.parking ? `🅿️ ca ${a.parking.distM} m unna.` : '🅿️ ingen kjent parkering funnet.'}</div>`).join('')}
-      <span style="font-size:11px;opacity:0.8;">Sirklene markerer OMRÅDER med gode odds, ikke eksakte punkter eller en gåtur mellom dem — bruk det topografiske kartlaget til å utforske selv innenfor sirkelen. Parkeringsmarkører er hentet live fra OpenStreetMap og kan avvike fra virkeligheten — bekreft alltid på stedet.</span>
+      <span style="font-size:var(--fs-xs);opacity:0.8;">Sirklene markerer OMRÅDER med gode odds, ikke eksakte punkter eller en gåtur mellom dem — bruk det topografiske kartlaget til å utforske selv innenfor sirkelen. Parkeringsmarkører er hentet live fra OpenStreetMap og kan avvike fra virkeligheten — bekreft alltid på stedet.</span>
       ${fetchNudgeHtml(scoped.length)}
     `;
     wireFetchNudgeLink();
@@ -3195,7 +3217,7 @@
     if (count >= AREA_COVERAGE_THIN_THRESHOLD) return '';
     const fetchPanel = document.getElementById('sp-fetch-panel');
     if (!fetchPanel || fetchPanel.style.display === 'none') return '';
-    return `<div class="sp-route-nudge" style="margin-top:8px;font-size:12px;color:var(--ink-soft);">Tynt datagrunnlag her (${count} punkt${count===1?'':'er'}) — <a href="#sp-fetch-panel" id="sp-route-nudge-link">hent mer terrengdata</a> for bedre forslag.</div>`;
+    return `<div class="sp-route-nudge" style="margin-top:8px;font-size:var(--fs-sm);color:var(--ink-soft);">Tynt datagrunnlag her (${count} punkt${count===1?'':'er'}) — <a href="#sp-fetch-panel" id="sp-route-nudge-link">hent mer terrengdata</a> for bedre forslag.</div>`;
   }
   function wireFetchNudgeLink(){
     const link = document.getElementById('sp-route-nudge-link');
@@ -3777,7 +3799,7 @@
           <label>Posisjon</label>
           <div class="sp-2col">
             <button type="button" class="sp-mini-btn" id="sp-find-use-my-position">📍 Bruk min posisjon</button>
-            <span id="sp-find-position-display" style="align-self:center;font-size:12.5px;color:var(--ink-soft);">${pendingLat!=null ? pendingLat.toFixed(5)+', '+pendingLon.toFixed(5) : 'Ikke satt — bruk knappen, eller lukk og klikk i kartet der du fant den'}</span>
+            <span id="sp-find-position-display" style="align-self:center;font-size:var(--fs-sm);color:var(--ink-soft);">${pendingLat!=null ? pendingLat.toFixed(5)+', '+pendingLon.toFixed(5) : 'Ikke satt — bruk knappen, eller lukk og klikk i kartet der du fant den'}</span>
           </div>` : ''}
           <label>Dato</label>
           <input type="date" id="sp-find-date" value="${escapeHtml(editingFind ? editingFind.date : todayStr)}"/>
@@ -3911,6 +3933,7 @@
     const pos = find && findLatLon(find);
     if (!pos || !leafletMap) return;
     if (findsLayer && !leafletMap.hasLayer(findsLayer)) leafletMap.addLayer(findsLayer);
+    setMobileView('kart');
     document.getElementById('sp-leaflet-map').scrollIntoView({ behavior:'smooth', block:'center' });
     leafletMap.setView([pos.lat, pos.lon], Math.max(leafletMap.getZoom(), 14));
     const marker = findMarkersById[findId];
@@ -4095,6 +4118,23 @@
   }
 
   // ---------- wiring ----------
+  // UX-gjennomgang 2026-08-14: selve .sp-toggle-knappen er kun 46×26px —
+  // grei nok som visuell bryter, men et lite touch-mål i en tekstrad. Én
+  // delegert lytter på hele raden (label + bryter) gir et reelt langt
+  // større klikk-/trykkmål uten å måtte gjenta logikk per bryter under:
+  // klikk hvor som helst i raden videresender et ekte klikk til selve
+  // <button>-en (som fortsatt har sin egen listener, se under) — treffer
+  // du selve bryteren direkte, fyres kun ÉN gang (event.target ER da
+  // knappen, så delegatet lar den vanlige bubblingen gjøre jobben i
+  // stedet for å dispatch'e et ekstra klikk).
+  document.querySelectorAll('.sp-slider-row').forEach((row) => {
+    row.addEventListener('click', (e) => {
+      const toggle = row.querySelector('.sp-toggle');
+      if (!toggle || e.target === toggle) return;
+      toggle.click();
+    });
+  });
+
   // Disse fem påvirker selve scoreLocation()-resultatet (ikke bare
   // visning/filtrering, som hideHogst/artskartOnlyRecent under) — bumper
   // derfor scoreCache før re-render, se scoreCache sin deklarasjon.
@@ -4168,6 +4208,10 @@
   });
   document.getElementById('sp-add-place').addEventListener('click', () => openFindModal(null, {}));
   document.getElementById('sp-map-fullscreen-toggle').addEventListener('click', () => toggleMapFullscreen());
+  document.getElementById('sp-mobile-view-toggle').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-mobileview]');
+    if (btn) setMobileView(btn.dataset.mobileview);
+  });
   // Samme forventning som ved oppstart-geolokasjon (se geolocateStartupView):
   // hvis du allerede står i Radius-modus, oppdaterer "min posisjon" nå også
   // selve radius-senteret, ikke bare kartvisningen.

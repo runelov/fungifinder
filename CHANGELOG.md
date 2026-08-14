@@ -1,5 +1,63 @@
 # Endringslogg
 
+## 0.22.3 — UX-gjennomgang: Liste/Kart-bryter på mobil, samkjørte fontstørrelser
+Fortsettelse av 0.22.2 sin design-/UX-kritikk — de to punktene som der ble
+bevisst utelatt fra førsterunden.
+
+- **Liste/Kart-bryter for mobil** (`.sp-mobile-view-toggle`, kun under
+  760px — desktop uendret, viser fortsatt begge side ved side): resultat-
+  listen lå tidligere etter kart+filtre+8-linjers tegnforklaring i
+  DOM-rekkefølgen, noe som betydde mye scroll før første forslag var
+  synlig. Standard er nå "Liste" (`sp-mobile-view-liste`-klassen på
+  `.sp-layout`, satt statisk i markup slik at riktig visning vises fra
+  første maling), med kartet ett trykk unna. `setMobileView('kart')` kalles
+  også automatisk fra "📍 Vis i kart"-knappen på hvert kort, `locateFindOnMap()`,
+  og de to "hent mer terrengdata"-nudge-lenkene — samt `leafletMap.invalidateSize()`
+  etter at panelet blir synlig igjen (samme mønster som `toggleMapFullscreen()`),
+  siden Leaflet ellers regner ut fliser mot en 0×0-container når kartet
+  initialiseres bak `display:none`.
+- **Samkjørte fontstørrelser**: sekundærtekst (hint/meta/brødtekst — IKKE
+  titler/knapper, som er bevisst egne størrelser) var spredt over ni
+  nesten-like verdier (9.5/10/10.5/11/11.5/12/12.5/13/13.5px) uten
+  systematikk, på tvers av `css/styles.css`, `js/app.js` (inline stiler i
+  template-strenger) og `index.html`. Konsolidert til tre CSS-variabler —
+  `--fs-xs` (11px), `--fs-sm` (12.5px), `--fs-md` (13.5px) — på `#sopp-root`,
+  med hver eksisterende bruk flyttet til nærmeste steg (maks ±1.5px avvik,
+  de fleste ±0.5px, umerkelig enkeltvis).
+
+## 0.22.2 — UX-gjennomgang: touch-mål, mobil-scroll, kontrast
+Rettet de tre prioriterte funnene fra en design-/UX-kritikk (skjermbilde-
+basert, desktop + mobilemulering, kontrastforhold og touch-mål faktisk
+målt via computed styles — ikke anslått):
+
+- **Preferanse-/kontobrytere (`.sp-toggle`)**: 38×21px → 46×26px — under
+  WCAG 2.2s minimum touch-mål på 24×24px (2.5.8), og langt under de
+  anbefalte 44×44px for utendørsbruk (kalde fingre/hansker/sollys). Hele
+  raden (`.sp-slider-row`) er nå i tillegg klikkbar, ikke bare selve
+  bryteren — én delegert lytter i `js/app.js` videresender klikket til
+  riktig `<button>`.
+- **Artsvelgeren på mobil** (`.sp-species-list`, horisontal scroll): med 11
+  arter var kun ~1,3 pills synlige om gangen, uten noe visuelt tegn på at
+  det fantes flere — chip-tekst ble bare brått avkuttet i kanten. Løst med
+  CSS-only "scroll shadow"-teknikken (fire lag-gradienter,
+  `background-attachment: local`/`scroll`) — skygge ved kantene som
+  automatisk forsvinner når man har scrollet helt fram/tilbake, uten JS.
+- **To WCAG AA-kontrastbrudd** (krav 4.5:1 for normal tekst), begge målt
+  direkte i DOM-en: `.sp-collapse-hint` ("klikk for å skjule/vise") hadde
+  `opacity: 0.6` oppå en ellers grei farge — reelt renderet kontrast kun
+  ~2.4:1, fjernet opacity. `.sp-species-info-top .sp-si-season` ("typisk
+  sesong: …") brukte `var(--moss)` mot papir-bakgrunnen — målt 3.37:1,
+  byttet til `var(--ink-soft)` (4.85–5.48:1 andre steder i appen — retter
+  også en fargeinkonsekvens).
+- Samkjørt `border-radius`/padding mellom `.sp-notice` og `.sp-safety`
+  (var 3px/10px 14px vs. 4px/14px 16px selv om de visuelt er ment som
+  søsken — kun ulik alvorlighetsfarge).
+- Bevisst UTELATT fra denne rettingen (større, mer produktavhengige
+  endringer — egen vurdering senere): konsolidering av de 6+ nesten-like
+  sekundærtekst-størrelsene (10.5–13.5px) til en fast type-skala, og
+  restrukturering av mobil-scrollrekkefølgen (kart/tegnforklaring kommer
+  før resultatlisten — ~3700px scroll til første stedsforslag).
+
 ## 0.22.1 — "Vis flere"-paginering av resultatlisten
 Bruker påpekte at selv om ALLE steder må scores for å avgjøre rangeringen,
 er det ikke nødvendig å faktisk BYGGE og sette inn HTML for samtlige

@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.22.1"/>
+<link rel="stylesheet" href="css/styles.css?v=0.22.3"/>
 </head>
 <body>
 
@@ -104,20 +104,20 @@
           <div id="sp-account-loggedout">
             <p class="sp-account-hint">Logg inn med e-posten din for å registrere funn og se turforslag. Du må være invitert av en administrator fra før.</p>
             <form id="sp-login-form" autocomplete="on">
-              <input type="email" id="sp-login-epost" name="email" autocomplete="email" required placeholder="din@epost.no" style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;font-size:12.5px;"/>
+              <input type="email" id="sp-login-epost" name="email" autocomplete="email" required placeholder="din@epost.no" style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;font-size:var(--fs-sm);"/>
               <div id="sp-turnstile" class="cf-turnstile" data-sitekey="0x4AAAAAAD5j-FdXd9X0eULG" style="margin-bottom:8px;"></div>
               <button type="submit" class="sp-btn sp-primary" id="sp-login-send" style="width:100%;">Send innloggingslenke</button>
             </form>
-            <div id="sp-login-status" style="font-size:12px;color:var(--ink-soft);margin-top:8px;"></div>
+            <div id="sp-login-status" style="font-size:var(--fs-sm);color:var(--ink-soft);margin-top:8px;"></div>
             <p class="sp-account-hint" style="margin-top:10px;">Lagt til FungiFinder på hjemskjermen? Lenken over åpnes i Safari, ikke i appen. Skriv i stedet inn den 6-sifrede koden fra e-posten her:</p>
             <form id="sp-kode-form" autocomplete="off">
-              <input type="text" id="sp-kode-input" name="kode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6-sifret kode" style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;font-size:12.5px;"/>
+              <input type="text" id="sp-kode-input" name="kode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6-sifret kode" style="width:100%;padding:6px 8px;border-radius:3px;border:1px solid var(--line);margin-bottom:6px;font-size:var(--fs-sm);"/>
               <button type="submit" class="sp-btn" id="sp-kode-send" style="width:100%;">Bekreft kode</button>
             </form>
-            <div id="sp-kode-status" style="font-size:12px;color:var(--ink-soft);margin-top:8px;"></div>
+            <div id="sp-kode-status" style="font-size:var(--fs-sm);color:var(--ink-soft);margin-top:8px;"></div>
           </div>
           <div id="sp-account-loggedin" style="display:none;">
-            <div style="font-size:13px;margin-bottom:8px;">
+            <div style="font-size:var(--fs-md);margin-bottom:8px;">
               Innlogget som <b id="sp-account-name"></b> <span class="sp-tag" id="sp-account-role"></span>
             </div>
             <div class="sp-slider-row">
@@ -147,7 +147,7 @@
 
         <div class="sp-tab-content" data-tab-content="invitasjoner" style="display:none;">
           <form id="sp-invitasjon-form" style="display:flex;gap:6px;margin-bottom:10px;">
-            <input type="email" id="sp-invitasjon-epost" required placeholder="epost@eksempel.no" style="flex:1;padding:6px 8px;border-radius:3px;border:1px solid var(--line);font-size:12.5px;"/>
+            <input type="email" id="sp-invitasjon-epost" required placeholder="epost@eksempel.no" style="flex:1;padding:6px 8px;border-radius:3px;border:1px solid var(--line);font-size:var(--fs-sm);"/>
             <button type="submit" class="sp-btn sp-primary">Inviter</button>
           </form>
           <div id="sp-invitasjon-ny-lenke" class="sp-access-box" style="display:none;word-break:break-all;"></div>
@@ -160,7 +160,7 @@
       </div>
     </details>
 
-    <div class="sp-layout">
+    <div class="sp-layout sp-mobile-view-liste">
       <div>
         <div class="sp-panel">
           <h3>Velg sopp</h3>
@@ -189,6 +189,20 @@
       </div>
 
       <div>
+        <!-- UX-gjennomgang 2026-08-14: på mobil kom resultatlisten etter
+             kart+filtre+tegnforklaring i DOM-rekkefølgen (~3700px scroll før
+             første forslag). Denne bryteren vises KUN under 760px (se
+             .sp-mobile-view-toggle i styles.css) og lar brukeren velge
+             mellom å vise #sp-results-wrap eller .sp-map-panel — desktop er
+             upåvirket (viser begge side ved side som før). Default er
+             "liste" (klassen sp-mobile-view-liste på .sp-layout, satt
+             statisk her slik at riktig visning vises fra første maling, uten
+             at JS må rekke å kjøre først). -->
+        <div class="sp-seg sp-mobile-view-toggle" id="sp-mobile-view-toggle">
+          <button type="button" class="active" data-mobileview="liste">📋 Liste</button>
+          <button type="button" data-mobileview="kart">🗺️ Kart</button>
+        </div>
+
         <div class="sp-panel sp-map-panel" id="sp-map-panel">
           <div class="sp-map-topline">
             <h3>Område</h3>
@@ -209,7 +223,7 @@
                 <datalist id="sp-kommune-datalist"></datalist>
                 <button class="sp-mini-btn" id="sp-kommune-clear">Vis alle</button>
               </div>
-              <div id="sp-kommune-ambiguous-hint" style="display:none;width:100%;font-size:11.5px;color:var(--russet-deep);margin-top:2px;"></div>
+              <div id="sp-kommune-ambiguous-hint" style="display:none;width:100%;font-size:var(--fs-xs);color:var(--russet-deep);margin-top:2px;"></div>
               <div class="sp-radius-controls" id="sp-radius-controls" style="display:none;">
                 <span id="sp-radius-label">20 km</span>
                 <input type="range" id="sp-radius-slider" min="2" max="60" value="20" step="1"/>
@@ -230,7 +244,7 @@
           <div class="sp-map-hint" id="sp-map-hint"></div>
 
           <div class="sp-route-panel" id="sp-route-panel">
-            <div id="sp-coverage-line" style="display:none;font-size:12.5px;color:var(--ink-soft);margin-bottom:6px;"></div>
+            <div id="sp-coverage-line" style="display:none;font-size:var(--fs-sm);color:var(--ink-soft);margin-bottom:6px;"></div>
             <div class="sp-route-row">
               <span>Foreslå gode områder — antall: <b id="sp-route-km-label">5</b></span>
               <input type="range" id="sp-route-km-slider" min="1" max="8" step="1" value="5"/>
@@ -239,33 +253,35 @@
             </div>
             <div id="sp-route-summary" style="display:none;"></div>
           </div>
-          <div id="sp-route-disabled-note" style="display:none;font-size:12px;color:var(--ink-soft);">
+          <div id="sp-route-disabled-note" style="display:none;font-size:var(--fs-sm);color:var(--ink-soft);">
             Logg inn under ⚙ Preferanser &amp; Config → Konto for å foreslå områder.
           </div>
 
           <div id="sp-fetch-panel" style="display:none; margin-top:14px; padding-top:12px; border-top: 1px dashed var(--line); border-left: 3px solid var(--gold); padding-left: 12px;">
             <h3>Hente terrengdata for dette området?</h3>
-            <div id="sp-fetch-info" style="font-size:13px;color:var(--ink);margin-bottom:10px;"></div>
-            <label style="display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:4px;">
+            <div id="sp-fetch-info" style="font-size:var(--fs-md);color:var(--ink);margin-bottom:10px;"></div>
+            <label style="display:block;font-size:var(--fs-xs);color:var(--ink-soft);margin-bottom:4px;">
               Rutenett-tetthet: <span id="sp-grid-label">1.5 km</span>
             </label>
             <input type="range" id="sp-grid-slider" min="0.5" max="3" step="0.25" value="1.5" style="width:100%;margin-bottom:8px;"/>
-            <div id="sp-fetch-estimate" style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;"></div>
+            <div id="sp-fetch-estimate" style="font-size:var(--fs-sm);color:var(--ink-soft);margin-bottom:10px;"></div>
             <button class="sp-btn sp-primary" id="sp-fetch-start">Hent data</button>
-            <div id="sp-fetch-progress" style="display:none;font-size:12.5px;color:var(--ink-soft);margin-top:10px;"></div>
+            <div id="sp-fetch-progress" style="display:none;font-size:var(--fs-sm);color:var(--ink-soft);margin-top:10px;"></div>
           </div>
         </div>
 
-        <div class="sp-results-head">
-          <h2 id="sp-results-title">Forslag</h2>
-          <span class="sp-count" id="sp-count"></span>
+        <div id="sp-results-wrap">
+          <div class="sp-results-head">
+            <h2 id="sp-results-title">Forslag</h2>
+            <span class="sp-count" id="sp-count"></span>
+          </div>
+          <div class="sp-score-filter-row">
+            <span>Vis kun score ≥ <b id="sp-score-filter-label">70</b></span>
+            <input type="range" id="sp-score-filter-slider" min="0" max="90" step="5" value="70"/>
+            <span class="sp-score-filter-hint">alle steder i området vises fortsatt i kartet</span>
+          </div>
+          <div id="sp-results"></div>
         </div>
-        <div class="sp-score-filter-row">
-          <span>Vis kun score ≥ <b id="sp-score-filter-label">70</b></span>
-          <input type="range" id="sp-score-filter-slider" min="0" max="90" step="5" value="70"/>
-          <span class="sp-score-filter-hint">alle steder i området vises fortsatt i kartet</span>
-        </div>
-        <div id="sp-results"></div>
       </div>
     </div>
   </div>
@@ -301,7 +317,7 @@
      worker/api/README.md). Testnøkkelen (1x00000000000000000000AA) hører
      kun hjemme i worker/api/.dev.vars for lokal utvikling, aldri her. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<script src="js/api-client.js?v=0.22.1"></script>
-<script src="js/app.js?v=0.22.1"></script>
+<script src="js/api-client.js?v=0.22.3"></script>
+<script src="js/app.js?v=0.22.3"></script>
 </body>
 </html>
