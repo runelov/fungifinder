@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.22.3"/>
+<link rel="stylesheet" href="css/styles.css?v=0.22.4"/>
 </head>
 <body>
 
@@ -161,8 +161,16 @@
     </details>
 
     <div class="sp-layout sp-mobile-view-liste">
+      <!-- UX-gjennomgang 2026-08-14 (mockup-oppfølging): denne wrapper-diven
+           (og høyrekolonnens under) blir display:contents på mobil, se
+           .sp-layout > div-regelen i styles.css — panelene inni blir da
+           reelle grid-barn av .sp-layout selv, og kan derfor gis individuell
+           order på mobil UTEN å påvirke desktop sin 2-kolonners plassering
+           (som fortsatt styres av selve wrapper-diven, uendret). Klassene
+           sp-panel-sopp/-funn/-vaer finnes bare for å ha noe stabilt å
+           target'e med order — ren styling er fortsatt via .sp-panel. -->
       <div>
-        <div class="sp-panel">
+        <div class="sp-panel sp-panel-sopp">
           <h3>Velg sopp</h3>
           <div class="sp-seg" id="sp-viewmode-seg">
             <button data-viewmode="single" class="active">Én art</button>
@@ -173,14 +181,14 @@
 
         <div class="sp-panel sp-species-info" id="sp-species-info"></div>
 
-        <div class="sp-panel">
+        <div class="sp-panel sp-panel-funn">
           <h3>Mine funn</h3>
           <div id="sp-myfinds-list" class="sp-mine-list"></div>
           <button class="sp-add-btn" id="sp-add-place">+ Registrer funn</button>
           <button class="sp-mark-hogst-btn" id="sp-mark-hogst">🪓 Merk hogstfelt i kart</button>
         </div>
 
-        <div class="sp-panel">
+        <div class="sp-panel sp-panel-vaer">
           <h3>Vær siste 14 dager</h3>
           <div class="sp-weather-box" id="sp-weather-box"><span class="sp-wstatus">henter værdata…</span></div>
           <h3 style="margin-top:12px;">Vekstsesong (mai–i dag)</h3>
@@ -317,7 +325,7 @@
      worker/api/README.md). Testnøkkelen (1x00000000000000000000AA) hører
      kun hjemme i worker/api/.dev.vars for lokal utvikling, aldri her. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<script src="js/api-client.js?v=0.22.3"></script>
-<script src="js/app.js?v=0.22.3"></script>
+<script src="js/api-client.js?v=0.22.4"></script>
+<script src="js/app.js?v=0.22.4"></script>
 </body>
 </html>

@@ -179,10 +179,31 @@
      aktiv KUN under 760px, samme brekkpunkt som resten av mobiltilpasningen. */
   .sp-mobile-view-toggle { display: none; }
   @media (max-width: 760px) {
-    .sp-mobile-view-toggle { display: flex; margin-bottom: 14px; }
+    .sp-mobile-view-toggle { display: flex; margin-bottom: 14px; order: 2; }
     .sp-mobile-view-toggle button { flex: 1; text-align: center; }
     .sp-layout.sp-mobile-view-liste .sp-map-panel { display: none; }
     .sp-layout.sp-mobile-view-kart #sp-results-wrap { display: none; }
+
+    /* UX-gjennomgang 2026-08-14 (mockup-oppfølging): rekkefølgen på mobil
+       fulgte tidligere bare desktop sin 2-kolonne-DOM (venstre kolonne
+       helt ut, så høyre) — Velg sopp/Artsprofil/Mine funn/Vær kom altså
+       FØR bryteren og resultatene, uendret av selve Liste/Kart-fiksen
+       over. display:contents på begge .sp-layout-wrapperne gjør panelene
+       inni til reelle grid-barn av .sp-layout selv (som fortsatt er
+       display:grid her, kun grid-template-columns er endret til 1fr) —
+       hver kan da få sin egen `order`, uavhengig av hvilken av de to
+       opprinnelige kolonnene den lå i, UTEN å røre desktop (der wrapperne
+       forblir vanlige bokser og styrer plasseringen som før). min-width:0
+       må flyttes ett hakk ned til selve panelene (samme overflow-grunn som
+       den opprinnelige regelen på selve wrapper-diven — se den) siden
+       display:contents-diven ikke lenger har noen boks å sette det på. */
+    .sp-layout > div { display: contents; }
+    .sp-layout > div > * { min-width: 0; }
+    .sp-panel-sopp { order: 1; }
+    #sp-map-panel, #sp-results-wrap { order: 3; }
+    #sp-species-info { order: 4; }
+    .sp-panel-funn { order: 5; }
+    .sp-panel-vaer { order: 6; }
   }
   /* Fullskjerm skal maksimere selve kartet — skjul underpanelene som ellers
      følger under (turforslag, hente-data) mens man er i denne visningen. */

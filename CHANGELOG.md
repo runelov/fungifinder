@@ -1,5 +1,33 @@
 # Endringslogg
 
+## 0.22.4 — UX-gjennomgang: fullfør mobil-restrukturering (mockup-oppfølging)
+0.22.3 sin Liste/Kart-bryter løste kart+tegnforklaring-delen av
+scroll-problemet, men Velg sopp/Artsprofil/Mine funn/Vær fulgte fortsatt
+desktop sin DOM-rekkefølge (hele venstre kolonne FØR bryteren og
+resultatene) — ikke det som faktisk ble vist i mockupen. Fullført nå:
+
+- Begge `.sp-layout`-wrapperne blir `display: contents` under 760px —
+  panelene inni (Velg sopp, Artsprofil, Mine funn, Vær, kart/resultat-
+  bryteren, kartpanelet, resultatlisten) blir dermed reelle grid-barn av
+  `.sp-layout` selv og kan gis individuell `order`, helt uavhengig av
+  hvilken av de to opprinnelige kolonnene de lå i. Desktop er 100 %
+  uendret — der er wrapperne fortsatt vanlige bokser (`display: block`)
+  og styrer plasseringen akkurat som før.
+- Ny mobil-rekkefølge: Velg sopp → Liste/Kart-bryter → resultater/kart →
+  Artsprofil → Mine funn → Vær. Resultatene kommer nå rett etter
+  artsvelgeren (~1500px scroll fra toppen, ned fra ~3700px før 0.22.3, og
+  fra enda lenger ned uten den delen av 0.22.3-fiksen).
+- `min-width: 0`-fiksen fra v0.22.0-generasjonen (hindrer den scrollbare
+  artslisten i å presse siden bredere enn skjermen) flyttet fra selve
+  wrapper-diven ned til hvert enkelt panel, siden en `display:contents`-div
+  ikke lenger har noen boks å sette det på.
+- Bevisst IKKE endret: sikkerhetsvarselet (`sp-safety`) er fortsatt åpent
+  som default (`open`-attributt) og ikke flyttet — i motsetning til
+  mockupen, som av plasshensyn viste den slått sammen med "Om dataene" i
+  en kollapset "pille". Vurderingen fra selve UX-kritikken sto fast: en
+  forgiftningsadvarsel er for viktig til å gjemmes bak et klikk brukeren
+  må huske å ta.
+
 ## 0.22.3 — UX-gjennomgang: Liste/Kart-bryter på mobil, samkjørte fontstørrelser
 Fortsettelse av 0.22.2 sin design-/UX-kritikk — de to punktene som der ble
 bevisst utelatt fra førsterunden.
