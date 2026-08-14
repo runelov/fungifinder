@@ -1,5 +1,34 @@
 # Endringslogg
 
+## 0.22.7 — Presisert "ingen steder"-meldingen for et uanalysert område
+Bruker meldte at meldingen som vises når et valgt fylke/kommune/radius ikke
+har noen kjente steder (f.eks. kommunen Lillestrøm) var "knotete norsk og
+upresis og lite brukervennlig": *"Ingen steder passerer filtrene dine akkurat
+nå i Lillestrøm. Prøv «Alle fylker/kommuner» eller juster radius."*
+
+To problemer: (1) `scoped.length === 0` her betyr ALLTID "ingen kjente
+steder i området" — aldri "for strenge filtre" (dette skjer før
+score-filteret i det hele tatt anvendes), så "passerer ikke filtrene dine"
+sa i realiteten det motsatte av hva som skjedde. (2) forslaget "Prøv «Alle
+fylker/kommuner» eller juster radius" pekte på en knapp som ikke finnes, og
+"juster radius" ga ingen mening utenfor radius-modus.
+
+Meldingen er nå modus-tilpasset og bruker faktiske UI-navn:
+- Fylke: *"Ingen analyserte steder i {fylke} ennå. Velg et annet fylke,
+  eller se hvilke kommuner som er dekket under «Om dataene»."*
+- Kommune: samme, men "Velg en annen kommune, ...".
+- Radius (senter satt): *"Ingen analyserte steder innen {radius} km ennå.
+  Prøv et annet senterpunkt eller en større radius."*
+- Radius (uten senter): uendret, "Klikk i kartet for å sette et
+  senterpunkt."
+
+Lagt til en admin-only oppfordring om å hente terrengdata for området
+(gjenbruker den allerede eksisterende `fetchNudgeHtml()`/
+`wireFetchNudgeLink()` — samme lenke-mønster som dekningslinjen over
+"Foreslå områder" og sammendraget etter et rundtur-forsøk), usynlig for
+vanlige brukere siden `#sp-fetch-panel` allerede skjules helt for dem
+server-side (`updateFetchPanel()`).
+
 ## 0.22.6 — Rettet radius-modus: kartet viste hele Norge, ikke bare valgt område
 Bruker påpekte at hintet "alle steder i området vises fortsatt i kartet"
 (under score-filteret) var en sannhet med modifikasjoner — gjennomgang

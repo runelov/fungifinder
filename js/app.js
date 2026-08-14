@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.22.6';
+  const APP_VERSION = '0.22.7';
   const APP_BUILD_DATE = '2026-08-14';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -3594,7 +3594,31 @@
     }
     if (!scoped.length) {
       document.getElementById('sp-count').textContent = `0 steder vist${areaLabel}`;
-      container.innerHTML = `<div class="sp-empty">Ingen steder passerer filtrene dine akkurat nå${areaLabel}. ${filterMode==='radius' && !radiusCenter ? 'Klikk i kartet for å sette et senterpunkt.' : 'Prøv «Alle fylker/kommuner» eller juster radius.'}</div>`;
+      // RETTET 2026-08-14 (bruker meldte at meldingen var upresis for en
+      // kommune uten analyserte steder, f.eks. Lillestrøm): scoped.length===0
+      // her betyr ALLTID "ingen kjente steder i dette området" (dette skjer
+      // FØR minScoreFilter i det hele tatt anvendes, se breakdown-kommentaren
+      // under) — aldri "for strenge filtre". Den gamle teksten ("passerer
+      // ikke filtrene dine … Prøv «Alle fylker/kommuner» eller juster
+      // radius") antydet det motsatte, OG ga et rådvag/feil handlingsforslag
+      // (ingen knapp heter "Alle fylker/kommuner", og "juster radius" er
+      // meningsløst utenfor radius-modus). Forslaget er nå modus-tilpasset og
+      // bruker faktiske UI-navn («Om dataene» sin dekningsliste, i stedet for
+      // å gjette på nabofylker/-kommuner blindt).
+      const forslag = filterMode === 'radius' && !radiusCenter
+        ? 'Klikk i kartet for å sette et senterpunkt.'
+        : filterMode === 'fylke'
+          ? 'Velg et annet fylke, eller se hvilke kommuner som er dekket under «Om dataene».'
+          : filterMode === 'kommune'
+            ? 'Velg en annen kommune, eller se hvilke kommuner som er dekket under «Om dataene».'
+            : 'Prøv et annet senterpunkt eller en større radius.';
+      // fetchNudgeHtml() er allerede admin-only i praksis (sjekker om
+      // #sp-fetch-panel faktisk er synlig — updateFetchPanel() skjuler det
+      // helt for ikke-admin, se der) — gjenbruker samme lenke/mønster som
+      // dekningslinjen over "Foreslå områder" og sammendraget etter et
+      // "Foreslå områder"-forsøk, i stedet for en tredje, særegen formulering.
+      container.innerHTML = `<div class="sp-empty">Ingen analyserte steder${areaLabel} ennå. ${forslag}${fetchNudgeHtml(scoped.length)}</div>`;
+      wireFetchNudgeLink();
       return;
     }
 
