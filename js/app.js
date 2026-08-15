@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.22.7';
-  const APP_BUILD_DATE = '2026-08-14';
+  const APP_VERSION = '0.24.0';
+  const APP_BUILD_DATE = '2026-08-15';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
   // kommentar der) — de to må holdes i sync manuelt siden repoet bevisst
@@ -142,6 +142,15 @@
   // OSM-data. Default AV — de fleste vil fortsatt sette pris på stier for å
   // komme seg inn i terrenget. Se stiavstandScore().
   let weighTrailDistance = false;
+  // Nedprioriterer steder nær en REELL, kjørbar vei — ikke sti/skogsbilvei
+  // (se veiavstandScore(), og RETTET 2026-08-15 i fetch_area.py der
+  // roads/trails ble gjort disjunkte nettopp for at dette skulle bli et eget
+  // signal). Distinkt fra adkomstScore() (som premierer kort avstand til
+  // PARKERING — motsatt fortegn) og roScore (som måler avstand til
+  // TETTSTED/befolkning, ikke vei — en gjennomgående vei i utmark uten noe
+  // tettsted i nærheten gir høy ro-score selv rett attmed veien). Default AV
+  // — de fleste vil fortsatt sette pris på grei bilatkomst.
+  let weighRoadDistance = false;
   // La egen funnhistorikk styrke forslag (opptil +20, se scoreLocation()).
   // Default PÅ — de fleste vil at "jeg har funnet det her før" skal telle.
   // Kan skrus av for å få rene terrengbaserte forslag, f.eks. for bevisst å
@@ -184,8 +193,19 @@
   let radiusKm = 20;
   let weatherBySpecies = {};
   let weatherReady = false;
-  let seasonWeather = null; // { totalPrecip, avgTemp, months:[{label,precip,tempAvg}], dryStreakDays }, se loadSeasonWeather()
+  // RETTET 2026-08-15: seasonWeather var tidligere ETT tall for HELE
+  // appen — hentet for sentroiden av alle lastede steder, uansett hvor
+  // spredt de var. Brukeren merket seg (via ekstrem tørke på Østlandet i
+  // 2026) at et sted kunne score 95-96 mens sesongen lokalt var den
+  // tørreste på flere tiår — nettopp fordi sentroide-tilnærmingen kunne
+  // gi et helt annet steds sesongvær hvis flere fylker var lastet inn
+  // samtidig. seasonWeather beholdes som ETT representativt sammendrag kun
+  // til infoboksen (se renderSeasonWeatherBox) — scoreLocation() slår nå i
+  // stedet opp seasonWeatherByCell PER STEDETS EGET rutenett-punkt (samme
+  // ~11 km rutenett som weatherGridKey/loadWeather bruker for 14-dagersværet).
+  let seasonWeather = null; // { totalPrecip, avgTemp, months:[{label,precip,tempAvg}], dryStreakDays, historicalAvgPrecip, historicalYears, precipRatioVsHistorical }, se loadSeasonWeather()
   let seasonWeatherReady = false;
+  let seasonWeatherByCell = {}; // rutenett-nøkkel (weatherGridKey) -> samme sesongobjekt som seasonWeather, se loadSeasonWeather()
   let userFinds = [];
   let userCuts = [];
   let hogstOmrader = []; // [{id, lat, lon, radiusM, dato}] — egne merkede flatehogd-OMRÅDER,
@@ -1749,91 +1769,205 @@
   }
 
   // ---------- sesongvær (vekstsesong-historikk) ----------
-  // Henter hele vekstsesongens (1. mai -> i dag) nedbør/temperatur for ETT
-  // representativt punkt (senter av alle lastede steder) via Open-Meteos
-  // gratis arkiv-API. Formålet er å fange opp om sesongen totalt sett har
-  // vært våt eller tørr — noe et rent 14-dagersvindu ikke fanger opp (f.eks.
-  // en ellers tørr sommer som nettopp har fått litt regn de siste 14 dagene).
-  // Hentes på ett representativt punkt, ikke per lokasjon, for å unngå
-  // hundrevis av kall for et sesonglangt datasett.
+  // Henter hele vekstsesongens (1. mai -> i dag) nedbør/temperatur PER
+  // RUTENETT-CELLE (samme ~11 km rutenett som 14-dagersværet over, se
+  // weatherGridKey) via Open-Meteos gratis arkiv-API — RETTET 2026-08-15,
+  // se seasonWeatherByCell-kommentaren ved state-variabelen for hvorfor
+  // ett globalt sentroide-punkt for hele appen var util for scoring.
+  //
+  // SAMME kall henter nå OGSÅ SEASON_CLIMATOLOGY_YEARS tidligere sesonger
+  // (samme kalenderdato-vindu, 1. mai -> samme MM-DD som i dag, hvert av de
+  // foregående årene) i ÉTT sammenhengende arkiv-oppslag per celle (i
+  // stedet for ett kall per år) — brukt til å regne ut om DENNE sesongen er
+  // unormalt tørr/våt for STEDET, ikke bare mot en artsspesifikk
+  // "ideell vekst"-terskel (se precipRatioVsHistorical i scoreLocation()).
+  const SEASON_WEATHER_CACHE_KEY = 'fungifinder-season-weather-grid-cache';
   const SEASON_WEATHER_CACHE_MAX_AGE_HOURS = 6;
+  const SEASON_CLIMATOLOGY_YEARS = 10; // hvor mange tidligere sesonger "normalt nivå" regnes ut fra
+  const SEASON_BATCH_SIZE = 15; // arkiv-kall med multi-års-vindu er MYE tyngre per lokasjon enn 14-dagersvarselet (se loadWeather) — mindre bolker
+  const SEASON_MAX_CELLS = 60; // tak på antall unike rutenett-celler per sideinnlasting — se loadSeasonWeather()
+
+  // Summerer precipitation_sum for datoer i [fraMD, tilMD] (MM-DD, inklusiv)
+  // innenfor ETT gitt kalenderår fra de parallelle dates/precip-arrayene.
+  // Brukt både for inneværende sesong og for hvert av klimatologi-årene —
+  // egen funksjon for å garantere at begge regnes ut på nøyaktig samme måte.
+  function sumPrecipInRange(dates, precipArr, year, fromMD, toMD){
+    let sum = 0, days = 0;
+    for (let i = 0; i < dates.length; i++) {
+      const d = dates[i];
+      if (!d.startsWith(String(year))) continue;
+      const md = d.slice(5);
+      if (md < fromMD || md > toMD) continue;
+      if (precipArr[i] != null) { sum += precipArr[i]; days++; }
+    }
+    return { sum, days };
+  }
 
   async function loadSeasonWeather(){
     const locs = allLocations();
     if (!locs.length) return;
-    const lat = locs.reduce((a,l)=>a+l.lat,0) / locs.length;
-    const lon = locs.reduce((a,l)=>a+l.lon,0) / locs.length;
     const now = new Date();
-    const seasonStart = `${now.getFullYear()}-05-01`;
-    const todayStr = now.toISOString().slice(0,10);
+    const currentYear = now.getFullYear();
+    const todayMD = now.toISOString().slice(5,10); // "MM-DD" — samme kalenderdato-vindu brukes for alle klimatologi-år
+    const historyStartYear = currentYear - SEASON_CLIMATOLOGY_YEARS;
+    const rangeStart = `${historyStartYear}-01-01`;
+    const rangeEnd = now.toISOString().slice(0,10);
 
-    // Centroiden flytter seg litt etter hvert som flere områder hentes, så
-    // avrundes til ~11 km for en stabil cache-nøkkel som fortsatt treffer på
-    // tvers av sideinnlastinger samme dag/kveld.
-    const cacheKey = `fungifinder-season-weather-${lat.toFixed(1)}_${lon.toFixed(1)}`;
-    try {
-      const cachedRaw = localStorage.getItem(cacheKey);
-      if (cachedRaw) {
-        const cached = JSON.parse(cachedRaw);
-        if ((Date.now() - cached.fetchedAt) < SEASON_WEATHER_CACHE_MAX_AGE_HOURS * 3600 * 1000 && cached.data) {
-          seasonWeather = cached.data;
-          seasonWeatherReady = true;
-          bumpScoreCache(); // seasonWeather endret — se scoreLocation()
-          renderSeasonWeatherBox();
-          return;
-        }
+    // Samme rutenett-dedup som loadWeather() — flere steder i samme
+    // ~11 km-celle deler ett arkiv-oppslag.
+    const cellByLoc = {};
+    const uniqueCells = {};
+    locs.forEach(loc => {
+      const key = weatherGridKey(loc.lat, loc.lon);
+      cellByLoc[loc.id] = key;
+      if (!uniqueCells[key]) uniqueCells[key] = { lat: loc.lat, lon: loc.lon };
+    });
+    let cellKeys = Object.keys(uniqueCells);
+    // SEASON_MAX_CELLS: øvre tak per sideinnlasting — et bredt "alle
+    // fylker"-utsnitt kan ha langt flere unike celler enn et scoped
+    // fylke/kommune-utsnitt, og hvert cellekall her er mye tyngre (multi-års
+    // datasett) enn 14-dagersværets. Steder i celler UTENFOR taket faller
+    // tilbake til nøytral (ingen) sesongscoring i stedet for et forsøk på å
+    // hente alt — samme gradvise degradering som når værtjenesten er nede.
+    const overCap = cellKeys.length > SEASON_MAX_CELLS;
+    if (overCap) cellKeys = cellKeys.slice(0, SEASON_MAX_CELLS);
+
+    let cache = {};
+    try { cache = JSON.parse(localStorage.getItem(SEASON_WEATHER_CACHE_KEY) || '{}'); } catch(e) { cache = {}; }
+    const nowMs = Date.now();
+    const freshCells = {};
+    const staleKeys = [];
+    cellKeys.forEach(key => {
+      const entry = cache[key];
+      if (entry && (nowMs - entry.fetchedAt) < SEASON_WEATHER_CACHE_MAX_AGE_HOURS * 3600 * 1000) {
+        freshCells[key] = entry.data;
+      } else {
+        staleKeys.push(key);
       }
-    } catch(e) { /* ignorer korrupt cache */ }
+    });
 
-    try {
-      const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}&start_date=${seasonStart}&end_date=${todayStr}&daily=precipitation_sum,temperature_2m_mean&timezone=Europe%2FOslo`;
-      const res = await fetch(url);
-      if (res.status === 429) throw new Error('429 Too Many Requests (Open-Meteo arkiv)');
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      const dates = (data.daily && data.daily.time) || [];
-      const precipArr = (data.daily && data.daily.precipitation_sum) || [];
-      const tempArr = (data.daily && data.daily.temperature_2m_mean) || [];
-      if (!dates.length) throw new Error('tomt datasett');
+    let anyOk = Object.keys(freshCells).length > 0;
+    let hit429 = false;
+    for (let i = 0; i < staleKeys.length && !hit429; i += SEASON_BATCH_SIZE) {
+      const batchKeys = staleKeys.slice(i, i + SEASON_BATCH_SIZE);
+      const batchCells = batchKeys.map(k => uniqueCells[k]);
+      try {
+        const lats = batchCells.map(c=>c.lat.toFixed(3)).join(',');
+        const lons = batchCells.map(c=>c.lon.toFixed(3)).join(',');
+        const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lats}&longitude=${lons}&start_date=${rangeStart}&end_date=${rangeEnd}&daily=precipitation_sum,temperature_2m_mean&timezone=Europe%2FOslo`;
+        const res = await fetch(url);
+        if (res.status === 429) {
+          console.warn('Open-Meteo arkiv svarte 429 (Too Many Requests) — stopper flere sesongvær-kall denne sesjonen.');
+          hit429 = true;
+          break;
+        }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        const arr = Array.isArray(data) ? data : [data];
+        const monthNames = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+        arr.forEach((d, j) => {
+          const key = batchKeys[j]; if (!key || !d || !d.daily) return;
+          const dates = d.daily.time || [];
+          const precipArr = d.daily.precipitation_sum || [];
+          const tempArr = d.daily.temperature_2m_mean || [];
+          if (!dates.length) return;
 
-      const monthNames = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
-      const monthBuckets = {};
-      let totalPrecip = 0, tempSum = 0, tempCount = 0;
-      let dryStreak = 0, longestDryStreak = 0;
-      dates.forEach((d, i) => {
-        const p = precipArr[i], t = tempArr[i];
-        const monthIdx = parseInt(d.slice(5,7), 10) - 1;
-        if (!monthBuckets[monthIdx]) monthBuckets[monthIdx] = { precip: 0, tempSum: 0, tempCount: 0 };
-        if (p != null) {
-          totalPrecip += p;
-          monthBuckets[monthIdx].precip += p;
-          dryStreak = p < 1 ? dryStreak + 1 : 0;
-          longestDryStreak = Math.max(longestDryStreak, dryStreak);
-        }
-        if (t != null) {
-          tempSum += t; tempCount++;
-          monthBuckets[monthIdx].tempSum += t;
-          monthBuckets[monthIdx].tempCount++;
-        }
-      });
-      const months = Object.keys(monthBuckets).sort((a,b)=>a-b).map(idx => {
-        const b = monthBuckets[idx];
-        return { label: monthNames[idx], precip: Math.round(b.precip), tempAvg: b.tempCount ? Math.round(b.tempSum/b.tempCount*10)/10 : null };
-      });
+          // Inneværende sesong: 1. mai -> i dag, samme logikk/månedsoppdeling
+          // som før RETTET 2026-08-15 (kun nå per celle i stedet for globalt).
+          const monthBuckets = {};
+          let totalPrecip = 0, tempSum = 0, tempCount = 0, seasonDays = 0;
+          let dryStreak = 0, longestDryStreak = 0;
+          dates.forEach((dstr, k) => {
+            if (!dstr.startsWith(String(currentYear))) return;
+            const md = dstr.slice(5);
+            if (md < '05-01') return; // før vekstsesongen
+            const p = precipArr[k], t = tempArr[k];
+            const monthIdx = parseInt(dstr.slice(5,7), 10) - 1;
+            if (!monthBuckets[monthIdx]) monthBuckets[monthIdx] = { precip: 0, tempSum: 0, tempCount: 0 };
+            seasonDays++;
+            if (p != null) {
+              totalPrecip += p;
+              monthBuckets[monthIdx].precip += p;
+              dryStreak = p < 1 ? dryStreak + 1 : 0;
+              longestDryStreak = Math.max(longestDryStreak, dryStreak);
+            }
+            if (t != null) {
+              tempSum += t; tempCount++;
+              monthBuckets[monthIdx].tempSum += t;
+              monthBuckets[monthIdx].tempCount++;
+            }
+          });
+          const months = Object.keys(monthBuckets).sort((a,b)=>a-b).map(idx => {
+            const b = monthBuckets[idx];
+            return { label: monthNames[idx], precip: Math.round(b.precip), tempAvg: b.tempCount ? Math.round(b.tempSum/b.tempCount*10)/10 : null };
+          });
+
+          // Klimatologi: samme kalendervindu (1. mai -> todayMD) for hvert
+          // av de SEASON_CLIMATOLOGY_YEARS foregående årene, fra SAMME
+          // arkiv-svar — ingen ekstra nettverkskall. Et år uten nok data
+          // (f.eks. helt i starten av arkivet) telles ikke med i snittet.
+          const yearlyTotals = [];
+          for (let y = historyStartYear; y < currentYear; y++) {
+            const { sum, days } = sumPrecipInRange(dates, precipArr, y, '05-01', todayMD);
+            if (days >= 30) yearlyTotals.push(sum); // krev et rimelig antall dager med data for at året skal telle
+          }
+          const historicalAvgPrecip = yearlyTotals.length
+            ? Math.round(yearlyTotals.reduce((a,b)=>a+b,0) / yearlyTotals.length)
+            : null;
+          const precipRatioVsHistorical = (historicalAvgPrecip && historicalAvgPrecip > 0)
+            ? Math.round((totalPrecip / historicalAvgPrecip) * 100) / 100
+            : null;
+
+          const entry = {
+            totalPrecip: Math.round(totalPrecip),
+            avgTemp: tempCount ? Math.round(tempSum/tempCount*10)/10 : null,
+            months,
+            dryStreakDays: longestDryStreak,
+            days: seasonDays,
+            historicalAvgPrecip,
+            historicalYears: yearlyTotals.length,
+            precipRatioVsHistorical,
+            fetchedAt: nowMs
+          };
+          freshCells[key] = entry;
+          cache[key] = { fetchedAt: nowMs, data: entry };
+        });
+        anyOk = true;
+      } catch (e) {
+        console.warn('Sesongvær feilet for en bolk med rutenett-celler', e);
+      }
+    }
+
+    if (staleKeys.length) {
+      try { localStorage.setItem(SEASON_WEATHER_CACHE_KEY, JSON.stringify(cache)); } catch(e) { /* full/blokkert lagring — ignorer, gjelder bare cache; entry holdes uansett i minnet denne sesjonen via freshCells */ }
+    }
+
+    // Slås opp av scoreLocation() PER STED via weatherGridKey(loc.lat,loc.lon)
+    // — samme rutenett-funksjon, ikke en egen loc.id-indeksert kopi, slik at
+    // oppslaget aldri kan bli utdatert i forhold til allLocations().
+    seasonWeatherByCell = freshCells;
+
+    // seasonWeather (representativt sammendrag til infoboksen): snitt over
+    // alle celler som faktisk ble hentet denne runden, ikke ett eget kall.
+    const cellVals = Object.values(freshCells);
+    if (cellVals.length) {
       seasonWeather = {
-        totalPrecip: Math.round(totalPrecip),
-        avgTemp: tempCount ? Math.round(tempSum/tempCount*10)/10 : null,
-        months,
-        dryStreakDays: longestDryStreak,
-        days: dates.length
+        totalPrecip: Math.round(cellVals.reduce((a,c)=>a+c.totalPrecip,0) / cellVals.length),
+        avgTemp: (() => { const t = cellVals.filter(c=>c.avgTemp!=null); return t.length ? Math.round(t.reduce((a,c)=>a+c.avgTemp,0)/t.length*10)/10 : null; })(),
+        months: cellVals[0].months, // til visning — samme mnd-liste-struktur uansett celle, presise tall er per-celle i scoringen
+        dryStreakDays: Math.max(...cellVals.map(c=>c.dryStreakDays)),
+        days: cellVals[0].days,
+        historicalAvgPrecip: (() => { const h = cellVals.filter(c=>c.historicalAvgPrecip!=null); return h.length ? Math.round(h.reduce((a,c)=>a+c.historicalAvgPrecip,0)/h.length) : null; })(),
+        historicalYears: cellVals[0].historicalYears,
+        precipRatioVsHistorical: (() => { const r = cellVals.filter(c=>c.precipRatioVsHistorical!=null); return r.length ? Math.round((r.reduce((a,c)=>a+c.precipRatioVsHistorical,0)/r.length)*100)/100 : null; })(),
+        cellCount: cellVals.length,
+        cellsCapped: overCap
       };
       seasonWeatherReady = true;
-      try { localStorage.setItem(cacheKey, JSON.stringify({ fetchedAt: Date.now(), data: seasonWeather })); } catch(e) { /* full/blokkert lagring — ignorer, gjelder bare cache */ }
-    } catch (e) {
-      console.warn('Sesongvær feilet', e);
+    } else if (!anyOk) {
       seasonWeatherReady = false;
     }
-    bumpScoreCache(); // seasonWeather endret — se scoreLocation()
+    bumpScoreCache(); // seasonWeatherByCell endret — se scoreLocation()
     renderSeasonWeatherBox();
     render();
   }
@@ -1847,9 +1981,26 @@
     }
     const sw = seasonWeather;
     const monthsHtml = sw.months.map(m => `${m.label}: ${m.precip} mm${m.tempAvg!=null?`, ${m.tempAvg}°C`:''}`).join(' · ');
+    // Historisk sammenligning (RETTET 2026-08-15) — se precipRatioVsHistorical
+    // i loadSeasonWeather()/scoreLocation(). Vises kun når vi faktisk fikk
+    // nok tidligere sesonger å sammenligne mot (historicalAvgPrecip != null).
+    let historikkHtml = '';
+    if (sw.historicalAvgPrecip != null && sw.precipRatioVsHistorical != null) {
+      const r = sw.precipRatioVsHistorical;
+      const verdict = r < 0.5 ? 'betydelig tørrere enn normalt'
+        : r < 0.75 ? 'tørrere enn normalt'
+        : r > 1.4 ? 'betydelig våtere enn normalt'
+        : r > 1.15 ? 'våtere enn normalt'
+        : 'nær normalt nivå';
+      historikkHtml = `<br/>Sammenlignet med snittet for samme periode de siste ${sw.historicalYears} sesongene (<b>${sw.historicalAvgPrecip} mm</b>): <b>${Math.round(r*100)}%</b> av normalen — ${verdict}.`;
+    }
+    const cellsNote = sw.cellCount > 1
+      ? `<br/><span style="opacity:.7">Snitt over ${sw.cellCount} områder${sw.cellsCapped ? ' (flere lastet inn enn vist her — se enkeltsteders egne tall i score-beregningen)' : ''} — se det enkelte sted for presist lokalt tall.</span>`
+      : '';
     box.innerHTML = `<span class="sp-wstatus">✓ sesongoversikt (${sw.days} dager, 1. mai–i dag)</span><br/>
-      Totalt <b>${sw.totalPrecip} mm</b> nedbør, snitt <b>${sw.avgTemp ?? '–'}°C</b>. Lengste tørkeperiode: ${sw.dryStreakDays} dager.<br/>
-      <span style="opacity:.8">${monthsHtml}</span>`;
+      Totalt <b>${sw.totalPrecip} mm</b> nedbør, snitt <b>${sw.avgTemp ?? '–'}°C</b>. Lengste tørkeperiode: ${sw.dryStreakDays} dager.
+      ${historikkHtml}<br/>
+      <span style="opacity:.8">${monthsHtml}</span>${cellsNote}`;
   }
 
   // ---------- helpers ----------
@@ -1930,6 +2081,35 @@
     return 4;
   }
 
+  // Nedprioriterer nærhet til en REELL, kjørbar vei — avstandVeiM måler nå
+  // (RETTET 2026-08-15 i fetch_area.py) avstand til nærmeste highway=* SOM
+  // IKKE er sti/skogsbilvei (path/track/footway/bridleway); før den datoen
+  // var "roads" en overmengde som inkluderte stier, så avstandVeiM og
+  // avstandStiM ville stort sett bare gjentatt hverandre. Distinkt fra alle
+  // tre andre nærhets-signaler i scoreLocation():
+  //  - adkomstScore(): premierer kort avstand til PARKERING (motsatt fortegn
+  //    — og et annet punkt; man kan ha langt til parkering, men likevel stå
+  //    rett attmed en gjennomgående vei et annet sted i terrenget)
+  //  - roScore: måler avstand til TETTSTED (befolkning), ikke vei — en
+  //    gjennomgående skogsbilvei/riksvei i utmark uten tettsted i nærheten
+  //    gir fortsatt høy ro-score selv rett ved veien
+  //  - stiavstandScore() over: kun sti/skogsbilvei, bevisst utelatt herfra
+  //    slik at "vei" og "sti" blir to atskilte, uavhengige preferanser
+  // Kun aktiv når weighRoadDistance-preferansen er på (default av). Samme
+  // terskler som stiavstandScore() — ikke fordi støy/forstyrrelse fra en
+  // bilvei antas å ha nøyaktig samme rekkevidde som fra en sti, men fordi
+  // begge er nærmeste-node-tilnærminger med samme datapresisjon; andre tall
+  // ville bare vært påstått presisjon uten grunnlag (samme resonnement som
+  // elevationScore()).
+  function veiavstandScore(loc){
+    if (loc.avstandVeiM == null) return 0;
+    const d = loc.avstandVeiM;
+    if (d <= 100) return -8;
+    if (d <= 300) return -4;
+    if (d <= 800) return 0;
+    return 4;
+  }
+
   function findsFor(locId, speciesId){
     return userFinds.filter(f => f.locId === locId && (!speciesId || f.speciesId === speciesId));
   }
@@ -1985,6 +2165,26 @@
   // (bevis for at arten finnes her / sannsynligheten for at stedet er
   // nedplukket) kan dele samme underliggende datakilde uten å kansellere
   // hverandre.
+  // 2026-08-15: lagt til enda en opt-in, default-AV kategori: nedprioriter
+  // nær REELL vei (±8, weighRoadDistance/veiavstandScore) — samme
+  // designmønster som stiavstand, men et distinkt signal (se
+  // veiavstandScore() for hvorfor dette IKKE bare gjentar adkomst/ro/sti).
+  // Krevde å gjøre roads/trails disjunkte i fetch_area.py (RETTET
+  // 2026-08-15) — avstandVeiM målte før dette avstand til nærmeste vei ELLER
+  // sti om hverandre, ubrukelig som eget signal.
+  // 2026-08-15 (samme dag, del 2 — tørkesesong-oppfølging): utvidet
+  // værbudsjettet med to nye modifikatorer, begge under weighWeather og
+  // begge PER STEDETS EGEN rutenett-celle (ikke lenger ett globalt
+  // sentroide-tall, se seasonWeatherByCell): "sesong vs. historisk normal"
+  // (+3/-6/-10, ekte sammenligning mot samme kalendervindu de siste
+  // SEASON_CLIMATOLOGY_YEARS sesongene — se loadSeasonWeather) og
+  // "lang tørkeperiode" (-2/-5/-8, kobler inn det tidligere ubrukte
+  // dryStreakDays-tallet). Værbudsjettet er dermed nå +12/-10 (14-dager) +
+  // +4/-4 (sesong vs. artsbehov) + +3/-10 (sesong vs. historisk normal) +
+  // 0/-8 (tørkeperiode) — bevisst asymmetrisk mot nedsiden: en reelt tørr
+  // sesong skal kunne trekke MER enn de tidligere -6/-10 tillot, mens en våt
+  // sesong ikke gis tilsvarende stor oppside (unormalt mye regn er ikke
+  // entydig bra for alle arter på samme måte som tørke entydig er dårlig).
   // ---------------------------------------------------------------------
   function scoreLocation(species, loc){
     const cacheKey = species.id + '|' + loc.id;
@@ -2066,6 +2266,16 @@
       breakdown.push([loc.avstandStiM == null ? 'Avstand fra sti (ukjent)' : 'Avstand fra sti/skogsbilvei', stiScore]);
     }
 
+    // Egen preferanse (default av), atskilt fra stiScore over — se
+    // veiavstandScore() for hvorfor "vei" og "sti" nå er to uavhengige
+    // signaler.
+    let veiScore = 0;
+    if (weighRoadDistance) {
+      veiScore = veiavstandScore(loc);
+      total += veiScore;
+      breakdown.push([loc.avstandVeiM == null ? 'Avstand fra vei (ukjent)' : 'Avstand fra vei', veiScore]);
+    }
+
     const acc = adkomstScore(loc);
     total += acc.pts; breakdown.push(['Adkomst (parkeringsavstand/stier)', acc.pts]);
 
@@ -2095,20 +2305,74 @@
     // Sesonghistorikk (1. mai -> i dag) — egen, mindre modifikator ved siden
     // av det ferske 14-dagersvinduet over. Fanger opp en sesong som totalt
     // sett har vært tørr/våt, selv om de siste 14 dagene alene ser greie ut
-    // (eller motsatt). idealNedbor14 brukes som et grovt ukentlig referansenivå
-    // og skaleres opp til sesongens lengde — bevisst holdt upresist/lav vekt,
-    // se samme resonnement som elevationScore om å ikke tallfeste mer presist
-    // enn datagrunnlaget faktisk tillater. Samme weighWeather-preferanse som over.
-    if (weighWeather && seasonWeatherReady && seasonWeather && species.weather.idealNedbor14) {
-      const expectedSeasonPrecip = species.weather.idealNedbor14 * (seasonWeather.days / 14);
-      const ratio = expectedSeasonPrecip > 0 ? seasonWeather.totalPrecip / expectedSeasonPrecip : 1;
+    // (eller motsatt). RETTET 2026-08-15: slår nå opp STEDETS EGEN
+    // rutenett-celle (seasonWeatherByCell) i stedet for ett globalt
+    // sentroide-tall for hele appen — se seasonWeatherByCell-kommentaren ved
+    // state-variabelen for hvorfor (brukeren observerte at et sted kunne
+    // score 95-96 under en reell ekstremtørke fordi sesongtallet som ble
+    // brukt i scoringen kom fra et helt annet sted i landet).
+    const sw = seasonWeatherByCell[weatherGridKey(loc.lat, loc.lon)];
+    // idealNedbor14 brukes som et grovt ukentlig referansenivå og skaleres
+    // opp til sesongens lengde — bevisst holdt upresist/lav vekt, se samme
+    // resonnement som elevationScore om å ikke tallfeste mer presist enn
+    // datagrunnlaget faktisk tillater. Samme weighWeather-preferanse som over.
+    if (weighWeather && sw && species.weather.idealNedbor14) {
+      const expectedSeasonPrecip = species.weather.idealNedbor14 * (sw.days / 14);
+      const ratio = expectedSeasonPrecip > 0 ? sw.totalPrecip / expectedSeasonPrecip : 1;
       let seasonScore = 0, seasonNote = null;
       if (ratio >= 0.9) { seasonScore = 4; seasonNote = 'God sesong hittil — nok nedbør over tid til gode vekstforhold.'; }
       else if (ratio < 0.5) { seasonScore = -4; seasonNote = 'Tørr sesong hittil — kan gi svakere oppblomstring selv med fuktighet nå.'; }
       if (seasonScore !== 0) {
         total += seasonScore;
-        breakdown.push(['Sesonghistorikk (nedbør mai–i dag)', seasonScore]);
+        breakdown.push(['Sesonghistorikk (nedbør vs. artens vekstbehov)', seasonScore]);
         weatherVerdict = weatherVerdict ? `${weatherVerdict} ${seasonNote}` : seasonNote;
+      }
+    }
+
+    // NYTT 2026-08-15, forslag 3: sammenligner mot et REELT historisk
+    // normalnivå for STEDET (snitt av samme 1.mai->i dag-vindu de siste
+    // SEASON_CLIMATOLOGY_YEARS sesongene, se loadSeasonWeather) — i stedet
+    // for KUN mot artens generiske vekstbehov over. De to måler forskjellige
+    // ting: "er det fuktig nok til at arten trives" (over) vs. "er dette en
+    // uvanlig tørr/våt sesong for AKKURAT DETTE STEDET, uansett art" (her).
+    // Sistnevnte er det brukeren faktisk etterspurte — modellen hadde
+    // tidligere intet begrep om "tørreste på X år", kun om artens ideelle
+    // fuktbehov. Litt tyngre vekt enn arts-modifikatoren over, siden dette
+    // er forankret i ekte historiske data for stedet, ikke en generisk
+    // terskel. Krever minst 3 av de SEASON_CLIMATOLOGY_YEARS årene å ha nok
+    // data (se yearlyTotals-filteret i loadSeasonWeather) — ellers droppes
+    // modifikatoren i stedet for å vise et normalnivå basert på for få år.
+    if (weighWeather && sw && sw.precipRatioVsHistorical != null && sw.historicalYears >= 3) {
+      const r = sw.precipRatioVsHistorical;
+      let histSeasonScore = 0, histNote2 = null;
+      if (r < 0.4) { histSeasonScore = -10; histNote2 = `Ekstremt tørr sesong for stedet — kun ${Math.round(r*100)}% av normalt nedbørsnivå siste ${sw.historicalYears} sesonger.`; }
+      else if (r < 0.65) { histSeasonScore = -6; histNote2 = `Tørrere enn normalt for stedet — ${Math.round(r*100)}% av snittet siste ${sw.historicalYears} sesonger.`; }
+      else if (r > 1.4) { histSeasonScore = 3; histNote2 = `Våtere enn normalt for stedet denne sesongen.`; }
+      if (histSeasonScore !== 0) {
+        total += histSeasonScore;
+        breakdown.push([`Sesong vs. ${sw.historicalYears}-års normal for stedet`, histSeasonScore]);
+        weatherVerdict = weatherVerdict ? `${weatherVerdict} ${histNote2}` : histNote2;
+      }
+    }
+
+    // NYTT 2026-08-15, forslag 1: dryStreakDays (lengste sammenhengende
+    // tørkeperiode i sesongen) ble beregnet allerede fra 2026-07-17 og vist
+    // i sesong-infoboksen, men ALDRI brukt i scoringen — akkurat det
+    // signalet som best fanger en LANGVARIG, sammenhengende tørkeperiode
+    // (i motsetning til totalnedbør, som en enkelt kraftig regnbyge midt i
+    // en ellers tørr sesong kan dekke over). Egen, liten modifikator —
+    // overlapper bevisst noe med totalnedbør-modifikatorene over (samme
+    // underliggende værdata), men fanger opp et scenario de ikke gjør: en
+    // lang, ubrutt tørkeperiode etterfulgt av nok totalnedbør til at
+    // ratio-modifikatorene over ikke slår ut.
+    if (weighWeather && sw) {
+      let streakScore = 0;
+      if (sw.dryStreakDays >= 30) streakScore = -8;
+      else if (sw.dryStreakDays >= 21) streakScore = -5;
+      else if (sw.dryStreakDays >= 14) streakScore = -2;
+      if (streakScore !== 0) {
+        total += streakScore;
+        breakdown.push([`Lang sammenhengende tørkeperiode (${sw.dryStreakDays} dager)`, streakScore]);
       }
     }
 
@@ -2125,7 +2389,18 @@
     }
 
     total = Math.max(0, Math.min(100, Math.round(total)));
-    const result = { total, breakdown, isCut, weatherVerdict, weather: w, histNote, accessTags: acc.tags };
+    // hasEvidence: skiller REELL evidens (noen — enten deg selv eller
+    // Artsdatabanken — har faktisk funnet/rapportert arten her) fra en score
+    // som utelukkende hviler på terreng-/vær-match. Innført 2026-08-15 etter
+    // at brukeren påpekte at et tall i 90-årene lett leses som en garanti —
+    // men vektbudsjettet (se kommentaren over scoreLocation) er bevisst satt
+    // opp slik at "alltid tilgjengelige" kategorier alene lander på ~90, så
+    // et RENT terrengbasert sted kan komme nesten helt til værs uten at noen
+    // noensinne har funnet arten der. Vist på selve kortet (se cardHtml),
+    // ikke bare i score-breakdown-modalen, nettopp for å gjøre den
+    // forskjellen synlig UTEN et ekstra klikk.
+    const hasEvidence = funnDetaljer.length > 0 || (weighOwnFindHistory && myFinds.length > 0);
+    const result = { total, breakdown, isCut, weatherVerdict, weather: w, histNote, accessTags: acc.tags, hasEvidence };
     scoreCache.set(cacheKey, result);
     return result;
   }
@@ -3316,7 +3591,7 @@
             <div class="sp-card-name">${escapeHtml(loc.name)}</div>
             <div class="sp-card-kommune">${escapeHtml(loc.kommune)}, ${escapeHtml(loc.fylke)} · ${loc.lat.toFixed(3)}, ${loc.lon.toFixed(3)}</div>
           </div>
-          <div class="sp-gauge-wrap" data-score-loc="${loc.id}" data-score-species="${species_for_card().id}" title="Klikk for å se score-beregningen">${gaugeSvg(res.total)}<div class="sp-gauge-label">score</div></div>
+          <div class="sp-gauge-wrap" data-score-loc="${loc.id}" data-score-species="${species_for_card().id}" title="Klikk for å se score-beregningen">${gaugeSvg(res.total)}<div class="sp-gauge-label">score</div><div class="sp-gauge-basis ${res.hasEvidence ? 'evidence' : 'terrain'}">${res.hasEvidence ? '✓ kjent funnsted' : '🔍 terrengbasert'}</div></div>
         </div>
         <div class="sp-tags">
           ${loc.custom ? `<span class="sp-tag custom">eget sted</span>` : ''}
@@ -3374,7 +3649,7 @@
           </div>
         </div>
         <div class="sp-fav-scorelist">
-          ${favResults.map(r => `<span class="sp-fav-score-chip ${r.res.isCut?'cut':''}" data-score-loc="${loc.id}" data-score-species="${r.species.id}" title="Klikk for å se score-beregningen">${escapeHtml(r.species.name)} <b>${r.res.total}</b></span>`).join('')}
+          ${favResults.map(r => `<span class="sp-fav-score-chip ${r.res.isCut?'cut':''}" data-score-loc="${loc.id}" data-score-species="${r.species.id}" title="${r.res.hasEvidence ? 'Kjent funnsted' : 'Terrengbasert (ingen kjent funnhistorikk)'} — klikk for å se score-beregningen">${r.res.hasEvidence ? '✓ ' : ''}${escapeHtml(r.species.name)} <b>${r.res.total}</b></span>`).join('')}
         </div>
         <div class="sp-tags">
           ${loc.custom ? `<span class="sp-tag custom">eget sted</span>` : ''}
@@ -3470,6 +3745,7 @@
     document.getElementById('sp-route-disabled-note').style.display = routeEnabled ? 'none' : '';
     document.getElementById('sp-toggle-quiet').classList.toggle('on', prioritizeQuiet);
     document.getElementById('sp-toggle-sti').classList.toggle('on', weighTrailDistance);
+    document.getElementById('sp-toggle-vei').classList.toggle('on', weighRoadDistance);
     document.getElementById('sp-toggle-ownhistory').classList.toggle('on', weighOwnFindHistory);
     document.getElementById('sp-toggle-weather').classList.toggle('on', weighWeather);
     document.getElementById('sp-toggle-knownfinds').classList.toggle('on', deprioritizeKnownFinds);
@@ -4178,6 +4454,7 @@
   // derfor scoreCache før re-render, se scoreCache sin deklarasjon.
   document.getElementById('sp-toggle-quiet').addEventListener('click', () => { prioritizeQuiet = !prioritizeQuiet; bumpScoreCache(); render(); });
   document.getElementById('sp-toggle-sti').addEventListener('click', () => { weighTrailDistance = !weighTrailDistance; bumpScoreCache(); render(); });
+  document.getElementById('sp-toggle-vei').addEventListener('click', () => { weighRoadDistance = !weighRoadDistance; bumpScoreCache(); render(); });
   document.getElementById('sp-toggle-ownhistory').addEventListener('click', () => { weighOwnFindHistory = !weighOwnFindHistory; bumpScoreCache(); render(); });
   document.getElementById('sp-toggle-weather').addEventListener('click', () => { weighWeather = !weighWeather; bumpScoreCache(); render(); });
   document.getElementById('sp-toggle-knownfinds').addEventListener('click', () => { deprioritizeKnownFinds = !deprioritizeKnownFinds; bumpScoreCache(); render(); });

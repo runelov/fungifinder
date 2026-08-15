@@ -1,5 +1,87 @@
 # Endringslogg
 
+## 0.24.0 — Evidens-merking på kort + reell tørkesesong-vurdering
+To spørsmål fra brukeren i samme samtale som v0.23.0:
+
+**1) "Score på 100 kan oppleves som en garanti — burde modellen vært
+strengere?"** Svar: vektbudsjettet var allerede satt opp (2026-07-10) slik
+at 100 normalt krever korroborerende evidens, men kortet viste ikke DENNE
+forskjellen — man måtte klikke inn i score-modalen for å se om en høy score
+kom fra terreng alene eller fra faktisk kjent funnhistorikk. Løsning: ny
+`hasEvidence`-beregning i `scoreLocation()` (sann hvis stedet har kjente
+Artsdatabanken-funn for arten ELLER egen funnhistorikk, gitt at hhv.
+Artskart-bonusen/`weighOwnFindHistory` faktisk er aktive) — vist direkte på
+kortet under score-hjulet som "✓ kjent funnsted" (uthevet) eller
+"🔍 terrengbasert" (dempet), og som prefiks på hver art-chip i
+"Mine favoritter"-visningen.
+
+**2) "Hvor godt fanges en ekstremtørr sesong (Østlandet 2026) opp — og
+sammenlignes den mot tidligere sesonger?"** Svar før denne versjonen: dårlig
+på begge punkter. Tre fikser:
+
+- **Sesongvær er nå PER STED, ikke ett globalt tall.** `loadSeasonWeather()`
+  hentet tidligere data for ÉTT representativt punkt — sentroiden av ALLE
+  steder lastet inn i appen — uansett hvor spredt de var. Et bredt
+  fylkesutsnitt kunne dermed gi et Hobøl/Indre Østfold-punkt sesongtall fra
+  et helt annet sted i landet. Hentes nå per ~11 km rutenett-celle (samme
+  rutenett som 14-dagersværet, se `weatherGridKey`), med samme
+  bolk-/cache-mønster som `loadWeather()`. Et tak (`SEASON_MAX_CELLS=60`) og
+  mindre bolker (`SEASON_BATCH_SIZE=15`) holder kostnaden nede for svært
+  brede utsnitt — celler utover taket faller tilbake til nøytral (ingen)
+  sesongscoring i stedet for et forsøk på å hente alt.
+- **Ekte historisk sammenligning.** Samme arkiv-kall utvidet til å hente
+  `SEASON_CLIMATOLOGY_YEARS` (10) tidligere sesonger i ÉTT sammenhengende
+  oppslag (ett Jan-i-fjor-til-i-dag-vindu i stedet for ett kall per år), og
+  regner ut snittnedbør for SAMME kalendervindu (1. mai -> samme dato) hvert
+  av de foregående årene. Ny scoring-modifikator "Sesong vs. N-års normal
+  for stedet" (+3/−6/−10) sammenligner mot DETTE i stedet for kun mot artens
+  generiske vekstbehov — modellen kan nå faktisk si noe om "uvanlig tørt for
+  STEDET", ikke bare "tørt for en kantarell". Vises også i
+  sesong-infoboksen i UI-et (prosent av normalen + verdikt), ikke bare i
+  scoringen.
+- **`dryStreakDays` koblet inn i scoringen.** Lengste sammenhengende
+  tørkeperiode i sesongen ble beregnet siden 2026-07-17 og vist i UI-et, men
+  var ALDRI brukt i selve scoren — dødt signal. Ny modifikator (0/−2/−5/−8
+  ved hhv. <14/14-20/21-29/≥30 dagers sammenhengende tørke) fanger opp en
+  lang, ubrutt tørkeperiode som totalnedbør-tallene alene kan dekke over
+  (f.eks. én kraftig regnbyge midt i en ellers tørr sesong).
+
+Værbudsjettet er nå bevisst asymmetrisk mot nedsiden — en reelt tørr sesong
+kan trekke betydelig mer enn før (opptil −24 samlet på tvers av de fire
+værmodifikatorene, mot tidligere −16), mens en våt sesong ikke får
+tilsvarende stor oppside.
+
+## 0.23.0 — Ny preferanse: nedprioriter nær vei
+Bruker spurte om det var en idé å innføre en preferanse for å nedprioritere
+områder nær vei, eller om dette allerede dekkes av eksisterende preferanser.
+Svaret var nei: adkomstScore() premierer kort avstand til PARKERING (motsatt
+fortegn), roScore måler avstand til TETTSTED/befolkning (ikke vei — en
+gjennomgående skogsbilvei i utmark uten tettsted i nærheten ga fortsatt høy
+ro-score), og stiavstandScore() (weighTrailDistance) er eksplisitt avgrenset
+til sti/skogsbilvei (`path/track/footway/bridleway`), ikke reelle veier.
+`avstandVeiM` fantes allerede i datamodellen, men var ubrukt i scoring siden
+opprydningen 2026-07-10 (den dobbelttalte den gang med adkomst og ro).
+
+Lagt til:
+- Ny brukerpreferanse "Vektlegg avstand fra vei" (`weighRoadDistance`,
+  default AV — samme designmønster som "Vektlegg avstand fra sti").
+- `veiavstandScore()` i `js/app.js`, strukturelt identisk med
+  `stiavstandScore()` (samme terskler, samme resonnement om å ikke late som
+  scoringen er mer presis enn nærmeste-node-tilnærmingen faktisk er).
+- **Forutsetning i data-repoet**: `fetch_area_data_in_bbox()` i
+  `fetch_area.py` gjorde tidligere `roads` og `trails` til overlappende sett
+  (enhver sti-node lå i BEGGE listene), så `avstandVeiM` og `avstandStiM`
+  ville stort sett bare gjentatt hverandre. Rettet til disjunkte sett i
+  fungifinder-db (se den repoens CHANGELOG) — bonus-effekt: `kjorbarVei`
+  (avledet fra samme avstand) er nå mer presis, siden en enslig fotsti ikke
+  lenger kan telle som "kjørbar vei i nærheten".
+
+Eksisterende steder får korrekt `avstandVeiM` først etter neste
+`--refresh-existing`-kjøring som trigger OSM-infra-oppfriskingen (60-dagers
+intervall, samme mekanisme som befolkning/stier-backfillen 2026-07-10) —
+frem til da er feltet enten `null` (nøytral 0-score, ikke straffet) eller det
+gamle, upresise tallet for steder hentet før denne fiksen.
+
 ## 0.22.7 — Presisert "ingen steder"-meldingen for et uanalysert område
 Bruker meldte at meldingen som vises når et valgt fylke/kommune/radius ikke
 har noen kjente steder (f.eks. kommunen Lillestrøm) var "knotete norsk og
