@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.24.2';
+  const APP_VERSION = '0.25.0';
   const APP_BUILD_DATE = '2026-08-15';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -3688,6 +3688,26 @@
     </svg>`;
   }
 
+  // Lenke til selve parkeringsplassen — RETTET 2026-08-15: parkeringsnotatet
+  // skrev tidligere bare "(OSM)" som kildeangivelse, uten noe å klikke på;
+  // brukeren påpekte at "OSM" er en forkortelse ingen sluttbrukere vet hva
+  // betyr. Foretrekker en direkte lenke til selve OSM-elementet
+  // (osm.org/{type}/{id}, viser hele det kartlagte området/alle tags — se
+  // parkeringOsmType/parkeringOsmId i fetch_area.py) fremfor en generisk
+  // kart-markør (?mlat=&mlon=) når vi har element-ID-en; faller tilbake til
+  // markør-varianten for steder hentet før 2026-08-15 (som har lat/lon, men
+  // ikke osmType/osmId). Returnerer null når det ikke finnes noen kjent
+  // parkeringsplass i det hele tatt (avstand_m var null → ingen koordinater).
+  function parkeringKartUrl(loc){
+    if (loc.parkeringOsmType && loc.parkeringOsmId != null) {
+      return `https://www.openstreetmap.org/${loc.parkeringOsmType}/${loc.parkeringOsmId}`;
+    }
+    if (loc.parkeringLat != null && loc.parkeringLon != null) {
+      return `https://www.openstreetmap.org/?mlat=${loc.parkeringLat}&mlon=${loc.parkeringLon}#map=18/${loc.parkeringLat}/${loc.parkeringLon}`;
+    }
+    return null;
+  }
+
   function cardHtml(loc, res){
     const t = locTexts(loc);
     const finds = findsFor(loc.id);
@@ -3718,7 +3738,7 @@
           ${res.isCut ? `<span class="sp-tag warn">ekskludert fra anbefaling</span>` : ''}
         </div>
         <div class="sp-access-box">
-          <div>🚗 <b>Parkering:</b> ${escapeHtml(loc.parkeringNotat) || 'ikke oppgitt'}${parkWarn ? ' <span class="sp-access-warn">— bekreft selv at det ikke er privat grunn</span>' : ''}</div>
+          <div>🚗 <b>Parkering:</b> ${escapeHtml(loc.parkeringNotat) || 'ikke oppgitt'}${parkWarn ? ' <span class="sp-access-warn">— bekreft selv at det ikke er privat grunn</span>' : ''}${parkeringKartUrl(loc) ? ` <a href="${parkeringKartUrl(loc)}" target="_blank" rel="noopener">Vis på kart →</a>` : ''}</div>
           <div>🥾 <b>Sti/skogsbilvei i terrenget:</b> ${loc.stier==='ja'?'ja':loc.stier==='nei'?'nei, ingen kjent sti':'ukjent'}${loc.avstandStiM != null ? ` (${loc.avstandStiM} m)` : ''}${loc.avstandParkeringM ? ` · ca ${loc.avstandParkeringM} m å gå fra parkering` : ''}</div>
         </div>
         ${res.histNote ? `<div class="sp-hist-note">★ ${res.histNote}</div>` : ''}
@@ -3774,7 +3794,7 @@
           ${res.isCut ? `<span class="sp-tag warn">ekskludert fra anbefaling</span>` : ''}
         </div>
         <div class="sp-access-box">
-          <div>🚗 <b>Parkering:</b> ${escapeHtml(loc.parkeringNotat) || 'ikke oppgitt'}${parkWarn ? ' <span class="sp-access-warn">— bekreft selv at det ikke er privat grunn</span>' : ''}</div>
+          <div>🚗 <b>Parkering:</b> ${escapeHtml(loc.parkeringNotat) || 'ikke oppgitt'}${parkWarn ? ' <span class="sp-access-warn">— bekreft selv at det ikke er privat grunn</span>' : ''}${parkeringKartUrl(loc) ? ` <a href="${parkeringKartUrl(loc)}" target="_blank" rel="noopener">Vis på kart →</a>` : ''}</div>
           <div>🥾 <b>Sti/skogsbilvei i terrenget:</b> ${loc.stier==='ja'?'ja':loc.stier==='nei'?'nei, ingen kjent sti':'ukjent'}${loc.avstandStiM != null ? ` (${loc.avstandStiM} m)` : ''}${loc.avstandParkeringM ? ` · ca ${loc.avstandParkeringM} m å gå fra parkering` : ''}</div>
         </div>
         ${res.histNote ? `<div class="sp-hist-note">★ ${res.histNote}</div>` : ''}
@@ -4136,6 +4156,7 @@
       kjenteFunn: [], kjenteFunnDetaljer: [], custom: true,
       kilde: 'find-pending', enrichStatus: 'pending',
       kjorbarVei: 'ukjent', parkeringNotat: null, stier: 'ukjent', avstandStiM: null, avstandParkeringM: null,
+      parkeringLat: null, parkeringLon: null, parkeringOsmType: null, parkeringOsmId: null,
     });
     return { locId: id, isNew: true };
   }

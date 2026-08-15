@@ -1,5 +1,25 @@
 # Endringslogg
 
+## 0.25.0 — "Vis på kart"-lenke til parkeringsplassen (i stedet for "(OSM)")
+Bruker påpekte at parkeringsnotatet skrev f.eks. "Nærmeste kjente
+parkeringsplass (OSM), ca 240 m unna" — "OSM" er en forkortelse ingen
+sluttbrukere vet hva betyr, og foreslo en lenke til selve parkeringsplassen
+i stedet.
+
+- `(OSM)` byttet til `(kartdata)` i alle varianter av parkeringsnotatet
+  (`parkering_notat()` i fetch_area-db) — samme regex-avhengighet i appens
+  `adkomstScore()` uendret (ingen av mønstrene refererer "OSM").
+- Ny "Vis på kart →"-lenke lagt til rett etter parkeringsteksten på hvert
+  sted-kort. Lenker direkte til selve OSM-elementet
+  (`openstreetmap.org/{type}/{id}`, viser hele det kartlagte området og
+  alle tags) når vi har element-ID-en, ellers til en generisk kart-markør
+  på koordinaten — se `parkeringKartUrl()`. Ingen lenke vises når det ikke
+  finnes noen kjent parkeringsplass i nærheten.
+- Forutsetter nye felt fra fungifinder-db (se den repoens CHANGELOG v36):
+  `parkeringLat`/`parkeringLon`/`parkeringOsmType`/`parkeringOsmId`.
+  Eldre steder (hentet før 2026-08-15) har kun avstand/notat, ikke disse
+  feltene, og viser derfor ingen lenke før neste `--refresh-existing`.
+
 ## 0.24.2 — Fiks: værboksene viste nasjonalt snitt, ikke valgt område
 Bruker meldte at "Snitt nedbør siste 14 dager (alle steder)" viste NØYAKTIG
 samme tall (37 mm) for både Trondheim og Indre Østfold — to helt ulike
