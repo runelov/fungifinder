@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.24.0';
+  const APP_VERSION = '0.24.2';
   const APP_BUILD_DATE = '2026-08-15';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -260,6 +260,65 @@
   const yearNow = new Date().getFullYear();
 
   function allLocations(){ return BASE_LOCATIONS.concat(customLocations); }
+
+  // RETTET 2026-08-15: samme fylke/kommune/radius-filtreringslogikk lå
+  // duplisert tre steder (render()'s `scoped`, suggestAreas()'s `scoped`) —
+  // trukket ut hit som ÉN delt predikat-funksjon. Umiddelbare årsaken:
+  // brukeren merket seg at "Snitt nedbør siste 14 dager (alle steder)"
+  // viste NØYAKTIG samme tall for Trondheim og Indre Østfold — fordi
+  // loadWeather()/loadSeasonWeather() kjørte på allLocations() (ALT noensinne
+  // lastet inn, typisk hele landet fra første sideinnlasting med "alle
+  // fylker" valgt) i stedet for KUN det brukeren faktisk har valgt å se på
+  // akkurat nå. Brukes nå av scopedLocations() under, OG direkte av
+  // render()/suggestAreas() sine `scoped`-filtre (samme resultat, men uten
+  // tre kopier av samme tre if-setninger å holde i synk).
+  function isInCurrentScope(loc){
+    if (filterMode === 'fylke') return fylkeFilter === 'alle' || loc.fylke === fylkeFilter;
+    if (filterMode === 'kommune') return kommuneFilter === 'alle' || loc.kommune === kommuneFilter;
+    if (filterMode === 'radius' && radiusCenter) return haversineKm(radiusCenter.lat, radiusCenter.lon, loc.lat, loc.lon) <= radiusKm;
+    return true;
+  }
+
+  // Stedene innenfor det brukeren FAKTISK ser på nå (fylke/kommune/radius-
+  // filteret) — se isInCurrentScope() over. Brukt av loadWeather()/
+  // loadSeasonWeather() slik at værsammendragene faktisk gjelder valgt
+  // område, ikke alt appen noensinne har lastet inn.
+  function scopedLocations(){ return allLocations().filter(isInCurrentScope); }
+
+  // Kaller begge værhentingene på nytt for GJELDENDE scope — MÅ trigges ved
+  // hvert fylke/kommune/radius-bytte (se wiring nederst i filen), ikke bare
+  // én gang ved oppstart, ellers fryser weatherBySpecies/seasonWeatherByCell
+  // (og "alle steder"-sammendraget i infoboksene) fast på scopet som gjaldt
+  // FØRSTE gang appen lastet inn. Fire-and-forget, samme mønster som ved
+  // oppstart (ingen await her) — begge funksjonene oppdaterer UI selv når
+  // de er ferdige.
+  function refreshWeatherForScope(){ loadWeather(); loadSeasonWeather(); }
+
+  // Trigger for refreshWeatherForScope() — hektet inn i render() (se kallet
+  // i render()) i stedet for lagt til manuelt ved hvert enkelt sted som
+  // endrer fylke/kommune/radius (innlogging, filterbytte, "Hent data"
+  // fullført, ...). Disse stedene kaller ALLTID render() uansett når scopet
+  // endrer seg, så å hekte fast HER gjør det umulig å glemme et kallsted —
+  // sammenlignet med å måtte huske refreshWeatherForScope() manuelt ved
+  // hver av de ~9 stedene som endrer filterMode/fylkeFilter/kommuneFilter/
+  // radiusCenter/radiusKm. Debounces 400ms: uten dette ville radius-
+  // slideren (som endrer radiusKm på HVER 'input'-hendelse under drag)
+  // trigget ett nytt værkall per pikselforflytning.
+  let lastWeatherScopeKey = null;
+  let weatherScopeDebounce = null;
+  function currentScopeKey(){
+    if (filterMode === 'fylke') return `fylke:${fylkeFilter}`;
+    if (filterMode === 'kommune') return `kommune:${kommuneFilter}`;
+    if (filterMode === 'radius') return radiusCenter ? `radius:${radiusCenter.lat.toFixed(3)},${radiusCenter.lon.toFixed(3)}:${radiusKm}` : 'radius:ingen-senter';
+    return 'ukjent-modus';
+  }
+  function maybeRefreshWeatherForScope(){
+    const key = currentScopeKey();
+    if (key === lastWeatherScopeKey) return;
+    lastWeatherScopeKey = key;
+    clearTimeout(weatherScopeDebounce);
+    weatherScopeDebounce = setTimeout(refreshWeatherForScope, 400);
+  }
 
   // Art(er) som er aktive i "Velg sopp" akkurat nå — brukes til å begrense
   // Artsdatabanken-laget og Mine funn-laget i kartet til det du faktisk ser
@@ -1673,7 +1732,11 @@
 
   async function loadWeather(){
     const box = document.getElementById('sp-weather-box');
-    const locs = allLocations();
+    // RETTET 2026-08-15: scopedLocations() (kun valgt fylke/kommune/radius),
+    // IKKE allLocations() (alt appen noensinne har lastet inn — typisk hele
+    // landet). Se isInCurrentScope()-kommentaren for hvorfor dette var feil
+    // (identisk "snitt nedbør" for to helt ulike kommuner).
+    const locs = scopedLocations();
 
     // Uten dedup kostet HVER sideinnlasting like mange "lokasjoner" mot
     // Open-Meteos gratis kvote som antall punkter i datasettet (fort 1000+
@@ -1729,11 +1792,26 @@
           const key = batchKeys[j]; if(!key || !d || !d.daily) return;
           const precipArr = d.daily.precipitation_sum || [];
           const tempArr = d.daily.temperature_2m_mean || [];
-          const last14p = precipArr.slice(0,14);
+          const last14p = precipArr.slice(0,14); // dag -14 t.o.m. i går (dagens forecast_days=1-oppføring er bevisst utelatt, se URL-en over)
           const last5t = tempArr.slice(9,14);
           const sumP = last14p.reduce((a,b)=>a+(b||0),0);
           const avgT = last5t.length ? last5t.reduce((a,b)=>a+(b||0),0)/last5t.length : null;
-          const entry = { precip14: Math.round(sumP*10)/10, tempAvg: avgT!==null? Math.round(avgT*10)/10 : null, fetchedAt: now };
+          // RETTET 2026-08-15: brukeren besøkte et sted som var "knusktørt" i
+          // terrenget, men appen viste "Godt fuktnivå — gode odds nå" — fordi
+          // precip14 kun er en RÅ SUM over 14 dager, uten hensyn til NÅR
+          // regnet falt. Ett kraftig regnskyll for 12-13 dager siden gir
+          // samme sum som jevn nedbør gjennom hele perioden, men bakken kan
+          // ha vært knusktørr i ukevis siden. daysSinceRain (antall dager
+          // siden siste dag med målbar nedbør, samme ≥1mm-terskel som
+          // dryStreakDays i sesongberegningen for konsistens) fanger dette —
+          // se korreksjonen i scoreLocation()'s værblokk. Iterert fra
+          // NYESTE (indeks 13 = i går) og bakover.
+          let daysSinceRain = null;
+          for (let k = last14p.length - 1; k >= 0; k--) {
+            if ((last14p[k] || 0) >= 1) { daysSinceRain = last14p.length - k; break; }
+          }
+          if (daysSinceRain === null) daysSinceRain = last14p.length + 1; // ikke noe målbart regn i hele vinduet
+          const entry = { precip14: Math.round(sumP*10)/10, tempAvg: avgT!==null? Math.round(avgT*10)/10 : null, daysSinceRain, fetchedAt: now };
           freshCells[key] = entry;
           cache[key] = entry;
         });
@@ -1749,7 +1827,7 @@
 
     locs.forEach(loc => {
       const cell = freshCells[cellByLoc[loc.id]];
-      if (cell) weatherBySpecies[loc.id] = { precip14: cell.precip14, tempAvg: cell.tempAvg };
+      if (cell) weatherBySpecies[loc.id] = { precip14: cell.precip14, tempAvg: cell.tempAvg, daysSinceRain: cell.daysSinceRain };
     });
 
     if (anyOk) {
@@ -1804,8 +1882,26 @@
   }
 
   async function loadSeasonWeather(){
-    const locs = allLocations();
-    if (!locs.length) return;
+    // RETTET 2026-08-15: samme fiks som loadWeather() — scopedLocations(),
+    // ikke allLocations(). Bonus-effekt: SEASON_MAX_CELLS-taket (60) traff
+    // tidligere nesten alltid nasjonalt (typisk 1000+ unike celler for hele
+    // landet), så de aller fleste steder fikk ALDRI sesong-vs-historikk/
+    // dryStreakDays-korreksjonen fra v0.24.0 uansett hvilket område brukeren
+    // faktisk så på. Et scoped fylke/kommune/radius-utsnitt er nesten alltid
+    // langt under 60 celler.
+    const locs = scopedLocations();
+    if (!locs.length) {
+      // RETTET 2026-08-15: tidligere et rått `return` her, som lot boksen
+      // stå igjen med FORRIGE (nå feilaktige) scopes sesongdata når brukeren
+      // bytter til et område uten steder ennå — samme klasse feil som denne
+      // hele fiksen handler om, bare i tomt-scope-varianten. Rydder nå
+      // eksplisitt i stedet, samme mønster som loadWeather()'s
+      // "kunne ikke hente værdata"-fallback.
+      seasonWeatherByCell = {};
+      seasonWeatherReady = false;
+      renderSeasonWeatherBox();
+      return;
+    }
     const now = new Date();
     const currentYear = now.getFullYear();
     const todayMD = now.toISOString().slice(5,10); // "MM-DD" — samme kalenderdato-vindu brukes for alle klimatologi-år
@@ -2299,6 +2395,25 @@
       else if (w.precip14 >= prof.minNedbor14) { wScore = 6; weatherVerdict = 'Litt tørt, men innen rekkevidde.'; }
       else { wScore = -6; weatherVerdict = 'For tørt siste 14 dager — vent til mer nedbør.'; }
       if (prof.minTempAvg !== undefined && w.tempAvg !== null && w.tempAvg < prof.minTempAvg - 4) { wScore -= 4; weatherVerdict += ' Også kjøligere enn ideelt.'; }
+      // RETTET 2026-08-15: bruker besøkte et sted som var knusktørt i
+      // terrenget samme dag appen viste "Godt fuktnivå — gode odds nå" for
+      // det. Årsak: precip14 over er en RÅ 14-dagers-SUM — ett kraftig
+      // regnskyll for 12-13 dager siden teller likt som jevn nedbør gjennom
+      // hele perioden, selv om bakken kan ha vært tørr i ukevis siden. Denne
+      // korreksjonen bruker daysSinceRain (se loadWeather()) til å nedjustere
+      // verdikten når totalen ser fin ut på papiret, men det faktisk er lenge
+      // siden sist målbare regn — uavhengig av om precip14-grenen over ga
+      // +12 eller +6. IKKE ment å presist tallfeste bakkefuktighet (det ville
+      // krevd jordfuktighetsmålinger appen ikke har, se markfuktighet-feltet
+      // fra NIBIO i stedet for det) — kun å unngå å påstå "godt fuktnivå NÅ"
+      // når det tydelig ikke stemmer.
+      if (w.daysSinceRain != null && w.daysSinceRain >= 7) {
+        wScore -= 8;
+        weatherVerdict = `Nok nedbør på papiret siste 14 dager, men ${w.daysSinceRain} dager siden sist målbare regn — sannsynligvis tørrere i terrenget nå enn totalen alene tilsier.`;
+      } else if (w.daysSinceRain != null && w.daysSinceRain >= 4) {
+        wScore -= 4;
+        weatherVerdict += ` (${w.daysSinceRain} dager siden sist regn — verdt å sjekke bakkefuktigheten selv før du drar.)`;
+      }
       total += wScore; breakdown.push(['Værvindu (nedbør/temp)', wScore]);
     }
 
@@ -3419,13 +3534,7 @@
       const r = scoreForRoute(loc);
       return { loc, res: r.res };
     });
-    const scoped = scoredAll.filter(s => {
-      if (s.res.isCut) return false;
-      if (filterMode === 'fylke') return fylkeFilter === 'alle' || s.loc.fylke === fylkeFilter;
-      if (filterMode === 'kommune') return kommuneFilter === 'alle' || s.loc.kommune === kommuneFilter;
-      if (filterMode === 'radius' && radiusCenter) return haversineKm(radiusCenter.lat, radiusCenter.lon, s.loc.lat, s.loc.lon) <= radiusKm;
-      return true;
-    });
+    const scoped = scoredAll.filter(s => !s.res.isCut && isInCurrentScope(s.loc));
 
     if (!scoped.length) {
       summary.innerHTML = 'Ingen steder å foreslå områder fra i valgt område.' + fetchNudgeHtml(0);
@@ -3732,6 +3841,7 @@
   }
 
   function render(){
+    maybeRefreshWeatherForScope();
     renderSpeciesList();
     renderMyFindsList();
     renderDataNotice();
@@ -3822,12 +3932,7 @@
     // "Målepunkter"-laget ble skrudd på. Beregnes nå FØR renderMap(), slik
     // at kartet faktisk viser nøyaktig "området" — samme mengde som
     // resultatlisten før score-/hogst-filteret tynner den videre ned.
-    let scoped = scoredAll.filter(s => {
-      if (filterMode === 'fylke') return fylkeFilter === 'alle' || s.loc.fylke === fylkeFilter;
-      if (filterMode === 'kommune') return kommuneFilter === 'alle' || s.loc.kommune === kommuneFilter;
-      if (filterMode === 'radius' && radiusCenter) return haversineKm(radiusCenter.lat, radiusCenter.lon, s.loc.lat, s.loc.lon) <= radiusKm;
-      return true;
-    });
+    let scoped = scoredAll.filter(s => isInCurrentScope(s.loc));
 
     renderMap(scoped);
     renderHogstZones();
@@ -4623,9 +4728,12 @@
     // (så en Promise.all her avviser aldri). Kjørt parallelt kutter
     // ventetiden fra summen av alle fire til den TREGESTE av dem.
     await Promise.all([loadLocations(), loadFetchedAreas(), loadArtsfunn(), loadStorage(), loadDelteFunn()]);
+    // render() under trigger nå selv den første loadWeather()/
+    // loadSeasonWeather()-kjøringen via maybeRefreshWeatherForScope() (se
+    // den funksjonen) — ikke lenger et eget par kall her, se RETTET
+    // 2026-08-15 ved refreshWeatherForScope()/render() for hvorfor
+    // (samme mekanisme dekker nå også hvert senere filterbytte).
     render();
-    loadWeather();
-    loadSeasonWeather();
   })();
 
 })();

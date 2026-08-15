@@ -1,5 +1,76 @@
 # Endringslogg
 
+## 0.24.2 — Fiks: værboksene viste nasjonalt snitt, ikke valgt område
+Bruker meldte at "Snitt nedbør siste 14 dager (alle steder)" viste NØYAKTIG
+samme tall (37 mm) for både Trondheim og Indre Østfold — to helt ulike
+kommuner — og spurte om alle værdata burde gjelde det valgte området.
+
+Rotårsak: `loadWeather()`/`loadSeasonWeather()` hentet værdata for
+`allLocations()` — ALT appen noensinne har lastet inn (typisk hele det
+nasjonale datasettet, siden `fylkeFilter==='alle'` ved første sideinnlasting
+ikke sender noe server-filter) — i stedet for kun stedene innenfor
+fylke/kommune/radius-filteret brukeren faktisk har valgt. Samme
+`allLocations()`-tall ble dermed vist uansett hvilket område man senere
+byttet til, fordi begge funksjonene KUN kjørte ÉN gang, ved oppstart.
+
+To fikser:
+- **Ny `scopedLocations()`/`isInCurrentScope()`**: trukket ut fra tre
+  kopier av samme fylke/kommune/radius-filtreringslogikk (`render()` sin
+  `scoped`, `suggestAreas()` sin `scoped`) til én delt funksjon.
+  `loadWeather()`/`loadSeasonWeather()` bruker nå denne i stedet for
+  `allLocations()`.
+- **Automatisk re-henting ved scope-bytte**: ny `maybeRefreshWeatherForScope()`,
+  hektet inn i `render()` selv (kalles på ALLEREDE hver gang fylke/kommune/
+  radius endres, uansett årsak — innlogging, filterbytte, fullført
+  "Hent data"-jobb) i stedet for manuelt lagt til ved hvert av de ~9
+  stedene som endrer filterMode/fylkeFilter/kommuneFilter/radiusCenter.
+  Sammenligner en scope-nøkkel mot forrige kjente, og re-henter kun ved
+  faktisk endring — debounces 400ms slik at radius-sliderens kontinuerlige
+  'input'-hendelser under drag ikke trigger ett værkall per pikselforflytning.
+- Bonus-effekt: `SEASON_MAX_CELLS`-taket (60, v0.24.0) traff tidligere nesten
+  alltid nasjonalt siden `loadSeasonWeather()` kjørte mot hele landet — de
+  fleste steder fikk dermed ALDRI sesong-vs-historikk/dryStreakDays-
+  korreksjonen fra v0.24.0, uansett hvilket område brukeren faktisk så på.
+  Et scoped utsnitt er nesten alltid langt under 60 celler.
+- Ryddet også opp i `loadSeasonWeather()`'s tomt-scope-håndtering (fylke/
+  kommune uten steder ennå): viste tidligere FORRIGE scopes tall videre i
+  stedet for å nullstille — samme feilklasse som selve hovedsaken, bare i
+  tomt-scope-varianten.
+
+Verifisert i preview: bytte til et fylke uten lastede steder (unngåelig i
+lokal, uinnlogget forhåndsvisning siden ekte data krever innlogging) ga
+korrekt "kunne ikke hente værdata"/"kunne ikke hente sesonghistorikk" i
+stedet for å henge fast på forrige tall — og bytte tilbake gjenopprettet
+riktig data igjen, uten konsollfeil.
+
+## 0.24.1 — Fiks: "Godt fuktnivå" kunne vises for et sted som faktisk var knusktørt
+Bruker meldte at et sted de selv besøkte dagen før — og som var "knusktørt" i
+terrenget — fikk værverdikten "Godt fuktnivå — gode odds nå." i appen.
+
+Rotårsak: `precip14` (14-dagersvinduet som driver denne verdikten) er en RÅ
+SUM av nedbør over 14 dager, uten hensyn til NÅR nedbøren falt. Ett kraftig
+regnskyll 12-13 dager tilbake gir nøyaktig samme sum som jevn nedbør gjennom
+hele perioden — men bakken/strøsjiktet kan ha vært knusktørt i ukevis siden
+det ene skyllet. Modellen hadde ingen "hvor lenge siden sist"-sjekk i det
+hele tatt, kun totalen.
+
+Lagt til `daysSinceRain` (dager siden siste dag med ≥1mm nedbør — samme
+terskel som `dryStreakDays` i sesongberegningen fra v0.24.0, for konsistens)
+i `loadWeather()`, beregnet fra samme daglige nedbørsarray som `precip14`
+allerede henter (ingen nytt nettverkskall). Ny korreksjon i
+`scoreLocation()`'s værblokk: uansett hva `precip14`-grenen ga (+12/+6/-6),
+trekkes poengene ned og verdikten skrives om når det faktisk er lenge siden
+sist regn:
+- ≥7 dager siden sist regn: −8, verdikt endres til å eksplisitt nevne antall
+  dager og at terrenget sannsynligvis er tørrere enn totalen tilsier.
+- 4-6 dager: −4, kort parentetisk advarsel lagt til verdikten.
+- ≤3 dager: ingen endring — fersk nok til at totalen fortsatt er
+  representativ.
+
+Ikke ment som en presis bakkefuktighetsmåling (det ville krevd faktiske
+jordfuktighetsdata, se `fuktighetIndex`/NIBIO-markfuktighet for det) — kun
+for å unngå å påstå "godt fuktnivå NÅ" når det er åpenbart usant.
+
 ## 0.24.0 — Evidens-merking på kort + reell tørkesesong-vurdering
 To spørsmål fra brukeren i samme samtale som v0.23.0:
 
