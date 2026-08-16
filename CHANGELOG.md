@@ -1,5 +1,25 @@
 # Endringslogg
 
+## 0.27.1 — Fikset fastlåst invitasjonsmodal ved ugyldig/utløpt lenke
+Bruker meldte at feilmeldingen "Invitasjonslenken er ugyldig, utløpt,
+eller allerede brukt" vises i en modal det ikke går an å komme seg ut
+av. Stemte: `#sp-invite-panel` (`checkUrlInvitasjon()` i app.js) hadde
+verken en Lukk-knapp eller en klikk-utenfor-lukker, i motsetning til
+alle andre modaler i appen (funn-/hogst-modalene) som begge har det.
+Feilgrenen satte kun statusteksten og returnerte — panelet ble stående
+åpent resten av økten, og en reload ville sjekket akkurat samme
+ugyldige token på nytt via `?invitasjon=`-parameteren i URL-en.
+
+- La til en "Lukk"-knapp i `#sp-invite-panel` (index.html) og en id på
+  backdropen (`#sp-invite-backdrop`) for klikk-utenfor-lukking, samme
+  mønster som `#sp-modal-backdrop` bruker andre steder.
+- `checkUrlInvitasjon()` fikk en delt `closeInvitePanel()`-funksjon,
+  wiret til begge FØR try/catch-blokken slik at den også virker mens
+  "Sjekker …" vises og i feilgrenen. Fjerner i tillegg `?invitasjon=`
+  fra URL-en ved lukking (samme opprensking som den vellykkede
+  registreringen allerede gjorde) — uten det ville en reload trigget
+  samme fastlåste modal på nytt.
+
 ## 0.27.0 — Voksestedslag: fargelag, tegnforklaring og "Hvorfor her?"-kort
 Del 1 (fig. 1–3) av "Voksestedslaget"-planen
 (https://claude.ai/code/artifact/70ef4f71-bc60-4973-a35c-cd34755351b0),

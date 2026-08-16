@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.27.0"/>
+<link rel="stylesheet" href="css/styles.css?v=0.27.1"/>
 </head>
 <body>
 
@@ -315,9 +315,13 @@
   <!-- Vises kun når siden åpnes via en invitasjonslenke (?invitasjon=<token>)
        — se checkUrlInvitasjon() i app.js. Gjenbruker samme
        .sp-modal-backdrop/.sp-modal-mønster som funn-/hogst-modalene
-       (bygget i JS, se openFindModal). -->
+       (bygget i JS, se openFindModal) — id på backdropen og en egen
+       Lukk-knapp under (RETTET 2026-08-16: manglet tidligere helt i
+       feilgrenen — en ugyldig/utløpt/brukt lenke viste feilteksten i denne
+       modalen UTEN noen måte å lukke den på, verken knapp eller
+       klikk-utenfor, se checkUrlInvitasjon()). -->
   <div id="sp-invite-panel" style="display:none;">
-    <div class="sp-modal-backdrop">
+    <div class="sp-modal-backdrop" id="sp-invite-backdrop">
       <div class="sp-modal">
         <h4>Bli med på FungiFinder</h4>
         <div id="sp-invite-status" class="sp-modal-sub"></div>
@@ -330,6 +334,9 @@
             <button type="submit" class="sp-btn sp-primary">Registrer meg</button>
           </div>
         </form>
+        <div class="sp-modal-actions">
+          <button type="button" class="sp-btn" id="sp-invite-close">Lukk</button>
+        </div>
       </div>
     </div>
   </div>
@@ -341,7 +348,7 @@
      worker/api/README.md). Testnøkkelen (1x00000000000000000000AA) hører
      kun hjemme i worker/api/.dev.vars for lokal utvikling, aldri her. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<script src="js/api-client.js?v=0.27.0"></script>
-<script src="js/app.js?v=0.27.0"></script>
+<script src="js/api-client.js?v=0.27.1"></script>
+<script src="js/app.js?v=0.27.1"></script>
 </body>
 </html>

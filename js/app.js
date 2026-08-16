@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.27.0';
+  const APP_VERSION = '0.27.1';
   const APP_BUILD_DATE = '2026-08-16';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -634,6 +634,26 @@
     const form = document.getElementById('sp-invite-form');
     panel.style.display = '';
     statusEl.textContent = 'Sjekker invitasjonen …';
+
+    // RETTET 2026-08-16: lukker panelet OG fjerner ?invitasjon= fra URL-en.
+    // Uten URL-opprenskingen ville en reload (eller at brukeren lukker og
+    // åpner appen på nytt, f.eks. PWA) sjekket akkurat samme
+    // ugyldige/utløpte/brukte token på nytt og vist samme fastlåste modal
+    // igjen. Wiret FØR try/catch under, slik at Lukk-knappen/klikk-utenfor
+    // også virker mens "Sjekker …" vises og i feilgrenen — tidligere fantes
+    // ingen måte å lukke panelet på i det hele tatt der (verken knapp eller
+    // klikk-utenfor), se bruker-rapporten som førte til denne rettelsen.
+    function closeInvitePanel(){
+      panel.style.display = 'none';
+      const p = new URLSearchParams(location.search);
+      p.delete('invitasjon');
+      history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p.toString() : ''));
+    }
+    document.getElementById('sp-invite-close').addEventListener('click', closeInvitePanel);
+    document.getElementById('sp-invite-backdrop').addEventListener('click', (e) => {
+      if (e.target.id === 'sp-invite-backdrop') closeInvitePanel();
+    });
+
     try {
       const res = await window.ApiClient.sjekkInvitasjon(token);
       if (!res.gyldig) { statusEl.textContent = '⚠ Invitasjonslenken er ugyldig, utløpt, eller allerede brukt.'; return; }
@@ -645,10 +665,7 @@
         const kortnavn = document.getElementById('sp-invite-kortnavn').value.trim();
         try {
           await window.ApiClient.registrerMedInvitasjon(token, kortnavn);
-          const p = new URLSearchParams(location.search);
-          p.delete('invitasjon');
-          history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p.toString() : ''));
-          panel.style.display = 'none';
+          closeInvitePanel();
           await initAuth();
           await loadLocations();
           await loadStorage();
