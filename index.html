@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.26.1"/>
+<link rel="stylesheet" href="css/styles.css?v=0.27.0"/>
 </head>
 <body>
 
@@ -253,6 +253,13 @@
             <span>◯ stor stiplet sirkel = foreslått godt område</span>
             <span>🅿️ = mulig parkering</span>
           </div>
+          <!-- Tegnforklaring for "Voksestedslag (fargelag)" (se
+               L.control.layers i app.js) — én rad per relevant art, fylles av
+               renderVoksestedslagLegend() og vises kun mens laget faktisk er
+               skrudd på kartet (voksestedslagPanelsVisible()). Del 1.3 i
+               "Voksestedslaget"-planen, fig. 2. -->
+          <div class="sp-voksested-legend" id="sp-voksested-legend" style="display:none;"></div>
+          <div class="sp-voksested-coverage" id="sp-voksested-coverage" style="display:none;"></div>
           <div class="sp-map-hint" id="sp-map-hint"></div>
 
           <div class="sp-route-panel" id="sp-route-panel">
@@ -334,7 +341,7 @@
      worker/api/README.md). Testnøkkelen (1x00000000000000000000AA) hører
      kun hjemme i worker/api/.dev.vars for lokal utvikling, aldri her. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<script src="js/api-client.js?v=0.26.1"></script>
-<script src="js/app.js?v=0.26.1"></script>
+<script src="js/api-client.js?v=0.27.0"></script>
+<script src="js/app.js?v=0.27.0"></script>
 </body>
 </html>

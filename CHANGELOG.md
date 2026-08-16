@@ -1,5 +1,39 @@
 # Endringslogg
 
+## 0.27.0 — Voksestedslag: fargelag, tegnforklaring og "Hvorfor her?"-kort
+Del 1 (fig. 1–3) av "Voksestedslaget"-planen
+(https://claude.ai/code/artifact/70ef4f71-bc60-4973-a35c-cd34755351b0),
+inspirert av en UX-gjennomgang av bærher.no. Bygget utelukkende på data
+appen allerede laster/beregner (`terreng_steder` + `scoreLocation()`) —
+ingen ny tabell, ingen ny ETL, ingen backend-endring.
+
+- **Nytt kartlag "Voksestedslag (fargelag)"** i lag-kontrollen (av som
+  standard, samme mønster som Målepunkter-laget). Tegner ett lite
+  kant-løst rektangel per allerede scoret punkt, farget etter en egen
+  kulør PER ART (`SPECIES_HUE`) med metning/lyshet styrt av score
+  (`speciesPointColor`) — i stedet for appens delte score-fargeskala.
+  Flatehogde punkter hoppes over. Renderes av `renderVoksestedslag()`.
+- **Dekningslinje** under kartet mens laget er på: reelt telt antall
+  fargelagte punkter i valgt område — bevisst ALDRI en areal-/
+  prosentandel av kommunen, siden appen ikke har kommunens polygonareal
+  tilgjengelig klientsidig. Samme ærlighetsprinsipp som "tynt
+  datagrunnlag"-teksten over "Foreslå områder".
+- **Tegnforklaring** for fargelaget: én gradient-rad per relevant art
+  (valgt art, eller alle favoritter i favoritt-modus), generert fra
+  samme `SPECIES_HUE` som selve fargelaget slik at stolpen og
+  punktfargene alltid stemmer visuelt overens.
+- **"Hvorfor her?"-kort** i stedskortet (både enkeltart- og
+  favoritt-visning): fire faktorstolper — avstand til vei, skogtype &
+  alder, befolkningsnærhet, kjente Artsdatabanken-funn < 1,5 km — pluss
+  en "God match"/"Meget god match"/"Middels match"/"Svak match"-merkelapp
+  basert på totalscoren. Ren UI-eksponering av felt `scoreLocation()`
+  allerede leser/beregner (`whyHereFactors()`), påvirker ikke selve
+  scoren.
+
+Del 1.5 (rakere start, mykere risikoboks, mobil bottom-sheet) og Del 2–4
+(cache-lag, ETL-bulkmigrasjon, kalibreringskjøring) er ikke del av denne
+releasen — se plandokumentet.
+
 ## worker/api — 2026-08-16 (produksjonshotfix, ingen APP_VERSION-bump nødvendig)
 `refresh-areas.yml` (fungifinder-db) feilet to netter på rad
 (15. aug 18:24 og 16. aug 08:00) med `503`-feil fra

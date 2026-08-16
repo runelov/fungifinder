@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.26.1';
-  const APP_BUILD_DATE = '2026-08-15';
+  const APP_VERSION = '0.27.0';
+  const APP_BUILD_DATE = '2026-08-16';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
   // kommentar der) — de to må holdes i sync manuelt siden repoet bevisst
@@ -118,6 +118,62 @@
     { id:'demo-1', name:'Eksempelskog A (demo)', fylke:'Demo', kommune:'Demo', lat:60.0, lon:10.0, treslag:['gran','bjork'], skogalder:'gammel', fuktighet:'frisk', berggrunn:'fattig', avstandVeiM:null, befolkning:'ukjent', hogstAr:null, kjenteFunn:[], custom:false, kjorbarVei:'ukjent', parkeringNotat:'Logg inn for ekte steder', stier:'ukjent', avstandStiM:null, avstandParkeringM:null },
     { id:'demo-2', name:'Eksempelskog B (demo)', fylke:'Demo', kommune:'Demo', lat:60.2, lon:10.4, treslag:['furu'], skogalder:'middels', fuktighet:'tørr', berggrunn:'moderat', avstandVeiM:null, befolkning:'ukjent', hogstAr:null, kjenteFunn:[], custom:false, kjorbarVei:'ukjent', parkeringNotat:'Logg inn for ekte steder', stier:'ukjent', avstandStiM:null, avstandParkeringM:null }
   ];
+
+  // ---------- Voksestedslag: per-art fargekode ----------
+  // Del 1.3 i "Voksestedslaget"-planen (2026-08-16, se
+  // https://claude.ai/code/artifact/70ef4f71-bc60-4973-a35c-cd34755351b0) —
+  // én kulør per art i stedet for appens delte score-fargeskala
+  // (scoreColor under, fortsatt brukt av de vanlige markørene/Målepunkter-
+  // laget). Kulør identifiserer ARTEN, metning/lyshet innenfor kuløren er
+  // SCOREN. Valgt til å minne om artens faktiske utseende der det gir
+  // mening (kantarell=gul, steinsopp=rødbrun) — ren UI/konfigurasjon, ingen
+  // ny data, ingen backend-endring.
+  const SPECIES_HUE = {
+    kantarell: '#C9922C',
+    traktkantarell: '#8A7358',
+    trompetsopp: '#5B4B66',
+    steinsopp: '#8A5A34',
+    rodskrubb: '#B3552E',
+    matriske: '#C2632A',
+    piggsopp: '#CBAE82',
+    faresopp: '#B7AF92',
+    parasollsopp: '#A9895E',
+    sjampinjong: '#B98A7A',
+    furuknippesopp: '#8C8268',
+    kransmusserong: '#7A4B3A'
+  };
+
+  function hexToRgb(hex){
+    const n = parseInt(hex.slice(1), 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+  function mixHex(hexA, hexB, t){
+    t = Math.max(0, Math.min(1, t));
+    const a = hexToRgb(hexA), b = hexToRgb(hexB);
+    const r = Math.round(a.r + (b.r - a.r) * t);
+    const g = Math.round(a.g + (b.g - a.g) * t);
+    const bl = Math.round(a.b + (b.b - a.b) * t);
+    return '#' + [r, g, bl].map(v => v.toString(16).padStart(2, '0')).join('');
+  }
+  // Lys→mørk-skala for én art, generert fra én enkelt basiskulør i stedet
+  // for håndplukkede stopp — "kulør ved 60%" matcher gradient-oppsettet i
+  // plandokumentets fig. 2.
+  function speciesGradientStops(hex){
+    return { light: mixHex(hex, '#ffffff', 0.72), mid: hex, dark: mixHex(hex, '#000000', 0.55) };
+  }
+  function speciesGradientCss(hex){
+    const s = speciesGradientStops(hex);
+    return `linear-gradient(90deg, ${s.light}, ${s.mid} 60%, ${s.dark})`;
+  }
+  // Fargen på ETT punkt i voksestedslaget: kulør = art, lyshet = score
+  // (0–100). Samme 60 %-knekkpunkt som speciesGradientCss over, slik at
+  // punktfargen på kartet og tegnforklaringens stolpe alltid stemmer
+  // visuelt overens.
+  function speciesPointColor(hex, score){
+    const s = speciesGradientStops(hex);
+    const pct = Math.max(0, Math.min(100, score)) / 100;
+    return pct <= 0.6 ? mixHex(s.light, s.mid, pct / 0.6) : mixHex(s.mid, s.dark, (pct - 0.6) / 0.4);
+  }
 
   // Arter som er kjent for å foretrekke varme, soleksponerte vokseplasser —
   // brukes til å gi et lite tillegg for sørvendte skråninger når vi har ekte
@@ -2960,6 +3016,7 @@
   let findsLayer = null;
   let artskartLayer = null;
   let delteFunnLayer = null; // andre brukeres delte funn — se loadDelteFunn()/renderDelteFunnLayer()
+  let voksestedslagLayer = null; // fargelag per art/score — se renderVoksestedslag()
   let artskartMoveDebounce = null; // se moveend-lytteren i initMap()
   let findMarkersById = {};
   let mapFittedOnce = false;
@@ -3197,6 +3254,12 @@
     // laget ikke er på kartet ennå), og locateOnMap()/handleMapMarkerClick()
     // skrur det på automatisk igjen når man faktisk trenger å se et punkt.
     markerLayer = L.layerGroup();
+    // Voksestedslaget starter AV, samme begrunnelse som Målepunkter-laget
+    // over (se kommentaren der) — pluss at det er et alternativt, ikke et
+    // tillegg til, den vanlige markørvisningen. renderVoksestedslag() fyller
+    // laget uansett på/av-tilstand, slik at det er ferdig tegnet i det
+    // øyeblikket avkrysningen skrus på.
+    voksestedslagLayer = L.layerGroup();
     radiusLayer = L.layerGroup().addTo(leafletMap);
     routeLayer = L.layerGroup().addTo(leafletMap);
     hogstLayer = L.layerGroup().addTo(leafletMap);
@@ -3209,9 +3272,17 @@
     // rent terreng for å merke seg egne funnsteder uten at prikkene er i veien.
     L.control.layers(
       { 'Topografisk (Kartverket)': topoLayer, 'Standard': standardLayer, 'Satellitt': satelliteLayer },
-      { 'Målepunkter': markerLayer, 'Foreslåtte områder': routeLayer, 'Mine hogstfelt': hogstLayer, 'Mine funn': findsLayer, 'Artsdatabanken-funn': artskartLayer, 'Delte funn (andre brukere)': delteFunnLayer },
+      { 'Målepunkter': markerLayer, 'Voksestedslag (fargelag)': voksestedslagLayer, 'Foreslåtte områder': routeLayer, 'Mine hogstfelt': hogstLayer, 'Mine funn': findsLayer, 'Artsdatabanken-funn': artskartLayer, 'Delte funn (andre brukere)': delteFunnLayer },
       { collapsed: true }
     ).addTo(leafletMap);
+
+    // Tegnforklaring/dekningstekst for voksestedslaget vises kun mens laget
+    // faktisk er på kartet — se renderVoksestedslagLegend()/
+    // renderVoksestedslagCoverage() (fylles uansett) og
+    // voksestedslagPanelsVisible() (styrer synlighet).
+    leafletMap.on('overlayadd overlayremove', (e) => {
+      if (e.layer === voksestedslagLayer) voksestedslagPanelsVisible(e.type === 'overlayadd');
+    });
 
     leafletMap.on('click', (e) => {
       if (markingHogstMode) {
@@ -3359,6 +3430,99 @@
         ? `Senter satt ved ${radiusCenter.lat.toFixed(3)}, ${radiusCenter.lon.toFixed(3)}. Klikk et nytt punkt for å flytte senteret.`
         : 'Klikk et punkt i kartet (eller på et sted) for å sette senter for radiusfilteret.';
     }
+  }
+
+  // ---------- Voksestedslag (dekningsbevisst fargelag) ----------
+  //
+  // Del 1.1/1.2 i "Voksestedslaget"-planen: et rendringslag bygget
+  // UTELUKKENDE på scoredAll — samme allerede-lastede/allerede-scorede
+  // punkter som renderMap() over tegner som sirkelmarkører — pluss
+  // SPECIES_HUE/speciesPointColor (se toppen av filen). Ingen ny
+  // backend-endring, ingen ny tabell, ingen egen henting: laget er en ren
+  // alternativ tegning av data appen allerede har lastet inn for det
+  // synlige området.
+  //
+  // Hvilken art et gitt punkt fargelegges etter: i favoritt-modus brukes
+  // samme "beste favoritt her"-logikk som resten av kortene (favResults[0],
+  // se cardHtmlFavorites/scoreForRoute) — ett punkt kan kun ha ÉN farge.
+  function speciesForVoksestedspunkt(item){
+    if (viewMode === 'favorites') {
+      return (item.favResults && item.favResults[0]) ? item.favResults[0].species : null;
+    }
+    return _currentSpecies;
+  }
+
+  // Tegner ett lite, kant-løst rektangel per punkt (ikke sirkel — leser mer
+  // som en rutenett-"celle" enn en markør, nærmere fig. 1 i planen) i
+  // stedet for interpolasjon mellom punkter. dLon korrigeres for breddegrad
+  // slik at cellen ser tilnærmet kvadratisk ut både i Sør- og Nord-Norge.
+  // Flatehogde steder (res.isCut) hoppes over — samme eksklusjon som
+  // resten av appen bruker, et nylig hogd punkt skal ikke se ut som et godt
+  // voksested her heller.
+  function renderVoksestedslag(scoredAll){
+    if (!voksestedslagLayer) return;
+    voksestedslagLayer.clearLayers();
+    scoredAll.forEach(item => {
+      const { loc, res } = item;
+      if (res.isCut) return;
+      const species = speciesForVoksestedspunkt(item);
+      if (!species) return;
+      const hue = SPECIES_HUE[species.id] || SPECIES_HUE.kantarell;
+      const fill = speciesPointColor(hue, res.total);
+      const dLat = 0.0021;
+      const dLon = dLat / Math.max(0.3, Math.cos(loc.lat * Math.PI / 180));
+      const rect = L.rectangle(
+        [[loc.lat - dLat, loc.lon - dLon], [loc.lat + dLat, loc.lon + dLon]],
+        { stroke: false, fillColor: fill, fillOpacity: 0.7 }
+      );
+      rect.bindTooltip(`${escapeHtml(species.name)}: ${res.total}`, { direction: 'top', offset: [0, -4] });
+      rect.on('click', () => handleMapMarkerClick(loc));
+      rect.addTo(voksestedslagLayer);
+    });
+  }
+
+  // Dekningstekst — ALDRI en areal-/prosentandel av kommunen (appen har
+  // ikke kommunens faktiske polygonareal tilgjengelig klientsidig), kun et
+  // reelt telt antall tegnede punkter. Samme ærlighetsprinsipp som
+  // "tynt datagrunnlag"-linjen over "Foreslå områder" (se
+  // AREA_COVERAGE_THIN_THRESHOLD): ingen tall appen ikke kan stå inne for.
+  function renderVoksestedslagCoverage(scoredAll){
+    const el = document.getElementById('sp-voksested-coverage');
+    if (!el) return;
+    const painted = scoredAll.filter(item => !item.res.isCut && speciesForVoksestedspunkt(item)).length;
+    el.textContent = painted === 0
+      ? 'Ingen fargelagte punkter i valgt område ennå — terrengdata er ikke hentet her.'
+      : `Fargelegger ${painted} kjent${painted === 1 ? '' : 'e'} punkt${painted === 1 ? '' : 'er'} i valgt område. Fargelaget dekker kun der terrengdata faktisk er hentet — resten av kartet vises umerket, ingen interpolering mellom punktene.`;
+  }
+
+  function voksestedslagRelevantSpecies(){
+    if (viewMode === 'favorites' && favoriteSpecies.length) {
+      return favoriteSpecies.map(id => SPECIES.find(s => s.id === id)).filter(Boolean);
+    }
+    return _currentSpecies ? [_currentSpecies] : [];
+  }
+
+  // Tegnforklaring (fig. 2) — én rad per relevant art (valgt art, eller alle
+  // favoritter i favoritt-modus), gjenbrukt fra samme SPECIES_HUE/
+  // speciesGradientCss som selve fargelaget, slik at stolpen alltid stemmer
+  // visuelt med punktfargene på kartet.
+  function renderVoksestedslagLegend(){
+    const el = document.getElementById('sp-voksested-legend');
+    if (!el) return;
+    const species = voksestedslagRelevantSpecies();
+    el.innerHTML = species.map(sp => `
+      <div class="sp-vlegend-row">
+        <span class="sp-vlegend-name">${escapeHtml(sp.name)}</span>
+        <span class="sp-vlegend-bar" style="background:${speciesGradientCss(SPECIES_HUE[sp.id] || SPECIES_HUE.kantarell)}"></span>
+        <span class="sp-vlegend-labels"><span>lav</span><span>høy</span></span>
+      </div>`).join('');
+  }
+
+  function voksestedslagPanelsVisible(visible){
+    const legend = document.getElementById('sp-voksested-legend');
+    const coverage = document.getElementById('sp-voksested-coverage');
+    if (legend) legend.style.display = visible ? 'flex' : 'none';
+    if (coverage) coverage.style.display = visible ? 'block' : 'none';
   }
 
   // ---------- turforslag (rundtur) ----------
@@ -3714,6 +3878,73 @@
     return null;
   }
 
+  // ---------- "Hvorfor her?"-kort ----------
+  //
+  // Del 1.4 i "Voksestedslaget"-planen (fig. 3): ren UI-eksponering av felt
+  // scoreLocation() allerede har lest inn/beregnet et stykke på veien —
+  // avstandVeiM, treslag/skogalder-matchen fra attrScore(), befolkning, og
+  // kjenteFunnDetaljer. Prosentene under styrer KUN stolpelengden i UI-en;
+  // de er ikke koblet til scoreLocation()s faktiske vektbudsjett og
+  // påvirker ikke selve scoren.
+  function whyHereFactors(species, loc){
+    const t = locTexts(loc);
+    const factors = [];
+
+    if (loc.avstandVeiM != null) {
+      const v = loc.avstandVeiM;
+      let pct;
+      if (v < 100) pct = 40 + (v / 100) * 20;
+      else if (v <= 800) pct = 60 + Math.min(30, (v - 100) / 700 * 30);
+      else pct = Math.max(15, 90 - (v - 800) / 50);
+      factors.push({ label: 'Avstand til vei', valueText: `${Math.round(v)} m`, pct: Math.round(Math.max(5, Math.min(95, pct))) });
+    } else {
+      factors.push({ label: 'Avstand til vei', valueText: 'ukjent', pct: null });
+    }
+
+    const treslagOk = attrScore(loc.treslag, species.treslag, 20).ok;
+    const alderOk = attrScore(loc.skogalder, species.skogalder, 10).ok;
+    const matches = [treslagOk, alderOk].filter(x => x === true).length;
+    const unknowns = [treslagOk, alderOk].filter(x => x === null).length;
+    const pctForest = matches === 2 ? 90 : matches === 1 ? 60 : unknowns > 0 ? 40 : 20;
+    factors.push({ label: 'Skogtype & alder', valueText: `${t.treslagTekst}, ${t.alderTekst}`, pct: pctForest });
+
+    const befMap = { lav: { pct: 82, text: 'Lav' }, middels: { pct: 48, text: 'Middels' }, hoy: { pct: 18, text: 'Høy' } };
+    const bef = befMap[loc.befolkning] || { pct: null, text: 'Ukjent' };
+    factors.push({ label: 'Befolkningsnærhet', valueText: bef.text, pct: bef.pct });
+
+    const funn = (loc.kjenteFunnDetaljer || []).filter(f => f.art === species.id && f.avstandM < 1500);
+    const pctFunn = funn.length === 0 ? 12 : Math.min(90, 30 + funn.length * 15);
+    factors.push({ label: 'Kjente funn < 1,5 km', valueText: funn.length ? `${funn.length} stk` : 'ingen kjente', pct: pctFunn });
+
+    return factors;
+  }
+
+  function matchTier(score){
+    if (score >= 75) return { cls: 'high', label: 'Meget god match' };
+    if (score >= 55) return { cls: 'good', label: 'God match' };
+    if (score >= 35) return { cls: 'mid', label: 'Middels match' };
+    return { cls: 'low', label: 'Svak match' };
+  }
+
+  function whyHereHtml(species, loc, res){
+    const tier = matchTier(res.total);
+    const factors = whyHereFactors(species, loc);
+    return `
+      <div class="sp-why-here">
+        <div class="sp-why-here-head">
+          <span class="sp-why-here-label">Hvorfor her?</span>
+          <span class="sp-why-badge sp-why-badge-${tier.cls}">${tier.label}</span>
+        </div>
+        ${factors.map(f => `
+          <div class="sp-why-factor">
+            <div class="sp-why-factor-row"><span>${escapeHtml(f.label)}</span><span>${escapeHtml(f.valueText)}</span></div>
+            <div class="sp-why-factor-track">${f.pct != null
+              ? `<div class="sp-why-factor-fill" style="width:${f.pct}%"></div>`
+              : `<div class="sp-why-factor-fill sp-why-unknown"></div>`}</div>
+          </div>`).join('')}
+      </div>`;
+  }
+
   function cardHtml(loc, res){
     const t = locTexts(loc);
     const finds = findsFor(loc.id);
@@ -3743,6 +3974,7 @@
           ${userCuts.includes(loc.id) ? `<span class="sp-tag warn">egen merking: hogd</span>` : ''}
           ${res.isCut ? `<span class="sp-tag warn">ekskludert fra anbefaling</span>` : ''}
         </div>
+        ${whyHereHtml(species_for_card(), loc, res)}
         <div class="sp-access-box">
           <div>🚗 <b>Parkering:</b> ${escapeHtml(loc.parkeringNotat) || 'ikke oppgitt'}${parkWarn ? ' <span class="sp-access-warn">— bekreft selv at det ikke er privat grunn</span>' : ''}${parkeringKartUrl(loc) ? ` <a href="${parkeringKartUrl(loc)}" target="_blank" rel="noopener">Vis på kart →</a>` : ''}</div>
           <div>🥾 <b>Sti/skogsbilvei i terrenget:</b> ${loc.stier==='ja'?'ja':loc.stier==='nei'?'nei, ingen kjent sti':'ukjent'}${loc.avstandStiM != null ? ` (${loc.avstandStiM} m)` : ''}${loc.avstandParkeringM ? ` · ca ${loc.avstandParkeringM} m å gå fra parkering` : ''}</div>
@@ -3799,6 +4031,7 @@
           ${loc.hogstAr ? `<span class="sp-tag warn">flatehogd ${loc.hogstAr}</span>` : ''}
           ${res.isCut ? `<span class="sp-tag warn">ekskludert fra anbefaling</span>` : ''}
         </div>
+        ${whyHereHtml(topSpecies, loc, res)}
         <div class="sp-access-box">
           <div>🚗 <b>Parkering:</b> ${escapeHtml(loc.parkeringNotat) || 'ikke oppgitt'}${parkWarn ? ' <span class="sp-access-warn">— bekreft selv at det ikke er privat grunn</span>' : ''}${parkeringKartUrl(loc) ? ` <a href="${parkeringKartUrl(loc)}" target="_blank" rel="noopener">Vis på kart →</a>` : ''}</div>
           <div>🥾 <b>Sti/skogsbilvei i terrenget:</b> ${loc.stier==='ja'?'ja':loc.stier==='nei'?'nei, ingen kjent sti':'ukjent'}${loc.avstandStiM != null ? ` (${loc.avstandStiM} m)` : ''}${loc.avstandParkeringM ? ` · ca ${loc.avstandParkeringM} m å gå fra parkering` : ''}</div>
@@ -3982,6 +4215,10 @@
     let scoped = scoredAll.filter(s => isInCurrentScope(s.loc));
 
     renderMap(scoped);
+    renderVoksestedslag(scoped);
+    renderVoksestedslagLegend();
+    renderVoksestedslagCoverage(scoped);
+    if (leafletMap) voksestedslagPanelsVisible(leafletMap.hasLayer(voksestedslagLayer));
     renderHogstZones();
     renderFindsLayer();
     renderDelteFunnLayer();
