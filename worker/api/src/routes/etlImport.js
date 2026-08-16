@@ -154,10 +154,33 @@ export async function eksporterTerrengdata({ request, env, url }) {
     return json({ error: `Ukjent tabell: ${table}` }, 400, cors);
   }
 
+  // fylke/kommune/bbox (2026-08-16): valgfrie server-side filtre, videreført
+  // til hentTerrengStederFraDb (som app.js sin egen fylke/kommune-filtrering
+  // allerede brukte — kun denne ETL-eksportruten manglet dem). fetch_area.py
+  // sin --refresh-existing gjorde tidligere ETT ufiltrert SELECT * FROM
+  // terreng_steder (12 700+ rader) PER allerede-hentede område i
+  // refresh-areas.yml (opptil 31 ganger i én kjøring) — dette overbelastet
+  // Workeren og ga intermitterende 503 (se CHANGELOG 2026-08-16). Ingen
+  // parametre satt = uendret oppførsel (hele datasettet).
   let data;
-  if (table === 'terreng_steder') data = await hentTerrengStederFraDb(env);
-  else if (table === 'artsfunn') data = await hentArtsfunnFraDb(env);
-  else data = await hentFetchedAreasFraDb(env);
+  if (table === 'terreng_steder') {
+    const num = (navn) => {
+      const v = url.searchParams.get(navn);
+      return v === null ? undefined : Number(v);
+    };
+    data = await hentTerrengStederFraDb(env, {
+      fylke: url.searchParams.get('fylke') || undefined,
+      kommune: url.searchParams.get('kommune') || undefined,
+      minLat: num('minLat'),
+      maxLat: num('maxLat'),
+      minLon: num('minLon'),
+      maxLon: num('maxLon'),
+    });
+  } else if (table === 'artsfunn') {
+    data = await hentArtsfunnFraDb(env);
+  } else {
+    data = await hentFetchedAreasFraDb(env);
+  }
 
   return json(data, 200, cors);
 }

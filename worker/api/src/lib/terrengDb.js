@@ -42,11 +42,22 @@ function radTilSted(rad) {
 // et nytt, tredje filter-konsept). Begge sendt samtidig = AND, men i
 // praksis sender app.js kun det ene, aldri begge. Ingen av dem satt =
 // uendret oppførsel (hele datasettet, som før filtrering ble lagt til).
-export async function hentTerrengStederFraDb(env, { fylke, kommune } = {}) {
+// minLat/maxLat/minLon/maxLon (2026-08-16): samme valgfrie bbox-filter som
+// hentArtsfunnFraDb under, lagt til for fetch_area.py sitt --mode radius
+// (som ikke har noe kommune/fylke-felt å filtrere skarpt på) — se
+// eksporterTerrengdata() for hvorfor dette trengtes (refresh-areas.yml sine
+// 503-feil fra ufiltrerte nasjonale eksporter, ett per allerede-hentet
+// område).
+export async function hentTerrengStederFraDb(env, { fylke, kommune, minLat, maxLat, minLon, maxLon } = {}) {
   const vilkar = [];
   const binds = [];
   if (fylke) { vilkar.push('fylke = ?'); binds.push(fylke); }
   if (kommune) { vilkar.push('kommune = ?'); binds.push(kommune); }
+  const harBbox = [minLat, maxLat, minLon, maxLon].every((v) => typeof v === 'number' && Number.isFinite(v));
+  if (harBbox) {
+    vilkar.push('lat BETWEEN ? AND ?', 'lon BETWEEN ? AND ?');
+    binds.push(Math.min(minLat, maxLat), Math.max(minLat, maxLat), Math.min(minLon, maxLon), Math.max(minLon, maxLon));
+  }
   const sql = 'SELECT * FROM terreng_steder' + (vilkar.length ? ` WHERE ${vilkar.join(' AND ')}` : '');
   const stmt = binds.length ? env.DB.prepare(sql).bind(...binds) : env.DB.prepare(sql);
   const { results } = await stmt.all();

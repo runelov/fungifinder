@@ -1,5 +1,31 @@
 # Endringslogg
 
+## worker/api — 2026-08-16 (produksjonshotfix, ingen APP_VERSION-bump nødvendig)
+`refresh-areas.yml` (fungifinder-db) feilet to netter på rad
+(15. aug 18:24 og 16. aug 08:00) med `503`-feil fra
+`GET /admin/terrengdata/eksport?tabell=terreng_steder`. Rotårsak: den
+ukentlige jobben kaller `fetch_area.py --refresh-existing` én gang PER
+allerede-hentet område (opptil 30+ ganger i én kjøring), og hvert kall
+gjorde et HELT ufiltrert `SELECT * FROM terreng_steder` (12 700+ rader) —
+Workeren tålte ikke gjentatt last av det i løpet av kjøringens ~24 minutter.
+
+- `eksporterTerrengdata()` (`worker/api/src/routes/etlImport.js`) leser nå
+  `fylke`/`kommune`/`minLat`/`maxLat`/`minLon`/`maxLon` fra querystringen og
+  sender dem videre til `hentTerrengStederFraDb()` — som allerede støttet
+  fylke/kommune-filtrering internt (brukt av app.js sin egen visning), bare
+  ikke koblet til denne ETL-eksportruten.
+- `hentTerrengStederFraDb()` (`worker/api/src/lib/terrengDb.js`) fikk i
+  tillegg et valgfritt bbox-filter, samme mønster som
+  `hentArtsfunnFraDb()` allerede hadde — dekker `--mode radius`, som ikke
+  har noe kommune/fylke-felt å filtrere skarpt på.
+- Se fungifinder-db sin CHANGELOG (samme dato) for motstykket:
+  `fetch_area.py`/`refresh-areas.yml` bruker nå dette filteret, og deler i
+  tillegg ÉN artsfunn-henting mellom alle områdene i en kjøring i stedet for
+  én full 31 000-raders nasjonal eksport per område.
+- Ingen endring i responskontrakten når ingen filterparametre sendes (hele
+  datasettet, som før) — kun ETL-kallene fra fungifinder-db er endret til
+  faktisk å bruke filteret.
+
 ## 0.26.1 — Fjernet "(kartdata)" helt + fikset inkonsistent parkering i foreslåtte områder
 Oppfølging på v0.25.0. Bruker meldte tre ting:
 
