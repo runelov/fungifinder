@@ -222,7 +222,17 @@
 
   .sp-score-filter-row { display: flex; align-items: center; gap: 10px; font-size: var(--fs-sm); color: var(--ink-soft); margin-bottom: 14px; flex-wrap: wrap; }
   .sp-score-filter-row input[type=range] { width: 140px; }
-  .sp-score-filter-hint { font-size: var(--fs-xs); opacity: 0.8; }
+  /* RETTET 2026-08-15: var tidligere ren, uklikkbar tekst som pekte på et
+     lag-menyvalg inni kartet — usynlig for en mobilbruker i listevisning
+     (kartet er display:none der, se .sp-mobile-view-liste). Nå en ekte lenke
+     (se showAllPointsOnMap() i app.js) — cursor/underline signaliserer det. */
+  .sp-score-filter-hint { font-size: var(--fs-xs); opacity: 0.8; cursor: pointer; }
+
+  /* Demo-varsel i resultatlisten når man ikke er innlogget (se render()) —
+     samme visuelle språk som .sp-notice ("Om dataene"-boksen), ikke en egen
+     ny fargehistorie. */
+  .sp-demo-banner { background: #DCE3CB; border: 1px solid rgba(52,67,44,0.25); border-radius: 3px; padding: 8px 12px; font-size: var(--fs-sm); color: var(--pine-deep); margin-bottom: 12px; }
+  .sp-demo-banner a { color: var(--russet-deep); font-weight: 600; }
 
   .sp-route-panel { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
   .sp-route-row { display: flex; align-items: center; gap: 10px; font-size: var(--fs-sm); color: var(--ink-soft); flex-wrap: wrap; }

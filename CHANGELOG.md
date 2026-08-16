@@ -1,5 +1,37 @@
 # Endringslogg
 
+## 0.26.0 — Kart som standard for demo/ikke-innlogget + tydelig demo-varsel
+Bruker meldte å ha opplevd å bare se 1-2 demo-steder i listevisningen på
+mobil (standalone/PWA, ikke innlogget), uten at noe forklarte hvorfor eller
+hvordan man kommer videre. Tre tiltak, alle verifisert i preview (mobil +
+desktop):
+
+1. **Kart som standard KUN for ikke-innlogget/demo** — listevisning er
+   fortsatt standard for innloggede brukere (mest nyttig med tusenvis av
+   ekte steder å skumlese), men et kart som viser "nesten ingenting her"
+   kommuniserer langt tydeligere enn en liste som sier "1 av 1 steder vist"
+   når man kun har 1-2 demo-punkter. Satt ÉN gang ved oppstart (ikke i
+   `render()`, som ville tvunget brukeren tilbake til kart igjen og igjen
+   selv etter et bevisst bytte til liste).
+2. **Nytt, alltid synlig demo-varsel** øverst i resultatlisten når man ikke
+   er innlogget: "👋 Du ser 2 demo-steder — ikke ekte, analyserte
+   skogpunkter. Logg inn for å se tusenvis av ekte steder i hele Norge." —
+   med en ekte "Logg inn"-lenke (ny `openLoginPanel()`) som åpner
+   Preferanser & Config-panelet, bytter til Konto-fanen OG scroller dit i
+   ett klikk, i stedet for bare å nevne hvor innloggingen ligger som ren
+   tekst (det gamle mønsteret flere andre steder i appen fortsatt bruker,
+   se `openLoginPanel()`-kommentaren for hvorfor akkurat denne ble
+   forbedret).
+3. **Fjernet et reelt ødelagt hint**: "alle steder i området finnes
+   fortsatt i kartet — skru på «Målepunkter» i lag-menyen øverst til høyre"
+   var statisk tekst som pekte på et lag-menyvalg INNI kartet — usynlig for
+   en mobilbruker i listevisning, siden kartet er `display:none` der (se
+   `.sp-mobile-view-liste`). Erstattet med en ekte lenke ("Vis alle steder i
+   området på kartet →", ny `showAllPointsOnMap()`) som skrur på
+   Målepunkter-laget (av som standard, se `initMap()`) OG bytter til
+   kartvisning i ett klikk — virker identisk på desktop (der
+   `setMobileView()` uansett er en no-op, kartet er alltid synlig der).
+
 ## 0.25.0 — "Vis på kart"-lenke til parkeringsplassen (i stedet for "(OSM)")
 Bruker påpekte at parkeringsnotatet skrev f.eks. "Nærmeste kjente
 parkeringsplass (OSM), ca 240 m unna" — "OSM" er en forkortelse ingen

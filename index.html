@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.25.0"/>
+<link rel="stylesheet" href="css/styles.css?v=0.26.0"/>
 </head>
 <body>
 
@@ -287,10 +287,15 @@
             <h2 id="sp-results-title">Forslag</h2>
             <span class="sp-count" id="sp-count"></span>
           </div>
+          <!-- UX-gjennomgang 2026-08-15: bruker meldte at man i standalone-modus
+               (PWA, ikke innlogget) kunne se kun 1-2 demo-steder i listen uten at
+               noe forklarte hvorfor, eller hvordan man kommer videre — se
+               render() for logikken som fyller/skjuler denne. -->
+          <div id="sp-demo-banner" style="display:none;"></div>
           <div class="sp-score-filter-row">
             <span>Vis kun score ≥ <b id="sp-score-filter-label">70</b></span>
             <input type="range" id="sp-score-filter-slider" min="0" max="90" step="5" value="70"/>
-            <span class="sp-score-filter-hint">alle steder i området finnes fortsatt i kartet — skru på «Målepunkter» i lag-menyen øverst til høyre for å se dem</span>
+            <a href="#" class="sp-score-filter-hint" id="sp-score-filter-hint">Vis alle steder i området på kartet →</a>
           </div>
           <div id="sp-results"></div>
         </div>
@@ -329,7 +334,7 @@
      worker/api/README.md). Testnøkkelen (1x00000000000000000000AA) hører
      kun hjemme i worker/api/.dev.vars for lokal utvikling, aldri her. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<script src="js/api-client.js?v=0.25.0"></script>
-<script src="js/app.js?v=0.25.0"></script>
+<script src="js/api-client.js?v=0.26.0"></script>
+<script src="js/app.js?v=0.26.0"></script>
 </body>
 </html>

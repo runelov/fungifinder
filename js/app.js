@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.25.0';
+  const APP_VERSION = '0.26.0';
   const APP_BUILD_DATE = '2026-08-15';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -434,6 +434,23 @@
         localStorage.setItem(key, el.open ? 'open' : 'closed');
       });
     });
+  }
+
+  // RETTET 2026-08-15 (UX-gjennomgang, se render()/sp-demo-banner): appen
+  // hadde flere steder som bare NEVNTE "Logg inn under ⚙ Preferanser &
+  // Config → Konto" som ren tekst, uten å faktisk gjøre noe — brukeren måtte
+  // selv finne fram til panelet, åpne det (details/summary), OG bytte til
+  // riktig fane. Denne gjør alle tre stegene i ett klikk. Brukt av
+  // demo-varselet i resultatlisten; kan gjenbrukes andre steder som i dag
+  // bare skriver teksten (se f.eks. openFindModal/suggestAreas sine alert()-
+  // meldinger — ikke endret her, utenfor scope for denne rettingen).
+  function openLoginPanel(){
+    const panel = document.getElementById('sp-preferences');
+    if (!panel) return;
+    panel.open = true;
+    const kontoBtn = panel.querySelector('.sp-tab-btn[data-tab="konto"]');
+    if (kontoBtn) kontoBtn.click();
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // ---------- auth (fungifinder-api: magic-link + sesjon + roller) ----------
@@ -3258,6 +3275,20 @@
     }, 60);
   }
 
+  // RETTET 2026-08-15 (UX-gjennomgang, se render()/sp-score-filter-hint):
+  // erstatter et tidligere STATISK hint ("skru på «Målepunkter» i lag-menyen
+  // øverst til høyre") som pekte på noe usynlig for en mobilbruker i
+  // listevisning (kartet er display:none der til man bytter fane, se
+  // .sp-mobile-view-liste). Samme to trekk som locateOnMap() gjør uansett
+  // (skru på markerLayer + setMobileView('kart')), bare uten å zoome til ett
+  // bestemt punkt — brukt av "Vis alle steder i området på kartet"-lenken.
+  function showAllPointsOnMap(){
+    if (!leafletMap) return;
+    if (markerLayer && !leafletMap.hasLayer(markerLayer)) leafletMap.addLayer(markerLayer);
+    setMobileView('kart');
+    document.getElementById('sp-leaflet-map').scrollIntoView({ behavior:'smooth', block:'center' });
+  }
+
   // Motsatt vei av handleMapMarkerClick: klikk på "Vis i kart" på et kort i
   // listen panorerer/zoomer kartet til akkurat det stedet og åpner popup-en,
   // slik at du kan analysere naboterrenget uten å måtte lete deg fram manuelt.
@@ -3862,6 +3893,27 @@
 
   function render(){
     maybeRefreshWeatherForScope();
+    // RETTET 2026-08-15 (UX-gjennomgang): bruker meldte å ha opplevd å bare
+    // se 1-2 demo-steder i listen (standalone/PWA, ikke innlogget) uten at
+    // noe forklarte hvorfor. !currentUser er en pålitelig proxy for "viser
+    // demodata" i denne appen — loadLocations() bailer tidlig og beholder
+    // BASE_LOCATIONS-demofallbacken øverst i filen når ingen er innlogget,
+    // det er eneste grunn til å se demodata i det hele tatt. Plassert HELT
+    // først i render() (før eventuelle tidlige return i selve
+    // resultatlisten under) slik at varselet alltid vises/skjules korrekt
+    // uavhengig av hvilken gren resten av funksjonen tar.
+    const demoBanner = document.getElementById('sp-demo-banner');
+    if (demoBanner) {
+      if (!currentUser) {
+        const n = allLocations().length;
+        demoBanner.style.display = '';
+        demoBanner.innerHTML = `👋 Du ser <b>${n} demo-steder</b> — ikke ekte, analyserte skogpunkter. <a href="#" id="sp-demo-login-link">Logg inn</a> for å se tusenvis av ekte steder i hele Norge.`;
+        const link = document.getElementById('sp-demo-login-link');
+        if (link) link.addEventListener('click', (e) => { e.preventDefault(); openLoginPanel(); });
+      } else {
+        demoBanner.style.display = 'none';
+      }
+    }
     renderSpeciesList();
     renderMyFindsList();
     renderDataNotice();
@@ -4714,6 +4766,7 @@
     document.getElementById('sp-score-filter-label').textContent = minScoreFilter;
     render();
   });
+  document.getElementById('sp-score-filter-hint').addEventListener('click', (e) => { e.preventDefault(); showAllPointsOnMap(); });
 
   (async function init(){
     wireVersionInfo();
@@ -4741,6 +4794,15 @@
     // under, men MÅ være ferdig (eller ha gitt opp) FØR den, siden
     // loadArtsfunn() der leser leafletMap.getBounds() for sitt bbox-hent.
     await Promise.all([geolocateStartupView(), initAuth()]);
+    // RETTET 2026-08-15 (UX-gjennomgang): listevisning er fortsatt default
+    // på mobil for INNLOGGEDE brukere (mest nyttig når man har tusenvis av
+    // ekte, scorede steder å skumlese) — men for en ikke-innlogget
+    // besøkende med kun 1-2 demo-steder kommuniserer kartet ("se, nesten
+    // ingenting her") mye tydeligere enn en liste som sier "1 av 1 steder
+    // vist". Kun satt HER, ved oppstart — IKKE i render(), som ellers ville
+    // tvunget brukeren tilbake til kartvisning igjen og igjen selv etter at
+    // de bevisst har byttet til liste.
+    if (!currentUser) setMobileView('kart');
     await checkUrlInvitasjon();
     // RETTET (lastetid): disse fire var tidligere sekvensielle await-kall
     // uten noen reell avhengighet mellom dem — hver skriver til sin egen,
