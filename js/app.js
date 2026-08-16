@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.27.1';
+  const APP_VERSION = '0.27.2';
   const APP_BUILD_DATE = '2026-08-16';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -552,6 +552,7 @@
       adminPanel.hidden = !isAdmin();
       if (isAdmin()) { renderAdminBrukere(); renderAdminInvitasjoner(); renderAdminStatistikk(); }
     }
+    updateVoksestedslagAvailability();
   }
 
   function wireLoginForm(){
@@ -3034,6 +3035,7 @@
   let artskartLayer = null;
   let delteFunnLayer = null; // andre brukeres delte funn — se loadDelteFunn()/renderDelteFunnLayer()
   let voksestedslagLayer = null; // fargelag per art/score — se renderVoksestedslag()
+  let layersControl = null; // L.control.layers-instansen — se updateVoksestedslagAvailability()
   let artskartMoveDebounce = null; // se moveend-lytteren i initMap()
   let findMarkersById = {};
   let mapFittedOnce = false;
@@ -3287,9 +3289,16 @@
     // Lag-kontroll: bytt bakgrunnskart (radioknapper) og skru målepunkter/
     // rundtur/hogstfelt/funn av/på (avkrysning) — praktisk når man vil se
     // rent terreng for å merke seg egne funnsteder uten at prikkene er i veien.
-    L.control.layers(
+    // "Voksestedslag (fargelag)" er BEVISST IKKE med i den statiske
+    // overlay-listen her — isAdmin() er alltid usann i det øyeblikket
+    // initMap() kjører (currentUser settes først når initAuth() resolves
+    // ETTER initMap(), se init()), så et betinget objekt-literal her ville
+    // aldri fått med laget, selv for en faktisk admin. Legges i stedet til
+    // dynamisk via layersControl.addOverlay()/removeOverlay(), se
+    // updateVoksestedslagAvailability() (kalt fra reflectAccountUi()).
+    layersControl = L.control.layers(
       { 'Topografisk (Kartverket)': topoLayer, 'Standard': standardLayer, 'Satellitt': satelliteLayer },
-      { 'Målepunkter': markerLayer, 'Voksestedslag (fargelag)': voksestedslagLayer, 'Foreslåtte områder': routeLayer, 'Mine hogstfelt': hogstLayer, 'Mine funn': findsLayer, 'Artsdatabanken-funn': artskartLayer, 'Delte funn (andre brukere)': delteFunnLayer },
+      { 'Målepunkter': markerLayer, 'Foreslåtte områder': routeLayer, 'Mine hogstfelt': hogstLayer, 'Mine funn': findsLayer, 'Artsdatabanken-funn': artskartLayer, 'Delte funn (andre brukere)': delteFunnLayer },
       { collapsed: true }
     ).addTo(leafletMap);
 
@@ -3540,6 +3549,30 @@
     const coverage = document.getElementById('sp-voksested-coverage');
     if (legend) legend.style.display = visible ? 'flex' : 'none';
     if (coverage) coverage.style.display = visible ? 'block' : 'none';
+  }
+
+  // Voksestedslaget er admin-only inntil videre (bruker-ønske 2026-08-16:
+  // "gjør voksestedslaget kun tilgjengelig for admin frem til jeg er
+  // fornøyd med kvaliteten") — legges til/fjernes fra selve
+  // lag-kontrollen dynamisk her, i stedet for kun å styre CSS-synlighet,
+  // slik at vanlige brukere verken ser avkrysningen eller kan skru den på
+  // via DevTools. Kalt fra reflectAccountUi() (dermed ved oppstart,
+  // innlogging og utlogging).
+  function updateVoksestedslagAvailability(){
+    if (!layersControl || !voksestedslagLayer) return;
+    // removeLayer() FØRST, uansett (IKKE removeOverlay() — L.Control.Layers
+    // i Leaflet 1.9.4 har ingen slik metode, kun addOverlay()/
+    // removeLayer(); verifisert live mot window.L før dette ble skrevet).
+    // Gjør funksjonen trygg å kalle flere ganger uten å hope opp duplikate
+    // rader i lag-kontrollen (addOverlay() sjekker ikke selv om laget
+    // allerede er lagt til).
+    layersControl.removeLayer(voksestedslagLayer);
+    if (isAdmin()) {
+      layersControl.addOverlay(voksestedslagLayer, 'Voksestedslag (fargelag)');
+    } else {
+      if (leafletMap && leafletMap.hasLayer(voksestedslagLayer)) leafletMap.removeLayer(voksestedslagLayer);
+      voksestedslagPanelsVisible(false);
+    }
   }
 
   // ---------- turforslag (rundtur) ----------
@@ -4232,10 +4265,16 @@
     let scoped = scoredAll.filter(s => isInCurrentScope(s.loc));
 
     renderMap(scoped);
-    renderVoksestedslag(scoped);
-    renderVoksestedslagLegend();
-    renderVoksestedslagCoverage(scoped);
-    if (leafletMap) voksestedslagPanelsVisible(leafletMap.hasLayer(voksestedslagLayer));
+    // Voksestedslaget er admin-only inntil videre (se
+    // updateVoksestedslagAvailability()) — ikke bare skjult fra
+    // lag-kontrollen, men heller ikke tegnet/fylt for andre i det hele
+    // tatt, så det ikke finnes noe å oppdage via DevTools heller.
+    if (isAdmin()) {
+      renderVoksestedslag(scoped);
+      renderVoksestedslagLegend();
+      renderVoksestedslagCoverage(scoped);
+      if (leafletMap) voksestedslagPanelsVisible(leafletMap.hasLayer(voksestedslagLayer));
+    }
     renderHogstZones();
     renderFindsLayer();
     renderDelteFunnLayer();

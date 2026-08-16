@@ -1,5 +1,33 @@
 # Endringslogg
 
+## 0.27.2 — Voksestedslag: admin-only inntil videre
+Bruker-ønske: "gjør voksestedslaget kun tilgjengelig for admin frem til
+jeg er fornøyd med kvaliteten". "Voksestedslag (fargelag)"-laget
+(v0.27.0) er kvalitetsmessig fortsatt under vurdering — gjort
+admin-only i mellomtiden, uten å røre selve fargelogikken/kortene.
+
+- `L.control.layers()`-instansen lagres nå i `layersControl` i stedet
+  for å kastes bort etter `.addTo()`. "Voksestedslag (fargelag)" er
+  BEVISST fjernet fra den statiske overlay-listen i `initMap()` —
+  `isAdmin()` er alltid usann på det tidspunktet (`currentUser` settes
+  først når `initAuth()` resolves ETTER `initMap()`, se `init()`), så et
+  betinget objekt-literal der ville aldri vist laget for noen, selv en
+  ekte admin.
+- Ny `updateVoksestedslagAvailability()`: legger laget til/fjerner det
+  fra selve lag-kontrollen dynamisk via `addOverlay()`/`removeLayer()`
+  (IKKE `removeOverlay()` — den metoden finnes ikke på
+  `L.Control.Layers` i Leaflet 1.9.4, verifisert live mot `window.L` før
+  koden ble skrevet). Kalt fra `reflectAccountUi()`, dermed ved
+  oppstart, innlogging og utlogging.
+- Ikke-admin: laget fjernes fra kartet og kontrollen, og
+  tegnforklaring/dekningslinje skjules — vanlige brukere kan verken se
+  avkrysningen eller skru den på via DevTools.
+- `render()` tegner nå kun voksestedslaget (`renderVoksestedslag()` +
+  tegnforklaring + dekningslinje) når `isAdmin()`, i stedet for alltid.
+
+Verifisert i preview-nettleser: laget er fraværende fra lag-kontrollen
+for ikke-innlogget/vanlig bruker, ingen konsollfeil.
+
 ## 0.27.1 — Fikset fastlåst invitasjonsmodal ved ugyldig/utløpt lenke
 Bruker meldte at feilmeldingen "Invitasjonslenken er ugyldig, utløpt,
 eller allerede brukt" vises i en modal det ikke går an å komme seg ut
