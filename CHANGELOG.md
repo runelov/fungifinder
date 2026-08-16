@@ -1,5 +1,42 @@
 # Endringslogg
 
+## 0.26.1 — Fjernet "(kartdata)" helt + fikset inkonsistent parkering i foreslåtte områder
+Oppfølging på v0.25.0. Bruker meldte tre ting:
+
+1. **"(kartdata)" ga fortsatt ingen verdi** — samme innvending som mot
+   "(OSM)" i forrige runde. Fjernet parentesen/attribusjonen helt fra
+   `parkering_notat()`s tekster (fungifinder-db v37) i stedet for enda en
+   omskriving — "Vis på kart"-lenken ER kildeangivelsen nå, ikke ord i
+   selve notatet. Beholdt kun "Skilting kan avvike fra kartdata" i én
+   variant, siden det er en reell handlingsrettet advarsel, ikke bare
+   attribusjon.
+2. **"Vis på kart"-lenken manglet for enkelte steder** — mest sannsynlig
+   nettleseren som viser en cachet, eldre `app.js` (samme klasse problem som
+   prosjektets egen `?v=`-konvensjon finnes for, se
+   `feedback-fungifinder-versioning-convention`). `parkeringLat`/
+   `parkeringOsmType`/`parkeringOsmId` settes ALLTID sammen med
+   `avstandParkeringM` i `nearest_parking_from_cache()` (samme
+   kildepunkt), så et sted med kjent avstand men uten lenke er ikke en
+   datainkonsistens i seg selv.
+3. **Reell, funnet inkonsistens**: et steds EGET kort kunne vise "212 m til
+   parkering", mens akkurat samme sted sin OMRÅDE-sirkel (under "Foreslå
+   områder") viste "ingen kjent parkering funnet". Rotårsak: de to stedene i
+   koden brukte to HELT ULIKE datakilder — kortet brukte forhåndshentede
+   ETL-felt, mens områdesirkelen gjorde et eget, LIVE Overpass-oppslag
+   sentrert på områdets ANKER-punkt (ikke nødvendigvis samme punkt som
+   faktisk hadde parkering nær seg), innført før parkeringskoordinater i
+   det hele tatt ble lagret (se v36). Fjernet hele det live oppslaget
+   (`fetchParkingNear`/`findParkingForAreas`/Overpass-kallet) og erstattet
+   med ny, synkron `bestParkingForArea()` som velger nærmeste kjente
+   parkering blant OMRÅDETS MEDLEMMER (ikke bare ankeret) fra de samme
+   forhåndshentede feltene kortene allerede bruker — samme datakilde
+   begge steder nå, umulig for de to å motsi hverandre. Bivirkning: raskere
+   "Foreslå områder" (ingen nettverksrundtur/"søker etter parkering …"-
+   ventetid lenger) og én færre feilklasse (Overpass-timeout/feil for akkurat
+   dette søket).
+- Fjernet også en glemt "🅿️ = mulig parkering (**live fra OSM**)"-tekst i
+  kartforklaringen — samme utdaterte påstand.
+
 ## 0.26.0 — Kart som standard for demo/ikke-innlogget + tydelig demo-varsel
 Bruker meldte å ha opplevd å bare se 1-2 demo-steder i listevisningen på
 mobil (standalone/PWA, ikke innlogget), uten at noe forklarte hvorfor eller
