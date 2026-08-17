@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.27.3"/>
+<link rel="stylesheet" href="css/styles.css?v=0.28.2"/>
 </head>
 <body>
 
@@ -32,6 +32,23 @@
         <div class="sp-eyebrow">Hele Norge <span class="sp-version" id="sp-version"></span></div>
         <div class="sp-title">Fungi<em>Finder</em></div>
         <div class="sp-sub">Kombinerer artsprofiler, terrengdata, adkomst, værdata og din egen funnhistorikk for å foreslå hvor du bør lete — og hvorfor.</div>
+      </div>
+    </div>
+
+    <!-- "Legg til på hjemskjermen"-banner. Skjult by default (hidden-attributt) —
+         wireA2HS() i app.js avgjør synlighet ved oppstart: aldri vist hvis appen
+         allerede kjører standalone (display-mode: standalone / navigator.standalone),
+         og aldri vist igjen samme enhet etter at brukeren har lukket den (localStorage).
+         Innhold (tekst/knapp) fylles inn av samme funksjon, plattformavhengig — se
+         der for iOS (statisk anvisning, ingen programmatisk install-API finnes) vs.
+         Android/Chrome (ekte beforeinstallprompt()-knapp) vs. andre nettlesere. -->
+    <div class="sp-a2hs" id="sp-a2hs" hidden>
+      <button type="button" class="sp-a2hs-close" id="sp-a2hs-close" aria-label="Lukk">✕</button>
+      <div class="sp-a2hs-icon">📲</div>
+      <div class="sp-a2hs-body">
+        <b>Legg FungiFinder på hjemskjermen</b>
+        <p id="sp-a2hs-text">Rask tilgang som en app — og du slipper å logge inn i nettleseren på nytt hver gang.</p>
+        <button type="button" class="sp-btn sp-primary" id="sp-a2hs-action" hidden>Installer app</button>
       </div>
     </div>
 
@@ -335,6 +352,14 @@
           </div>
         </form>
         <div class="sp-modal-actions">
+          <!-- Vist kun av checkUrlInvitasjon() sin ugyldig-gren (allerede
+               brukt/utløpt token) — dekker det vanligste tilfellet: brukeren
+               er allerede registrert og prøver å logge inn på nytt med den
+               gamle, engangsbrukte invitasjonslenken sin (den eneste
+               lenken de har liggende, f.eks. i e-post/bokmerke), i stedet
+               for å be om en ny innloggingslenke. Sender dem rett dit i
+               stedet for å la dem sitte fast bak en feilmelding. -->
+          <button type="button" class="sp-btn sp-primary" id="sp-invite-go-login" hidden>Gå til innlogging</button>
           <button type="button" class="sp-btn" id="sp-invite-close">Lukk</button>
         </div>
       </div>
@@ -348,7 +373,7 @@
      worker/api/README.md). Testnøkkelen (1x00000000000000000000AA) hører
      kun hjemme i worker/api/.dev.vars for lokal utvikling, aldri her. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<script src="js/api-client.js?v=0.27.3"></script>
-<script src="js/app.js?v=0.27.3"></script>
+<script src="js/api-client.js?v=0.28.2"></script>
+<script src="js/app.js?v=0.28.2"></script>
 </body>
 </html>

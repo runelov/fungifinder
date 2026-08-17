@@ -1,31 +1,117 @@
 # Endringslogg
 
-## 0.27.3 — "Foreslå områder" respekterer nå kartutsnittet uten et eksplisitt filter
-Bruker meldte: "'Foreslå områder' ser ut til å fokusere på HELE Norge
-hvis man ikke har valgt fylke/kommune/radius — valget jeg eventuelt har
-gjort ved å navigere meg rundt i kartet blir ignorert." Stemte:
-`suggestAreas()` filtrerte kun på `isInCurrentScope()` (fylke/kommune/
-radius), som returnerer `true` for absolutt alt når disse alle står på
-"alle"/uvalgt — kartets synlige utsnitt ble aldri konsultert, i
-motsetning til Artskart-laget (`artskartSkalHentesOgVises()`), som
-allerede har hatt akkurat dette fallback-mønsteret siden v0.21.11.
+## 0.28.2 — Kartutsnitt-scope utvidet til hele appen (ikke bare "Foreslå områder")
+Oppfølger til v0.27.3, som løste dette KUN for "Foreslå områder"-knappen.
+Den avgrensingen viste seg selv forvirrende i praksis: knappen kunne telle
+et annet antall punkter enn resultatlisten/kartet/værsammendraget viste
+samtidig, siden de fortsatt kun så på eksplisitt fylke/kommune/radius.
+Bruker-spørsmål som avdekket dette: hva skjer med resten av appen hvis man
+har panorert kartet rundt uten å ha valgt fylke, kommune eller radius?
+Svaret var: ingenting der heller — samme "alltid hele Norge, uansett
+kartutsnitt"-oppførsel, bare uten noe varsel om det. To UX-svakheter rettet:
 
-- Ny `foreslaOmraderFallbackUtsnitt()`: uten et eksplisitt fylke/
-  kommune/radius-filter (`artskartOmradeErAvgrenset()`), faller
-  "Foreslå områder" nå tilbake til kartets synlige utsnitt (paddet 20 %)
-  — men KUN når brukeren har zoomet inn til minst samme nivå som
-  Artskart-laget krever (`ARTSKART_MIN_ZOOM`, gjenbrukt herfra). Helt
-  utzoomet (hele Norge synlig) gir fortsatt et nasjonalt søk, siden det
-  da ikke finnes noe bevisst "utsnitt" å falle tilbake til.
-- `isInForeslaOmraderScope()` brukes nå av `suggestAreas()` sitt
-  `scoped`-filter i stedet for `isInCurrentScope()` alene, og av
-  dekningslinjen over knappen (`updateCoverageLine()`, som nå viser
-  "N kjente punkter i synlig kartutsnitt" når fallback-en er aktiv).
-  Bevisst BEGRENSET til denne ene flyten — resultatlisten, kartmarkørene
-  og værsammendraget forblir upåvirket av ren panorering, se
-  `scopedLocations()`/`isInCurrentScope()`.
-- "Ingen steder å foreslå områder fra"-meldingen tipser nå om å zoome ut
-  (fremfor kun "hent mer data") når fallback-utsnittet er årsaken.
+- **Dekningslinjen over "Foreslå områder" var tidligere helt SKJULT**
+  akkurat i dette tilfellet (`updateCoverageLine()` i js/app.js) — det ene
+  stedet i UI-et designet for å svare på "hva skjer om jeg trykker denne?"
+  hadde et hull akkurat der behovet var størst. Viser nå "Ingen
+  fylke/kommune/radius valgt — søker i hele Norge (X kjente punkter)" i
+  stedet for å tie stille.
+- **Kartutsnittet er nå selve scopet** når intet er eksplisitt valgt OG man
+  har zoomet inn nok til at det er meningsfullt (samme terskel som allerede
+  fantes for Artskart-laget, `ARTSKART_MIN_ZOOM`/`artskartOmradeErAvgrenset()`
+  — gjenbrukt, ikke duplisert). Flyttet inn i selve `isInCurrentScope()`
+  (ny `viewportImpliesScope()`), i stedet for v0.27.3s egne
+  `foreslaOmraderFallbackUtsnitt()`/`isInForeslaOmraderScope()` (nå
+  fjernet — overflødige) — gjelder dermed ALLE fire stedene som deler
+  `isInCurrentScope()`: kartprikkene, resultatlisten, værsammendraget OG
+  "Foreslå områder". Ingen av dem kan lenger vise ulikt scope samtidig.
+  Helt utzoomet (hele Norge synlig) er søket fortsatt reelt nasjonalt, som
+  før — terskelen gjør det slik at panorering ved oppstart ikke endrer
+  noe uventet. Ny `moveend`-lytting (kun aktiv når intet er eksplisitt
+  valgt) re-scoper live når kartet panoreres/zoomes, kort debounce (200ms),
+  ingen ny nettverksrundtur i seg selv siden hele datasettet allerede er
+  lastet inn client-side i dette tilfellet.
+- Værsammendragets cache-nøkkel (`currentScopeKey()`) fikk samme
+  kartutsnitt-fallback, avrundet til ~1 km presisjon (`boundsKey()`) — uten
+  dette ville værtallene stå og vise et gammelt utsnitt mens lista/kartet
+  allerede hadde hoppet videre.
+
+Verifisert: logikken er testet isolert (Node, mock av
+`isInCurrentScope()`/`viewportImpliesScope()`) mot fire scenarier —
+utzoomet uten valg (fortsatt nasjonalt), zoomet inn uten valg (kartutsnitt
+avgjør inn/ut), og eksplisitt fylke valgt (kartutsnittet ignoreres helt,
+uendret oppførsel). Selve UI-flyten (`updateCoverageLine()`-teksten,
+"Foreslå områder" live i nettleseren) er IKKE verifisert live i denne
+runden — krever innlogging mot ekte backend, ikke tilgjengelig i dette
+miljøet; verdt en rask sjekk i praksis etter deploy.
+
+## 0.28.1 — Rettet: kartpopup for "Foreslåtte områder" ble avkuttet på mobil
+Bruker-rapport (med skjermbilde): popup-en som åpnes ved klikk på et
+"Foreslått område" i kartet ble feilplassert på mobil, og hele
+beskrivelsen var ikke synlig — teksten ble kuttet midt i ord ved
+høyrekanten.
+
+- Rotårsak: `bindPopup()` for "Foreslåtte områder" (`renderAreasOnMap()`
+  i js/app.js) fikk aldri noen `maxWidth`/`maxHeight`-begrensning —
+  Leaflets standard `maxWidth: 300` pluss dens egen ~44px innvendige
+  marg blir BREDERE enn selve kartcontaineren på en smal mobilskjerm
+  (`.sp-leaflet-map` er typisk ~320-333px bred der), og med lang nok
+  tekst (områdenavn + score + parkering + `describeRouteTerrain()`) ble
+  popup-en også HØYERE enn containeren (360-460px). Leaflets `autoPan`
+  flytter kun kartet for å holde popupen innenfor kartcontaineren — det
+  finnes ingen panorering som gjør en for stor boks helt synlig,
+  uansett retning.
+- Ny delt konstant `POPUP_OPTS` (`{ maxWidth: 240, maxHeight: 260,
+  autoPanPadding: [16, 16] }`) i js/app.js, brukt på ALLE 8
+  `bindPopup()`-kall i appen (ikke bare det ene lange) — `maxHeight`
+  er Leaflets EGEN mekanisme for lange popup-tekster: innholdet ruller
+  internt (`.leaflet-popup-scrolled`, fra leaflet.min.css) i stedet for
+  å bli kuttet av containerens `overflow:hidden`. `autoPanPadding` økt
+  fra Leaflets standard `[5,5]` for litt luft fra egne kartkontroller
+  (zoom +/−, lag-ikonet).
+- Verifisert live mot en isolert reproduksjon (ekte `css/styles.css` +
+  Leaflet 1.9.4 fra CDN-en, samme popup-HTML som `renderAreasOnMap()`
+  genererer, 375px mobilbredde): innholdet er nå alltid fullt synlig
+  innenfor kartcontaineren. Kjent, mindre restsak: i verste tenkelige
+  tilfelle (område-ankeret nøyaktig i kartets senter) kan zoom-
+  kontrollen fortsatt grafisk overlappe et par piksler av popup-ens
+  øverste venstre hjørne — ikke tapt innhold, bare et kosmetisk
+  overlapp, bevisst ikke jaget videre (se kommentaren ved `POPUP_OPTS`
+  for avveiningen mot å gjøre popup-en unødvendig smal for alle andre
+  tilfeller).
+
+## 0.28.0 — Hjemskjerm-installasjon + mer stabil pålogging
+Bruker-ønske: en "legg til på hjemskjermen"-lenke som bærher.no har på
+forsiden, pluss en løsning på at flere brukere sliter med å logge på på
+nytt og forsøker den gamle invitasjonslenken sin.
+
+- **Ny "Legg til på hjemskjermen"-banner** rett under headeren: skjult
+  automatisk hvis appen allerede kjører installert (`display-mode:
+  standalone` / `navigator.standalone`), ellers plattformriktig — iOS
+  viser statisk Del→"Legg til på Hjemskjerm"-anvisning (Safari har ingen
+  programmatisk install-API), Android/Chrome tilbyr en ekte
+  installer-knapp via `beforeinstallprompt()` med statisk fallback hvis
+  den aldri fyres. Lukkes permanent per enhet via `localStorage`. Ikke
+  vist på desktop.
+- **Sesjonens `utloper` glir nå fremover ved hver rullering** i stedet
+  for å ligge fast 30 dager fra selve innloggingen
+  (`rullerSesjonHvisNodvendig()` i `worker/api/src/lib/session.js`) — en
+  aktiv bruker logges nå aldri ut bare fordi det er lenge siden de
+  logget INN, kun etter 30 dagers sammenhengende INAKTIVITET. Trolig
+  hovedårsaken til at flere aktive brukere måtte be om nye
+  innloggingslenker oftere enn ventet, siden soppsanking er sesongvis
+  bruk i støt (rundt regnvær), ikke daglig.
+- **Tydeligere feilhåndtering for gjenbrukt invitasjonslenke**: en
+  invitasjonslenke er kun gyldig for selve førstegangsregistreringen,
+  men er ofte den eneste lenken en bruker har liggende (e-post/bokmerke)
+  når økten deres har utløpt uker/måneder senere. `checkUrlInvitasjon()`
+  viser nå en forklarende melding OG en "Gå til innlogging"-knapp som
+  sender brukeren rett til Konto-fanen (`openLoginPanel()`), i stedet
+  for å la dem sitte fast bak en generisk "ugyldig/utløpt/brukt"-feil.
+
+Verifisert i preview-nettleser (iOS-UA og Android-UA emulert): banneret
+viser riktig plattformtekst, skjules korrekt i standalone-modus, og
+lukkeknappen huskes på tvers av reload.
 
 ## 0.27.2 — Voksestedslag: admin-only inntil videre
 Bruker-ønske: "gjør voksestedslaget kun tilgjengelig for admin frem til

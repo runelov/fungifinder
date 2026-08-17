@@ -78,6 +78,16 @@ export async function requireAdmin(request, env) {
 // autentiseres fortsatt med det GAMLE tokenet (uendret av dette), rullering
 // gjelder først NESTE forespørsel. Returnerer null hvis ikke innlogget eller
 // sesjonen ikke er moden for rullering ennå; ellers { token, utloper }.
+//
+// RETTET 2026-08-16 (bruker-rapport: flere aktive brukere ble logget ut og
+// måtte be om ny lenke/kode oftere enn ventet): `utloper` lå tidligere FAST
+// fra opprettSesjon() — 30 dager fra selve innloggingsøyeblikket, uansett
+// hvor ofte kontoen faktisk ble brukt i mellomtiden. Sesjonen er sesongvis
+// bruk (soppsanking i støt rundt regnvær, ikke daglig), så en aktiv bruker
+// kunne likevel rekke å gå tom for de 30 dagene mellom to økter. `utloper`
+// glir nå fremover ved HVER rullering (hvert døgn appen faktisk åpnes) —
+// fortsatt logget ut etter LEVETID_MS med ren INAKTIVITET (ikke uendelig),
+// men aldri lenger mens kontoen faktisk er i bruk.
 export async function rullerSesjonHvisNodvendig(request, env) {
   const gammelToken = parseCookie(request.headers.get('Cookie') || '', COOKIE_NAVN);
   if (!gammelToken) return null;
@@ -86,16 +96,17 @@ export async function rullerSesjonHvisNodvendig(request, env) {
   const nyttToken = randomToken();
   const nyHash = await sha256Hex(nyttToken);
   const na = Date.now();
+  const nyUtloper = na + LEVETID_MS;
 
   // Atomisk: matcher kun en sesjon som fortsatt er gyldig OG moden for
   // rullering i samme UPDATE — unngår en separat les-så-skriv-race mot en
   // samtidig forespørsel som rullerer først.
   const rad = await env.DB.prepare(
-    `UPDATE sesjoner SET hash = ?1, rullert = ?2, forrige_hash = ?3, forrige_utloper = ?2 + ?5
+    `UPDATE sesjoner SET hash = ?1, rullert = ?2, forrige_hash = ?3, forrige_utloper = ?2 + ?5, utloper = ?6
      WHERE hash = ?3 AND utloper > ?2 AND rullert <= ?4
      RETURNING utloper`
   )
-    .bind(nyHash, na, gammelHash, na - ROTASJON_INTERVALL_MS, ROTASJON_OVERLAPP_MS)
+    .bind(nyHash, na, gammelHash, na - ROTASJON_INTERVALL_MS, ROTASJON_OVERLAPP_MS, nyUtloper)
     .first();
 
   if (!rad) return null;

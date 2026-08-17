@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.27.3';
+  const APP_VERSION = '0.28.2';
   const APP_BUILD_DATE = '2026-08-17';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -328,10 +328,24 @@
   // akkurat nå. Brukes nå av scopedLocations() under, OG direkte av
   // render()/suggestAreas() sine `scoped`-filtre (samme resultat, men uten
   // tre kopier av samme tre if-setninger å holde i synk).
+  //
+  // RETTET 2026-08-16 (bruker spurte: "hva hvis man ikke har valgt kommune/
+  // fylke/radius, men bare har flyttet seg rundt i kartet?"): svaret var
+  // "ingenting — søket dekket alltid hele Norge, uansett kartutsnitt", som
+  // bryter med selve grunnantagelsen i en kartapp (det du ser ER det du
+  // søker i). Når INTET er eksplisitt valgt (fylke='alle'/kommune='alle'/
+  // intet radius-senter), brukes nå kartutsnittet som scope i stedet — men
+  // KUN når man har zoomet inn nok til at det faktisk betyr noe presist
+  // (samme terskel/begrunnelse som artskartOmradeErAvgrenset()/
+  // ARTSKART_MIN_ZOOM lenger ned — gjenbrukt, ikke duplisert, slik at de to
+  // funksjonene ikke kan drifte fra hverandre). Helt utzoomet (hele landet
+  // synlig) forblir det reelt nasjonale søket som før, siden viewport da
+  // uansett dekker omtrent alt. Se viewportImpliesScope().
   function isInCurrentScope(loc){
-    if (filterMode === 'fylke') return fylkeFilter === 'alle' || loc.fylke === fylkeFilter;
-    if (filterMode === 'kommune') return kommuneFilter === 'alle' || loc.kommune === kommuneFilter;
+    if (filterMode === 'fylke' && fylkeFilter !== 'alle') return loc.fylke === fylkeFilter;
+    if (filterMode === 'kommune' && kommuneFilter !== 'alle') return loc.kommune === kommuneFilter;
     if (filterMode === 'radius' && radiusCenter) return haversineKm(radiusCenter.lat, radiusCenter.lon, loc.lat, loc.lon) <= radiusKm;
+    if (viewportImpliesScope()) return leafletMap.getBounds().contains([loc.lat, loc.lon]);
     return true;
   }
 
@@ -362,11 +376,24 @@
   // trigget ett nytt værkall per pikselforflytning.
   let lastWeatherScopeKey = null;
   let weatherScopeDebounce = null;
+  // RETTET 2026-08-16: samme "intet eksplisitt valgt → kartutsnitt"-fallback
+  // som isInCurrentScope() — ellers ville værsammendraget stå og vise tall
+  // for et gammelt (eller helt annet) kartutsnitt mens "Foreslå
+  // områder"/lista allerede hadde hoppet videre til det nye. boundsKey()
+  // runder til ~1 km presisjon, nok til at debounce/cache over faktisk
+  // dedupliserer små panoreringer — selve værhentingen har uansett sin egen
+  // grid-snap-cache (se Open-Meteo-notatet i CLAUDE.md), så en litt for
+  // "finkornet" nøkkel her er ufarlig, bare potensielt ett par ekstra
+  // cache-treff spart.
+  function boundsKey(b){
+    return `${b.getSouth().toFixed(2)},${b.getWest().toFixed(2)},${b.getNorth().toFixed(2)},${b.getEast().toFixed(2)}`;
+  }
   function currentScopeKey(){
-    if (filterMode === 'fylke') return `fylke:${fylkeFilter}`;
-    if (filterMode === 'kommune') return `kommune:${kommuneFilter}`;
-    if (filterMode === 'radius') return radiusCenter ? `radius:${radiusCenter.lat.toFixed(3)},${radiusCenter.lon.toFixed(3)}:${radiusKm}` : 'radius:ingen-senter';
-    return 'ukjent-modus';
+    if (filterMode === 'fylke' && fylkeFilter !== 'alle') return `fylke:${fylkeFilter}`;
+    if (filterMode === 'kommune' && kommuneFilter !== 'alle') return `kommune:${kommuneFilter}`;
+    if (filterMode === 'radius' && radiusCenter) return `radius:${radiusCenter.lat.toFixed(3)},${radiusCenter.lon.toFixed(3)}:${radiusKm}`;
+    if (viewportImpliesScope()) return `kartutsnitt:${boundsKey(leafletMap.getBounds())}`;
+    return 'hele-norge';
   }
   function maybeRefreshWeatherForScope(){
     const key = currentScopeKey();
@@ -490,6 +517,80 @@
         localStorage.setItem(key, el.open ? 'open' : 'closed');
       });
     });
+  }
+
+  // ---------- "Legg til på hjemskjermen" ----------
+  // RETTET 2026-08-16 (bruker-ønske, jf. bærher.no sin tilsvarende lenke på
+  // forsiden): en installert hjemskjerm-app (manifest.webmanifest,
+  // display:standalone) er også nøkkelen til STABIL innlogging — se
+  // verifiserKode() i worker/api/src/routes/auth.js sin begrunnelse for
+  // hvorfor magic-link-e-post og PWA-cookien lever i to atskilte
+  // lagringsrom på iOS. Denne banneren gjør selve installasjonen synlig og
+  // ett-trinns i stedet for noe brukeren må vite fra før.
+  function isStandalone(){
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  }
+
+  function wireA2HS(){
+    const el = document.getElementById('sp-a2hs');
+    if (!el) return;
+    if (isStandalone()) return; // allerede installert — ingenting å tilby
+    if (localStorage.getItem('fungifinder-a2hs-lukket')) return;
+
+    const textEl = document.getElementById('sp-a2hs-text');
+    const actionBtn = document.getElementById('sp-a2hs-action');
+    const ua = navigator.userAgent || '';
+    const erIOS = /iphone|ipad|ipod/i.test(ua);
+    const erAndroid = /android/i.test(ua);
+
+    document.getElementById('sp-a2hs-close').addEventListener('click', () => {
+      localStorage.setItem('fungifinder-a2hs-lukket', '1');
+      el.hidden = true;
+    });
+
+    if (erIOS) {
+      // iOS har intet programmatisk install-API (beforeinstallprompt finnes
+      // ikke der) — "Legg til på Hjemskjerm" ligger kun i Safari sin egen
+      // delemeny, så her kan vi bare vise anvisningen, ikke trigge den.
+      textEl.innerHTML = 'Rask tilgang som en app — og du slipper å logge inn i nettleseren på nytt hver gang. Trykk <b>Del</b>-ikonet nederst i Safari, og velg <b>«Legg til på Hjemskjerm»</b>.';
+      el.hidden = false;
+      return;
+    }
+
+    if (erAndroid) {
+      let deferredPrompt = null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        el.hidden = false;
+        actionBtn.hidden = false;
+      });
+      actionBtn.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+        actionBtn.disabled = true;
+        deferredPrompt.prompt();
+        const valg = await deferredPrompt.userChoice.catch(() => null);
+        deferredPrompt = null;
+        if (valg && valg.outcome === 'accepted') {
+          localStorage.setItem('fungifinder-a2hs-lukket', '1');
+          el.hidden = true;
+        } else {
+          actionBtn.disabled = false;
+        }
+      });
+      // Fallback hvis beforeinstallprompt aldri fyres (f.eks. nylig avvist
+      // av nettleseren selv) — vis statisk anvisning i stedet for at
+      // banneret bare forblir usynlig og brukeren aldri får tilbudet.
+      setTimeout(() => {
+        if (!deferredPrompt && el.hidden) {
+          textEl.textContent = 'Rask tilgang som en app — og du slipper å logge inn i nettleseren på nytt hver gang. Åpne meny-knappen (⋮) i nettleseren og velg «Legg til på startskjerm» / «Installer app».';
+          el.hidden = false;
+        }
+      }, 2500);
+      return;
+    }
+
+    // Desktop e.l. — ingen hjemskjerm å legge til, ikke vist.
   }
 
   // RETTET 2026-08-15 (UX-gjennomgang, se render()/sp-demo-banner): appen
@@ -657,7 +758,26 @@
 
     try {
       const res = await window.ApiClient.sjekkInvitasjon(token);
-      if (!res.gyldig) { statusEl.textContent = '⚠ Invitasjonslenken er ugyldig, utløpt, eller allerede brukt.'; return; }
+      if (!res.gyldig) {
+        // RETTET 2026-08-16 (bruker-rapport: "flere har forsøkt
+        // invitasjonslenken" for å logge inn på nytt): en invitasjonslenke
+        // er engangsbruk, kun ment for FØRSTE registrering — men det er
+        // ofte den eneste lenken brukeren har liggende (e-post/bokmerke),
+        // så de prøver den igjen når økten deres har gått ut. Generisk
+        // "ugyldig/utløpt/brukt"-tekst forklarte ikke DETTE, og etterlot
+        // brukeren fastlåst uten noen vei videre. Tilbyr nå eksplisitt
+        // "Gå til innlogging" i stedet, som lukker denne modalen og åpner
+        // Konto-fanen direkte (openLoginPanel()) — samme ett-klikks-hjelper
+        // som demo-varselet i resultatlisten allerede bruker.
+        statusEl.textContent = '⚠ Denne lenken er allerede brukt eller har utløpt — den virker kun for selve FØRSTEgangsregistreringen. Er du allerede bruker? Be om en ny innloggingslenke i stedet.';
+        const gaTilLoginBtn = document.getElementById('sp-invite-go-login');
+        gaTilLoginBtn.hidden = false;
+        gaTilLoginBtn.addEventListener('click', () => {
+          closeInvitePanel();
+          openLoginPanel();
+        });
+        return;
+      }
       statusEl.textContent = '';
       document.getElementById('sp-invite-epost').value = res.epost;
       form.style.display = '';
@@ -934,31 +1054,26 @@
 
   // RETTET 2026-08-17 (bruker meldte at "Foreslå områder" fokuserte på HELE
   // Norge selv om vedkommende hadde navigert/zoomet kartet til et bestemt
-  // utsnitt, uten å eksplisitt ha valgt fylke/kommune/radius) — samme
-  // "et bevisst utsnitt kan også vises via zoom, ikke bare via filter"-
-  // mønster som allerede gjelder for Artskart-laget over
-  // (artskartOmradeErAvgrenset/ARTSKART_MIN_ZOOM): uten et eksplisitt
-  // fylke/kommune/radius-filter faller "Foreslå områder" (og dekningslinjen
-  // over knappen) nå tilbake til kartets synlige utsnitt (paddet 20 %), men
-  // KUN når brukeren har zoomet inn til minst samme nivå som Artskart-laget
-  // allerede krever — helt utzoomet (hele Norge synlig) gir fortsatt et
-  // nasjonalt søk, siden det da ikke finnes noe bevisst "utsnitt" å falle
-  // tilbake til. Brukes KUN av suggestAreas()-flyten — resten av appen
-  // (resultatlisten, kartmarkørene, værsammendraget) er bevisst upåvirket,
-  // se scopedLocations()/isInCurrentScope() over, for ikke å gjøre panorering
-  // alene om et skjult filter andre steder i appen.
-  function foreslaOmraderFallbackUtsnitt(){
-    if (artskartOmradeErAvgrenset()) return null; // eksplisitt fylke/kommune/radius har alltid forrang
-    if (!leafletMap || leafletMap.getZoom() < ARTSKART_MIN_ZOOM) return null;
-    return leafletMap.getBounds().pad(0.2);
-  }
-  function isInForeslaOmraderScope(loc){
-    if (!isInCurrentScope(loc)) return false;
-    const utsnitt = foreslaOmraderFallbackUtsnitt();
-    return !utsnitt || utsnitt.contains([loc.lat, loc.lon]);
-  }
-  function foreslaOmraderScopeLabel(){
-    return currentAreaLabel() || (foreslaOmraderFallbackUtsnitt() ? 'synlig kartutsnitt' : null);
+  // utsnitt, uten å eksplisitt ha valgt fylke/kommune/radius): svaret var
+  // "ingenting" — søket dekket alltid hele Norge uansett kartutsnitt.
+  // Første runde (v0.27.3) fikset dette KUN for "Foreslå områder"-knappen
+  // (egen foreslaOmraderFallbackUtsnitt()/isInForeslaOmraderScope()), men
+  // etterlot resultatlisten/kartmarkørene/værsammendraget upåvirket — som
+  // viste seg selv å være forvirrende, siden brukeren da kunne se "Foreslå
+  // områder" telle et annet antall punkter enn det lista/kartet viste
+  // samtidig. Utvidet i v0.28.2 til samme "et bevisst utsnitt kan også
+  // vises via zoom, ikke bare via filter"-mønster som Artskart-laget over
+  // (artskartOmradeErAvgrenset()/ARTSKART_MIN_ZOOM, gjenbrukt her), men nå
+  // ETT sted (viewportImpliesScope(), brukt direkte av isInCurrentScope()
+  // over/currentScopeKey()/currentAreaLabel() under) — alle fire stedene
+  // som deler isInCurrentScope() (kartprikkene, resultatlisten,
+  // værsammendraget OG "Foreslå områder") kan derfor ikke lenger vise ulikt
+  // scope samtidig. De tre særskilte foreslaOmrader*()-funksjonene fra
+  // v0.27.3 er dermed overflødige og fjernet — isInCurrentScope()/
+  // currentAreaLabel() dekker nå akkurat det de gjorde, pluss resten av
+  // appen.
+  function viewportImpliesScope(){
+    return !!leafletMap && !artskartOmradeErAvgrenset() && leafletMap.getZoom() >= ARTSKART_MIN_ZOOM;
   }
 
   // Ekte Artsdatabanken-observasjoner (art/koordinat/dato), hentet av
@@ -1035,10 +1150,17 @@
     return null;
   }
 
+  // RETTET 2026-08-16: se isInCurrentScope()-kommentaren — returnerer nå
+  // "synlig kartutsnitt" i stedet for null når man har zoomet inn nok uten
+  // å ha valgt noe eksplisitt, slik at updateCoverageLine() under kan vise
+  // en presis merkelapp for AKKURAT det som faktisk blir søkt i, ikke bare
+  // late som ingenting er valgt. `null` betyr nå kun "reelt uavgrenset,
+  // helt utzoomet — søket dekker faktisk hele landet", se grenen under.
   function currentAreaLabel(){
-    if (filterMode === 'fylke') return fylkeFilter !== 'alle' ? fylkeFilter : null;
-    if (filterMode === 'kommune') return kommuneFilter !== 'alle' ? kommuneFilter : null;
-    if (filterMode === 'radius') return radiusCenter ? `${radiusKm} km rundt valgt punkt` : null;
+    if (filterMode === 'fylke' && fylkeFilter !== 'alle') return fylkeFilter;
+    if (filterMode === 'kommune' && kommuneFilter !== 'alle') return kommuneFilter;
+    if (filterMode === 'radius' && radiusCenter) return `${radiusKm} km rundt valgt punkt`;
+    if (viewportImpliesScope()) return 'synlig kartutsnitt';
     return null;
   }
 
@@ -1051,12 +1173,27 @@
     const line = document.getElementById('sp-coverage-line');
     const suggestBtn = document.getElementById('sp-route-suggest');
     if (!line || !suggestBtn || !personalFeaturesEnabled()) return;
-    // foreslaOmraderScopeLabel() (ikke currentAreaLabel()) — denne linjen
-    // varsler spesifikt om "Foreslå områder" (se kommentaren over den
-    // funksjonen), som siden 2026-08-17 også kan være avgrenset av kartets
-    // synlige utsnitt, ikke bare et eksplisitt fylke/kommune/radius-filter.
-    const areaLabel = foreslaOmraderScopeLabel();
-    if (!areaLabel) { line.style.display = 'none'; suggestBtn.disabled = false; return; }
+    // currentAreaLabel() (ikke en egen foreslaOmraderScopeLabel()) — siden
+    // v0.28.2 gjelder kartutsnitt-fallbacken app-vide (se
+    // viewportImpliesScope()-kommentaren ved isInCurrentScope()), så denne
+    // linjen kan bruke samme merkelapp-funksjon som resten av appen.
+    const areaLabel = currentAreaLabel();
+    // RETTET 2026-08-16 (bruker-spørsmål om "Foreslå områder" uten valgt
+    // fylke/kommune/radius): denne linjen ble tidligere BARE SKJULT når
+    // ingenting var valgt — akkurat det tilfellet der brukeren mest trenger
+    // å vite at "Foreslå områder" da søker i HELE Norge, uansett hvor
+    // kartet er panorert (currentAreaLabel() er fortsatt null i det ekte
+    // uavgrensede tilfellet — se kommentaren der; det zoomede/implisitte
+    // kartutsnitt-tilfellet har nå sin egen merkelapp og havner i den
+    // vanlige count-grenen under i stedet).
+    if (!areaLabel) {
+      line.style.display = '';
+      line.textContent = count > 0
+        ? `Ingen fylke/kommune/radius valgt — søker i hele Norge (${count} kjente punkter). Zoom inn, eller velg fylke/kommune/radius, for mer treffsikre forslag.`
+        : 'Ingen fylke/kommune/radius valgt, og ingen kjente punkter lastet ennå.';
+      suggestBtn.disabled = count === 0;
+      return;
+    }
     line.style.display = '';
     if (count === 0) {
       line.innerHTML = `⚠ Ingen kjente punkter i ${escapeHtml(areaLabel)} ennå — <a href="#sp-fetch-panel" id="sp-coverage-fetch-link">hent terrengdata</a> først.`;
@@ -3077,6 +3214,34 @@
   let suggestedRoute = null; // { areas: [{anchor, members, radiusM}] } — se suggestAreas()
   let mapFullscreen = false;
 
+  // RETTET 2026-08-16 (bruker-rapport: popup-en for et "Foreslått område"
+  // — som har MYE lengre tekst enn de andre popup-ene, se describeRouteTerrain()
+  // ved bindPopup()-kallet i renderAreasOnMap() — kunne bli TALLERE enn selve
+  // kartcontaineren (.sp-leaflet-map er kun 360-460px høy, se css/styles.css).
+  // Leaflets autoPan flytter kun SELVE KARTET for å holde popupen innenfor
+  // kartcontaineren — men hvis popupen er høyere ELLER bredere enn
+  // containeren, finnes det ingen panorering som får den til å bli helt
+  // synlig, uansett. Content ble derfor "avkuttet i kanten" på mobil, akkurat
+  // slik brukeren viste et skjermbilde av. Fast `maxHeight` er Leaflets EGET
+  // mekanisme for dette (ikke egendefinert CSS) — den ruller innholdet
+  // internt (`.leaflet-popup-scrolled`, allerede styrt av leaflet.min.css fra
+  // CDN-en) i stedet for å la det overflow:hidden-kuttes av containeren.
+  // `maxWidth` senket fra Leaflets standard 300 til 240 av samme grunn — 300
+  // pluss innvendig marg (~24px) er bredere enn selve kartcontaineren på en
+  // smal mobilskjerm (375px bred - 40px sideutfylling - kant ≈ 330px).
+  // Brukt på ALLE bindPopup()-kall, ikke bare det ene lange, slik at ingen
+  // fremtidig lengre popup-tekst kan gjeninnføre akkurat dette problemet.
+  // autoPanPadding økt fra Leaflets standard [5,5] — gir litt luft fra
+  // KANTEN på egne kontroller (zoom +/−, lag-ikonet) som ellers kan havne
+  // rett oppå en nettopp panorert popup (oppdaget under verifisering av
+  // maxWidth/maxHeight-fiksen, se skjermbilde i samtalen 2026-08-16).
+  // Bevisst UNIFORM, ikke asymmetrisk topLeft/bottomRight — forsøkt først,
+  // men en stor ensidig verdi presset i stedet popup-en ut over MOTSATT
+  // kant på en smal mobilskjerm (kun ca. 30px total slark igjen etter
+  // maxWidth 240 + Leaflets egen ~47px innvendige marg, på en ~320px bred
+  // kartcontainer) — verifisert live at dette IKKE skjer med [16,16].
+  const POPUP_OPTS = { maxWidth: 240, maxHeight: 260, autoPanPadding: [16, 16] };
+
   // Kartet var for lite til feltbruk (særlig mobil). Fullskjerm gjør panelet
   // til et fast overlay og lar CSS gi kartet det meste av skjermhøyden —
   // Leaflet må fortelles eksplisitt at containeren endret størrelse
@@ -3171,7 +3336,7 @@
     if (myLocationMarker) leafletMap.removeLayer(myLocationMarker);
     myLocationMarker = L.circleMarker([lat, lon], {
       radius: 9, color: '#fff', weight: 3, fillColor: '#2E6FE0', fillOpacity: 1
-    }).bindPopup('📍 Du er her').addTo(leafletMap);
+    }).bindPopup('📍 Du er her', POPUP_OPTS).addTo(leafletMap);
     leafletMap.setView([lat, lon], Math.max(leafletMap.getZoom(), zoom));
     if (openPopup) myLocationMarker.openPopup();
   }
@@ -3372,6 +3537,26 @@
         renderArtskartLayer();
       }, 300);
     });
+
+    // RETTET 2026-08-16 (se viewportImpliesScope()): når intet
+    // fylke/kommune/radius er eksplisitt valgt, ER kartutsnittet selve
+    // scopet for lista/kartprikkene/værsammendraget/"Foreslå områder" — en
+    // panorering/zoom må da re-scope akkurat som et fylke-/kommunebytte
+    // gjør, ellers ville dette kun blitt oppdatert ved NESTE, urelaterte
+    // render()-kall (filterbytte, innlogging, …), ikke av selve
+    // panoreringen brukeren nettopp gjorde. Egen debounce (kortere enn
+    // Artskart-kallet over — dette er en ren klient-side re-filtrering av
+    // allerede innlastet BASE_LOCATIONS, ingen nettverksrundtur i seg selv;
+    // render() sin egen maybeRefreshWeatherForScope() har uansett sin egen
+    // 400ms-debounce for værhentingen). Gjør ingenting når et eksplisitt
+    // fylke/kommune/radius ER valgt — da skal panorering fortsatt være ren
+    // visning, uendret oppførsel.
+    let viewportScopeMoveDebounce = null;
+    leafletMap.on('moveend', () => {
+      if (artskartOmradeErAvgrenset()) return;
+      clearTimeout(viewportScopeMoveDebounce);
+      viewportScopeMoveDebounce = setTimeout(render, 200);
+    });
   }
 
   function mapCenterFallback(){
@@ -3452,7 +3637,7 @@
         fillOpacity: 0.85,
         dashArray: loc.custom ? '3,3' : null
       });
-      marker.bindPopup(`<b>${escapeHtml(loc.name)}</b><br/>${escapeHtml(loc.kommune)}, ${escapeHtml(loc.fylke)}<br/>Score: ${res.total}${res.isCut ? ' — flatehogd' : ''}`);
+      marker.bindPopup(`<b>${escapeHtml(loc.name)}</b><br/>${escapeHtml(loc.kommune)}, ${escapeHtml(loc.fylke)}<br/>Score: ${res.total}${res.isCut ? ' — flatehogd' : ''}`, POPUP_OPTS);
       // Eksakt score synlig ved HOVER, ikke bare ved klikk (se vurderingen
       // av fargekodingens grovkornethet) — tooltip er lettvekts sammenlignet
       // med popup-en (åpnes ikke ved klikk, kolliderer ikke med
@@ -3729,13 +3914,13 @@
         : '🅿️ Ingen kjent parkeringsplass blant de kjente punktene i området';
       L.circle([a.anchor.loc.lat, a.anchor.loc.lon], {
         radius: a.radiusM, color, weight: 2.5, dashArray: '8,8', fillColor: color, fillOpacity: 0.07
-      }).bindPopup(`<b>Område ${i+1}: ${escapeHtml(a.anchor.loc.name)}</b><br/>Beste score i området: ${score}<br/>${parkeringTekst}<br/>${describeRouteTerrain(a.members)}`)
+      }).bindPopup(`<b>Område ${i+1}: ${escapeHtml(a.anchor.loc.name)}</b><br/>Beste score i området: ${score}<br/>${parkeringTekst}<br/>${describeRouteTerrain(a.members)}`, POPUP_OPTS)
         .addTo(routeLayer);
 
       if (a.parking) {
         L.marker([a.parking.lat, a.parking.lon], {
           icon: L.divIcon({ className: 'sp-parking-icon', html: 'P', iconSize: [22,22] })
-        }).bindPopup(`<b>Parkering — Område ${i+1}</b><br/>${escapeHtml(a.parking.notat) || 'Ingen ytterligere detaljer.'}`)
+        }).bindPopup(`<b>Parkering — Område ${i+1}</b><br/>${escapeHtml(a.parking.notat) || 'Ingen ytterligere detaljer.'}`, POPUP_OPTS)
           .addTo(routeLayer);
       }
     });
@@ -3789,19 +3974,19 @@
       const r = scoreForRoute(loc);
       return { loc, res: r.res };
     });
-    // isInForeslaOmraderScope (ikke isInCurrentScope alene) — se
-    // foreslaOmraderFallbackUtsnitt() for begrunnelsen: uten et eksplisitt
-    // fylke/kommune/radius-filter faller dette nå tilbake til kartets
-    // synlige utsnitt når brukeren har zoomet inn nok til at det utgjør et
-    // bevisst valg, i stedet for alltid å søke i hele Norge.
-    const scoped = scoredAll.filter(s => !s.res.isCut && isInForeslaOmraderScope(s.loc));
+    // isInCurrentScope (se viewportImpliesScope()-kommentaren der) — siden
+    // v0.28.2 faller dette allerede tilbake til kartets synlige utsnitt når
+    // brukeren har zoomet inn nok uten et eksplisitt fylke/kommune/radius-
+    // filter, i stedet for alltid å søke i hele Norge. Samme funksjon som
+    // resultatlisten/kartmarkørene bruker, så de kan ikke lenger uenes om
+    // hva som er "i scope".
+    const scoped = scoredAll.filter(s => !s.res.isCut && isInCurrentScope(s.loc));
 
     if (!scoped.length) {
-      // Skiller på eksplisitt filter (fylke/kommune/radius) og det synlige
-      // kartutsnittet som fallback (se foreslaOmraderFallbackUtsnitt()) —
-      // i sistnevnte tilfelle er "zoom ut" et reelt neste steg, ikke bare
-      // "hent mer data".
-      const zoomHint = !currentAreaLabel() && foreslaOmraderFallbackUtsnitt()
+      // viewportImpliesScope() alene (ikke bare "ingen areaLabel") — i det
+      // tilfellet er "zoom ut" et reelt neste steg, ikke bare "hent mer
+      // data".
+      const zoomHint = viewportImpliesScope()
         ? ' Prøv å zoome ut i kartet, eller velg et fylke/kommune/radius.'
         : '';
       summary.innerHTML = 'Ingen steder å foreslå områder fra i valgt område.' + zoomHint + fetchNudgeHtml(0);
@@ -4324,13 +4509,11 @@
     renderFindsLayer();
     renderDelteFunnLayer();
 
-    // isInForeslaOmraderScope (ikke isInCurrentScope, som `scoped` selv
-    // bruker) — dekningslinjen varsler spesifikt om "Foreslå områder", som
-    // siden 2026-08-17 kan være avgrenset strammere enn resten av appen (se
-    // foreslaOmraderFallbackUtsnitt()). Kartmarkørene/resultatlisten over
-    // (renderMap(scoped) osv.) er bevisst upåvirket av dette.
-    const coverageCount = scoredAll.filter(s => isInForeslaOmraderScope(s.loc)).length;
-    updateCoverageLine(coverageCount);
+    // `scoped` selv (isInCurrentScope, se render() over) — siden v0.28.2
+    // deler dekningslinjen samme scope som kartmarkørene/resultatlisten,
+    // ingen egen isInForeslaOmraderScope()-filtrering lenger nødvendig her.
+    // MÅ leses før `scoped` ev. tynnes videre av hideHogst under.
+    updateCoverageLine(scoped.length);
     if (hideHogst) scoped = scoped.filter(s => !s.res.isCut);
     // Tegner umiddelbart fra et evt. allerede innlastet datasett (billig,
     // synkront), OG trigger i tillegg en (fire-and-forget) sjekk av om et
@@ -4677,7 +4860,7 @@
     hogstLayer.clearLayers();
     hogstOmrader.forEach(z => {
       const circle = L.circle([z.lat, z.lon], { radius: z.radiusM, color: '#A23E2E', weight: 2, fillColor: '#A23E2E', fillOpacity: 0.2 });
-      circle.bindPopup(`<b>Flatehogd-område</b><br/>Merket ${escapeHtml(z.dato || '')}, radius ${z.radiusM} m<br/><button data-remove-hogst="${z.id}" class="sp-btn sp-ghost-danger" style="margin-top:6px;">Fjern</button>`);
+      circle.bindPopup(`<b>Flatehogd-område</b><br/>Merket ${escapeHtml(z.dato || '')}, radius ${z.radiusM} m<br/><button data-remove-hogst="${z.id}" class="sp-btn sp-ghost-danger" style="margin-top:6px;">Fjern</button>`, POPUP_OPTS);
       circle.on('popupopen', (e) => {
         const btn = e.popup._contentNode.querySelector('[data-remove-hogst]');
         if (btn) btn.addEventListener('click', async () => {
@@ -4707,7 +4890,7 @@
       const marker = L.circleMarker([pos.lat, pos.lon], {
         radius: 7, color: '#fff', weight: 2, fillColor: '#8C4A20', fillOpacity: 0.9
       });
-      marker.bindPopup(`<b>${escapeHtml(sp ? sp.name : f.speciesId)}</b><br/>${f.date} · mengde ${f.mengde}/5${f.note ? '<br/>' + escapeHtml(f.note) : ''}<br/><button data-edit-find-popup="${f.id}" class="sp-btn" style="margin-top:6px;">✏️ Rediger</button>`);
+      marker.bindPopup(`<b>${escapeHtml(sp ? sp.name : f.speciesId)}</b><br/>${f.date} · mengde ${f.mengde}/5${f.note ? '<br/>' + escapeHtml(f.note) : ''}<br/><button data-edit-find-popup="${f.id}" class="sp-btn" style="margin-top:6px;">✏️ Rediger</button>`, POPUP_OPTS);
       marker.on('popupopen', (e) => {
         const btn = e.popup._contentNode.querySelector('[data-edit-find-popup]');
         if (btn) btn.addEventListener('click', () => openFindModal(null, { editingFind: userFinds.find(x => x.id === f.id) }));
@@ -4733,7 +4916,7 @@
       const marker = L.circleMarker([f.lat, f.lon], {
         radius: 6, color: '#fff', weight: 1.5, fillColor: '#8451C7', fillOpacity: 0.85
       });
-      marker.bindPopup(`<b>${escapeHtml(sp ? sp.name : f.art)}</b><br/>${escapeHtml(f.dato || 'ukjent dato')}<br/>Funnet av ${escapeHtml(f.kortnavn)}`);
+      marker.bindPopup(`<b>${escapeHtml(sp ? sp.name : f.art)}</b><br/>${escapeHtml(f.dato || 'ukjent dato')}<br/>Funnet av ${escapeHtml(f.kortnavn)}`, POPUP_OPTS);
       marker.addTo(delteFunnLayer);
     });
   }
@@ -4792,7 +4975,7 @@
       const marker = L.circleMarker([o.lat, o.lon], {
         radius: 5, color: '#fff', weight: 1.5, fillColor: '#4C7BE1', fillOpacity: 0.85
       });
-      marker.bindPopup(`<b>${escapeHtml(sp ? sp.name : o.art)}</b><br/>${escapeHtml(o.dato || 'ukjent dato')}${o.url ? `<br/><a href="${escapeHtml(o.url)}" target="_blank" rel="noopener">Se på Artskart →</a>` : ''}`);
+      marker.bindPopup(`<b>${escapeHtml(sp ? sp.name : o.art)}</b><br/>${escapeHtml(o.dato || 'ukjent dato')}${o.url ? `<br/><a href="${escapeHtml(o.url)}" target="_blank" rel="noopener">Se på Artskart →</a>` : ''}`, POPUP_OPTS);
       marker.addTo(artskartLayer);
     });
   }
@@ -5090,6 +5273,7 @@
     wireVersionInfo();
     wireTabs();
     wireCollapsibles();
+    wireA2HS();
     wireLoginForm();
     wireKodeForm();
     wireLogout();

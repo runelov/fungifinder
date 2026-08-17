@@ -44,6 +44,19 @@
   .sp-notice { background: #DCE3CB; border: 1px solid rgba(52,67,44,0.25); border-radius: 3px; padding: 10px 14px; font-size: var(--fs-sm); color: var(--pine-deep); margin-bottom: 14px; }
   .sp-notice b { color: var(--russet-deep); }
 
+  /* "Legg til på hjemskjermen"-banner, se index.html/wireA2HS() i app.js.
+     Egen, litt varmere farge (gold-tint) enn .sp-notice ved siden av — skal
+     lese som en anbefaling/handling, ikke som endnu en informasjonsboks. */
+  .sp-a2hs { position: relative; display: flex; align-items: flex-start; gap: 12px; background: #F1E4C4; border: 1px solid rgba(200,151,74,0.55); border-radius: 3px; padding: 12px 40px 12px 14px; margin-bottom: 14px; }
+  .sp-a2hs-icon { font-size: 22px; line-height: 1; }
+  .sp-a2hs-body { flex: 1; min-width: 0; }
+  .sp-a2hs-body b { color: var(--russet-deep); font-size: var(--fs-md); }
+  .sp-a2hs-body p { margin: 3px 0 8px; font-size: var(--fs-sm); color: var(--ink-soft); }
+  .sp-a2hs-close { position: absolute; top: 8px; right: 10px; background: none; border: none; color: var(--ink-soft); font-size: 14px; cursor: pointer; padding: 2px 4px; line-height: 1; }
+  .sp-a2hs-close:hover { color: var(--ink); }
+  .sp-a2hs-instructions { font-size: var(--fs-sm); color: var(--ink-soft); background: rgba(255,255,255,0.5); border-radius: 3px; padding: 8px 10px; margin-top: 4px; }
+  .sp-a2hs-instructions code { background: rgba(38,48,31,0.08); padding: 1px 5px; border-radius: 3px; }
+
   .sp-safety { background: #F3E3DA; border: 1.5px solid var(--danger); border-radius: 4px; padding: 14px 16px; margin-bottom: 22px; }
   .sp-safety h4 { margin: 0 0 6px; font-family: 'Fraunces', serif; color: var(--danger); font-size: 15px; }
   .sp-safety p { margin: 0 0 8px; font-size: var(--fs-md); color: var(--ink); }
