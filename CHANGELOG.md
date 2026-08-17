@@ -1,5 +1,32 @@
 # Endringslogg
 
+## 0.27.3 — "Foreslå områder" respekterer nå kartutsnittet uten et eksplisitt filter
+Bruker meldte: "'Foreslå områder' ser ut til å fokusere på HELE Norge
+hvis man ikke har valgt fylke/kommune/radius — valget jeg eventuelt har
+gjort ved å navigere meg rundt i kartet blir ignorert." Stemte:
+`suggestAreas()` filtrerte kun på `isInCurrentScope()` (fylke/kommune/
+radius), som returnerer `true` for absolutt alt når disse alle står på
+"alle"/uvalgt — kartets synlige utsnitt ble aldri konsultert, i
+motsetning til Artskart-laget (`artskartSkalHentesOgVises()`), som
+allerede har hatt akkurat dette fallback-mønsteret siden v0.21.11.
+
+- Ny `foreslaOmraderFallbackUtsnitt()`: uten et eksplisitt fylke/
+  kommune/radius-filter (`artskartOmradeErAvgrenset()`), faller
+  "Foreslå områder" nå tilbake til kartets synlige utsnitt (paddet 20 %)
+  — men KUN når brukeren har zoomet inn til minst samme nivå som
+  Artskart-laget krever (`ARTSKART_MIN_ZOOM`, gjenbrukt herfra). Helt
+  utzoomet (hele Norge synlig) gir fortsatt et nasjonalt søk, siden det
+  da ikke finnes noe bevisst "utsnitt" å falle tilbake til.
+- `isInForeslaOmraderScope()` brukes nå av `suggestAreas()` sitt
+  `scoped`-filter i stedet for `isInCurrentScope()` alene, og av
+  dekningslinjen over knappen (`updateCoverageLine()`, som nå viser
+  "N kjente punkter i synlig kartutsnitt" når fallback-en er aktiv).
+  Bevisst BEGRENSET til denne ene flyten — resultatlisten, kartmarkørene
+  og værsammendraget forblir upåvirket av ren panorering, se
+  `scopedLocations()`/`isInCurrentScope()`.
+- "Ingen steder å foreslå områder fra"-meldingen tipser nå om å zoome ut
+  (fremfor kun "hent mer data") når fallback-utsnittet er årsaken.
+
 ## 0.27.2 — Voksestedslag: admin-only inntil videre
 Bruker-ønske: "gjør voksestedslaget kun tilgjengelig for admin frem til
 jeg er fornøyd med kvaliteten". "Voksestedslag (fargelag)"-laget
