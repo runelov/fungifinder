@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.27.2';
-  const APP_BUILD_DATE = '2026-08-16';
+  const APP_VERSION = '0.27.3';
+  const APP_BUILD_DATE = '2026-08-17';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
   // kommentar der) — de to må holdes i sync manuelt siden repoet bevisst
@@ -932,6 +932,35 @@
     return leafletMap.getZoom() >= ARTSKART_MIN_ZOOM;
   }
 
+  // RETTET 2026-08-17 (bruker meldte at "Foreslå områder" fokuserte på HELE
+  // Norge selv om vedkommende hadde navigert/zoomet kartet til et bestemt
+  // utsnitt, uten å eksplisitt ha valgt fylke/kommune/radius) — samme
+  // "et bevisst utsnitt kan også vises via zoom, ikke bare via filter"-
+  // mønster som allerede gjelder for Artskart-laget over
+  // (artskartOmradeErAvgrenset/ARTSKART_MIN_ZOOM): uten et eksplisitt
+  // fylke/kommune/radius-filter faller "Foreslå områder" (og dekningslinjen
+  // over knappen) nå tilbake til kartets synlige utsnitt (paddet 20 %), men
+  // KUN når brukeren har zoomet inn til minst samme nivå som Artskart-laget
+  // allerede krever — helt utzoomet (hele Norge synlig) gir fortsatt et
+  // nasjonalt søk, siden det da ikke finnes noe bevisst "utsnitt" å falle
+  // tilbake til. Brukes KUN av suggestAreas()-flyten — resten av appen
+  // (resultatlisten, kartmarkørene, værsammendraget) er bevisst upåvirket,
+  // se scopedLocations()/isInCurrentScope() over, for ikke å gjøre panorering
+  // alene om et skjult filter andre steder i appen.
+  function foreslaOmraderFallbackUtsnitt(){
+    if (artskartOmradeErAvgrenset()) return null; // eksplisitt fylke/kommune/radius har alltid forrang
+    if (!leafletMap || leafletMap.getZoom() < ARTSKART_MIN_ZOOM) return null;
+    return leafletMap.getBounds().pad(0.2);
+  }
+  function isInForeslaOmraderScope(loc){
+    if (!isInCurrentScope(loc)) return false;
+    const utsnitt = foreslaOmraderFallbackUtsnitt();
+    return !utsnitt || utsnitt.contains([loc.lat, loc.lon]);
+  }
+  function foreslaOmraderScopeLabel(){
+    return currentAreaLabel() || (foreslaOmraderFallbackUtsnitt() ? 'synlig kartutsnitt' : null);
+  }
+
   // Ekte Artsdatabanken-observasjoner (art/koordinat/dato), hentet av
   // fetch_area.py og akkumulert i D1 (se fungifinder-db).
   //
@@ -1022,7 +1051,11 @@
     const line = document.getElementById('sp-coverage-line');
     const suggestBtn = document.getElementById('sp-route-suggest');
     if (!line || !suggestBtn || !personalFeaturesEnabled()) return;
-    const areaLabel = currentAreaLabel();
+    // foreslaOmraderScopeLabel() (ikke currentAreaLabel()) — denne linjen
+    // varsler spesifikt om "Foreslå områder" (se kommentaren over den
+    // funksjonen), som siden 2026-08-17 også kan være avgrenset av kartets
+    // synlige utsnitt, ikke bare et eksplisitt fylke/kommune/radius-filter.
+    const areaLabel = foreslaOmraderScopeLabel();
     if (!areaLabel) { line.style.display = 'none'; suggestBtn.disabled = false; return; }
     line.style.display = '';
     if (count === 0) {
@@ -3756,10 +3789,22 @@
       const r = scoreForRoute(loc);
       return { loc, res: r.res };
     });
-    const scoped = scoredAll.filter(s => !s.res.isCut && isInCurrentScope(s.loc));
+    // isInForeslaOmraderScope (ikke isInCurrentScope alene) — se
+    // foreslaOmraderFallbackUtsnitt() for begrunnelsen: uten et eksplisitt
+    // fylke/kommune/radius-filter faller dette nå tilbake til kartets
+    // synlige utsnitt når brukeren har zoomet inn nok til at det utgjør et
+    // bevisst valg, i stedet for alltid å søke i hele Norge.
+    const scoped = scoredAll.filter(s => !s.res.isCut && isInForeslaOmraderScope(s.loc));
 
     if (!scoped.length) {
-      summary.innerHTML = 'Ingen steder å foreslå områder fra i valgt område.' + fetchNudgeHtml(0);
+      // Skiller på eksplisitt filter (fylke/kommune/radius) og det synlige
+      // kartutsnittet som fallback (se foreslaOmraderFallbackUtsnitt()) —
+      // i sistnevnte tilfelle er "zoom ut" et reelt neste steg, ikke bare
+      // "hent mer data".
+      const zoomHint = !currentAreaLabel() && foreslaOmraderFallbackUtsnitt()
+        ? ' Prøv å zoome ut i kartet, eller velg et fylke/kommune/radius.'
+        : '';
+      summary.innerHTML = 'Ingen steder å foreslå områder fra i valgt område.' + zoomHint + fetchNudgeHtml(0);
       wireFetchNudgeLink();
       return;
     }
@@ -4279,7 +4324,12 @@
     renderFindsLayer();
     renderDelteFunnLayer();
 
-    const coverageCount = scoped.length;
+    // isInForeslaOmraderScope (ikke isInCurrentScope, som `scoped` selv
+    // bruker) — dekningslinjen varsler spesifikt om "Foreslå områder", som
+    // siden 2026-08-17 kan være avgrenset strammere enn resten av appen (se
+    // foreslaOmraderFallbackUtsnitt()). Kartmarkørene/resultatlisten over
+    // (renderMap(scoped) osv.) er bevisst upåvirket av dette.
+    const coverageCount = scoredAll.filter(s => isInForeslaOmraderScope(s.loc)).length;
     updateCoverageLine(coverageCount);
     if (hideHogst) scoped = scoped.filter(s => !s.res.isCut);
     // Tegner umiddelbart fra et evt. allerede innlastet datasett (billig,
