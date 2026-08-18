@@ -219,7 +219,54 @@ terrengdata-laget (se eget punkt under).
   tallet, bare at det ikke er satt urealistisk strengt (folk finner
   faktisk kantarell nesten aldri i forhold modellen ville avvist). En
   litt lavere ELLER litt høyere grense kunne gitt et like konsistent
-  resultat med dette datagrunnlaget alene. Testet kun kantarell (n=25) —
-  de andre 8 artene er ikke sjekket. Nedvekting/tydeligere merking som
-  grov heuristikk er fortsatt en rimelig konklusjon, men "helt ukalibrert"
-  er ikke lenger riktig beskrivelse for kantarell spesifikt.
+  resultat med dette datagrunnlaget alene.
+
+  **Utvidet til de resterende 8 artene samme dag** (n≈20 per art, samme
+  metode):
+
+  | Art | n totalt | "FOR TØRT"-andel | Utenfor sesong-andel |
+  |---|---|---|---|
+  | Kantarell | 925 | 4 % | 16 % |
+  | Traktkantarell | 650 | **20 %** | 0 % |
+  | Trompetsopp | 273 | 16 % | 5 % |
+  | Steinsopp | 478 | 15 % | 20 % |
+  | Rødskrubb | 393 | 5 % | 10 % |
+  | Matriske | 47 | **35 %** | 10 % |
+  | Piggsopp | 102 | 5 % | 5 % |
+  | Fåresopp | 268 | 5 % | 5 % |
+  | Kransmusserong | 24 | 0 % | **37 %** |
+
+  De fleste artene ligner kantarell (lav "for tørt"-andel, ingen urealistisk
+  streng terskel synlig). To avvik peker seg ut som verdt å følge opp
+  konkret:
+  - **Matriske**: 35 % av bekreftede funn skjedde i forhold modellen ville
+    kalt "for tørt" — klart høyest i settet. Kan være at
+    `minNedbor14`=15 er satt for strengt for denne arten, ELLER en reell
+    økologisk forklaring: appens egen `why`-tekst for matriske nevner
+    allerede "sandholdig, veldrenert jord" — godt drenert furuskogsbunn
+    tørker fortere ut igjen enn mosedekket granskogsbunn, så samme
+    `precip14`-tall kan tilsvare en tørrere bakke i praksis for denne
+    arten enn for kantarell. Samme grunnleggende begrensning
+    (`daysSinceRain`-korreksjonen finnes allerede i koden av nøyaktig
+    denne typen grunn) som er nevnt i `scoreLocation()`.
+  - **Traktkantarell**: 20 % "for tørt" — nest høyest, og arten har
+    samtidig de strengeste tersklene i hele settet (min=20/ideal=45 mm,
+    mot kantarells 15/35 for en økologisk ganske lik art). Verdt å
+    vurdere å senke litt.
+  - **Kransmusserong sin sesong sticker seg ut mest i hele testen**: 37 %
+    av bekreftede funn (7 av 19) lå utenfor det deklarerte
+    september-oktober-vinduet — langt høyere enn noen annen art, selv om
+    n er lite (24 totalt). Kransmusserong er samtidig arten med best
+    kildedekning i settet (se `docs/artsprofiler-forskningsgrunnlag.md`)
+    og en art folk aktivt leter etter og kan feilbestemme blant nære
+    slektninger i Tricholoma — begge er plausible forklaringer, ikke
+    utelukkende hverandre. Høyeste prioritet av bifunnene til å se
+    nærmere på.
+
+  Testet kun n≈20-25 per art (kantarell) — små tall, spesielt for artene
+  med lite totalt datagrunnlag (kransmusserong n=24, matriske n=47).
+  Nedvekting/tydeligere merking som grov heuristikk er fortsatt en rimelig
+  konklusjon for settet som helhet, men "helt ukalibrert" er ikke lenger
+  riktig beskrivelse — de fleste artene ser brukbare ut, og de to-tre som
+  ikke gjør det har nå en konkret, navngitt retning å undersøke videre i
+  stedet for en generell bekymring.
