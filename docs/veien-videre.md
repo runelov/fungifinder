@@ -173,12 +173,55 @@ terrengdata-laget (se eget punkt under).
   under full AR5-satsing (se punktet under) fremfor som en mellomstasjon,
   med mindre et mye større utvalg reelle funnsteder (i dag kun n=3, for
   lite til å konkludere hardt) senere viser et annet bilde.
-- **Gjeninnfør parasollsopp og sjampinjong** — fjernet 2026-08-18 fordi
-  begge er saprotrofe grasmarksarter (lever av dødt organisk materiale),
-  ikke mykorrhiza-dannende. Dagens `treslag`/`skogalder`-scoringsmodell
-  (bygget for mykorrhiza-arter) gir ikke mening for dem. Krever en egen
-  scoringsakse først — trolig "åpen mark ja/nei" + sandholdig/gressdekt
-  grunn i stedet for treslag, se punktet under om `'apen'`-terrengdata.
+- **Gjeninnfør parasollsopp og sjampinjong — scoping 2026-08-18, klar til
+  implementering.** Fjernet fordi begge er saprotrofe grasmarksarter
+  (lever av dødt organisk materiale), ikke mykorrhiza-dannende — dagens
+  `treslag`/`skogalder`-scoringsmodell (bygget for mykorrhiza-arter) gir
+  ikke mening for dem.
+
+  **Viktig funn under scopingen: trenger IKKE en ny scoringsakse.**
+  `attrScore()` (`js/app.js`) matcher allerede `loc.treslag`/
+  `loc.skogalder` mot `species.treslag`/`species.skogalder` som ren
+  mengdemedlemskap — og `'apen'` er allerede en gyldig, tekstet verdi i
+  `TXT.treslag`/`TXT.alder` (`apen:'åpen mark'`/`apen:'åpen'`), bare aldri
+  faktisk produsert av SR16. Gir parasollsopp/sjampinjong
+  `treslag:['apen']`, `skogalder:['apen']` ved gjeninnføring, så virker
+  eksisterende scoringsmodell uendret — ingen ny funksjon, ingen nytt
+  vektbudsjett. Fuktighet/berggrunn scores som normalt (samme WMS-kall som
+  for skogpunkter, uavhengig av om SR16 har noe å si).
+
+  **Tre reelle strukturelle endringer, i rekkefølge:**
+  1. **`fetch_area.py`s kandidat-portvakt** (`enrich_point()`) forkaster i
+     dag ETHVERT punkt der høgde-API-ets `terreng`-felt ikke er
+     `"skog"`/`"skogbevokst myr"` — FØR SR16/markfuktighet/berggrunn i det
+     hele tatt kalles. Verifisert live 2026-08-18: API-et returnerer
+     `"ÅpentOmråde"` for et kjent jordbrukspunkt (Jæren), `"Skog"` for
+     Nordmarka, `"BymessigBebyggelse"` for Oslo sentrum — et konkret,
+     bekreftet nytt terrengtype-navn (`"åpentområde"` etter `.lower()`) å
+     legge til en utvidet aksept-liste ved siden av `FOREST_TERRAIN_VALUES`.
+     Uten denne endringen blir åpne punkter fortsatt forkastet på første
+     sjekk, uansett hvor god AR5-klassifiseringen er.
+  2. **Ny AR5-henting** (`fetch_ar5_arealtype()`, samme
+     `GetMap`+pikselfarge-mønster som `fetch_markfuktighet()`) kalles for
+     kandidater som ikke er skog, og setter `treslag`/`skogalder` til
+     `'apen'` når AR5 sier "Åpen fastmark" (evt. "Innmarksbeite" —
+     avgjøres empirisk mot flere kontrollpunkter enn de tre fra
+     gjennomførbarhetstesten). Kun ett nytt WMS-kall per tidligere
+     FORKASTET kandidat — ingen ekstra kostnad for skogpunkter.
+  3. **Eksisterende terreng_steder får INGEN åpne naboer av
+     `--refresh-existing` alene** — allerede lagrede steder ble per
+     definisjon godkjent av den GAMLE (skog-only) portvakten, så en
+     attributt-oppfriskning finner ingen nye punkter. Ekte åpen-mark-punkter
+     krever et FERSKT rutenett-sveip over samme områder (samme kostnadsbilde
+     som er scopet i Voksestedslaget-artifaktets Del 4-kalibrering — ikke
+     en gratis bonus, en reell ny ETL-kjøring per område).
+
+  **Rekkefølge foreslått**: (1) og (2) er rene kodeendringer, ingen
+  produksjonskjøring — trygge å implementere og teste isolert (f.eks.
+  `--test-point` mot Jæren-koordinatene fra gjennomførbarhetstesten) før
+  noe rulles ut. (3) er en bevisst, separat, senere beslutning — samme
+  "spor D er en egen, senere handling"-prinsipp som kalibreringsplanen
+  allerede bruker.
 - ~~**Gjeninnfør furuknippesopp**~~ — **gjort 2026-08-18 (v0.28.12), se
   CHANGELOG.** Trofisk modus avklart samme dag av en tredje, uavhengig,
   fagfellevurdert kilde (genomstudie, Ohta et al. i *DNA Research*):
@@ -215,9 +258,9 @@ terrengdata-laget (se eget punkt under).
     parasollsopp/sjampinjong trenger.
   - Ingen ny infrastruktur nødvendig utover å gjenbruke det eksisterende
     `decode_png_pixel()`-mønsteret på et nytt lag — samme teknikk, ikke
-    et nytt problem å løse. Klar for full scoping (ny scoringsakse,
-    ETL-integrasjon, `refresh-existing`-backfill for eksisterende
-    terreng_steder) når det prioriteres.
+    et nytt problem å løse. Full scoping (viser seg IKKE å trenge en ny
+    scoringsakse) i punktet under, "Gjeninnfør parasollsopp og
+    sjampinjong".
   - Merk: at det ekte parasollsopp-funnstedet i Oslo klassifiseres som
     "Skog" (ikke "Åpen fastmark") av AR5 er ikke en motsigelse — samme
     presisjonsbegrensning som OSM-testen traff på (terreng_stedet er et
