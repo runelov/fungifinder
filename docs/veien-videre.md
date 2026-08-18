@@ -136,14 +136,40 @@ terrengdata-laget (se eget punkt under).
   før — ingen ny data, ingen nye tallfestede grenser, ikke utvidet til
   flere arter enn de som allerede hadde en kildebelagt preferanse
   (`WARMTH_LOVING_SPECIES`/`species.hoydeMoh`).
-- **OSM `natural`/`landuse`-tags som billig `apen`-proxy** — planen under
-  peker på AR5 som eneste vei til ekte "åpen mark"-deteksjon, men
-  `fetch_area_features_in_bbox()` gjør allerede ett batched Overpass-kall
-  per område (veier/parkering/stier/befolkning). OSM har
-  `natural=grassland|heath`/`landuse=meadow` i akkurat samme respons —
-  marginalkostnad ≈ 0, ingen ny ekstern kilde. Verdt å teste empirisk
-  (dekningsgrad i OSM for Norge) som en billigere mellomstasjon før en
-  eventuell full AR5-satsing.
+- **OSM `natural`/`landuse`-tags som `apen`-proxy — testet 2026-08-18,
+  svakere enn håpet.** Kjørte ekte Overpass-spørringer (way+relation, ikke
+  bare way — enkle way-spørringer viste seg å UNDERVURDERE dekning kraftig
+  siden mange arealer er tagget som multipolygon-relasjoner) mot fire
+  områder:
+  1. Nordmarka (skog nær Oslo, generisk testområde): rik tagging —
+     `grass`=299, `meadow`=115, `farmland`=123, `village_green`=23,
+     `heath`=14 innenfor ~124 km².
+  2. Jæren (jordbruksland, mindre bbox pga. timeout på større): moderat —
+     `farmyard`=67, `grass`=25, `farmland`=17.
+  3. Finse/Hardangervidda (fjellhei): 0 relevante tags — dominert av
+     `water`(2596)/`glacier`/`wetland`/`bare_rock`. Trolig bboxen som
+     traff mest vann/isbre/nakent fjell fremfor selve heivegetasjonen, ikke
+     nødvendigvis bevis på generell manko — men uansett ingen brukbar
+     "åpen mark"-signal her.
+  4. **Den egentlig relevante testen — 3 ekte terreng_steder med bekreftet
+     parasollsopp-funn <500 m unna** (fra
+     `fungifinder-db/data/locations.json`), 300 m radius-søk rundt hvert:
+     kun **1 av 3** hadde `grass`/`meadow`/`farmland`-tagging i det hele
+     tatt (Nesodden-punktet); de to andre (Oslo 92 m til funn,
+     Indre Østfold 156 m til funn) hadde KUN skog-/kratt-/vanntagging —
+     proxyen ville ha bommet på disse to reelle funnstedene.
+
+  **Konklusjon**: signalet finnes, men er tynt nettopp der det trengs mest.
+  OSM-tagging ser ut til å følge samme mønster som Artskart-funnene i
+  egen-datavalideringen over — tett der frivillige kartleggere bor/ferdes
+  (byer, store jordbruksarealer), tynt for de små, spredte lysninger/
+  hageflekker/skogbryn parasollsopp/sjampinjong faktisk vokser i. Kombinert
+  med at implementasjonen uansett ville krevd ekte punkt-i-polygon-sjekk
+  (ikke bare nærmeste-punkt-avstand slik vei/sti/parkering gjøres i dag) er
+  dette IKKE lenger vurdert som en lavthengende frukt — nedprioritert
+  under full AR5-satsing (se punktet under) fremfor som en mellomstasjon,
+  med mindre et mye større utvalg reelle funnsteder (i dag kun n=3, for
+  lite til å konkludere hardt) senere viser et annet bilde.
 - **Gjeninnfør parasollsopp og sjampinjong** — fjernet 2026-08-18 fordi
   begge er saprotrofe grasmarksarter (lever av dødt organisk materiale),
   ikke mykorrhiza-dannende. Dagens `treslag`/`skogalder`-scoringsmodell
