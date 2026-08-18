@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.28.7';
+  const APP_VERSION = '0.28.8';
   const APP_BUILD_DATE = '2026-08-18';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -32,17 +32,23 @@
       fieldTips:'Gul-oransje traktformet hatt med bølget kant. Under hatten er det <b>lave, grove, gaffelgrenede ribber</b> som løper langt ned på stilken — ikke tynne, skarpe gjeller. Kjøttet er hvitt-gult gjennomgående, og lukten minner om modne aprikoser.',
       lookalike:'Falsk kantarell (Hygrophoropsis aurantiaca) ligner, men har tynne, skarpe, ekte gjeller (ikke butte ribber) og er mørkere oransje. Ikke farlig, men smaker dårlig — sjekk gjellene nøye.',
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/2007-07-14_Cantharellus_cibarius_cropped.jpg/500px-2007-07-14_Cantharellus_cibarius_cropped.jpg', artist:'Andreas Kunze', license:'CC BY-SA 4.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2007-07-14_Cantharellus_cibarius_cropped.jpg' } },
-    // Kilde: artfakta.se/taxa/3217 — AVVIK: kilden nevner furu (tall) på linje med gran, mangler i treslag under.
+    // Kilde: artfakta.se/taxa/3217 — RETTET 2026-08-18: la til furu i treslag
+    // (kilden nevner furu på linje med gran, manglet tidligere), se
+    // docs/artsprofiler-forskningsgrunnlag.md (Del 0).
     { id:'traktkantarell', name:'Traktkantarell', latin:'Craterellus tubaeformis', season:[8,11],
-      treslag:['gran'], skogalder:['middels','gammel'], fuktighet:['fuktig'], berggrunn:['fattig','moderat'],
+      treslag:['gran','furu'], skogalder:['middels','gammel'], fuktighet:['fuktig'], berggrunn:['fattig','moderat'],
       weather:{ minNedbor14:20, idealNedbor14:45, minTempAvg:4 },
-      why:(loc,t)=>`Fuktig, mosekledd granskog — traktkantarellens favorittmiljø. Tåler kjøligere vær enn kantarell.`,
+      why:(loc,t)=>`Fuktig, mosekledd ${t.treslagTekst}-skog — traktkantarellens favorittmiljø. Tåler kjøligere vær enn kantarell.`,
       fieldTips:'Liten, gråbrun-gulbrun sopp med <b>trakt-/pipeformet hatt</b> og hul stilk. Undersiden har lave, grålilla-gule ribber. Vokser ofte i <b>tette forekomster</b> i tykt mosedekke.',
       lookalike:'Få farlige forvekslingsarter. Skilles fra svart trompetsopp på farge (gulbrun, ikke gråsvart) og fra rørsopper ved at det ikke er noe rørlag under hatten.',
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/2011-07-12_Craterellus_tubaeformis_71471.jpg/500px-2011-07-12_Craterellus_tubaeformis_71471.jpg', artist:'Mushroom Observer-bruker', license:'CC BY-SA 3.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2011-07-12_Craterellus_tubaeformis_71471.jpg' } },
-    // Kilde: artfakta.se/taxa/3772 — AVVIK: kilden sier "sällan barrskog" (under hassel/eik/asp) — 'gran' i treslag er trolig feil retning.
+    // Kilde: artfakta.se/taxa/3772 — RETTET 2026-08-18: fjernet gran fra
+    // treslag (kilden sier "sällan barrskog" — arten foretrekker
+    // hassel/eik/asp, som uansett ikke skilles fra generisk "bjork" i
+    // terrengdata-laget, se docs/veien-videre.md), se
+    // docs/artsprofiler-forskningsgrunnlag.md (Del 0).
     { id:'trompetsopp', name:'Svart trompetsopp', latin:'Craterellus cornucopioides', season:[8,10],
-      treslag:['bjork','gran'], skogalder:['gammel'], fuktighet:['fuktig'], berggrunn:['moderat','rik'],
+      treslag:['bjork'], skogalder:['gammel'], fuktighet:['fuktig'], berggrunn:['moderat','rik'],
       weather:{ minNedbor14:20, idealNedbor14:40, minTempAvg:6 },
       why:(loc,t)=>`Fuktig løv-/blandingsskog på ${t.berggrunnTekst} grunn — trompetsoppens foretrukne miljø, ofte sammen med hassel eller bøk/eik.`,
       fieldTips:'Gråsvart, traktformet og helt hul gjennom hele soppen, uten tydelige gjeller eller ribber (helt glatt eller svakt rynket underside). Ligner et lite, mørkt horn. Vokser ofte i store, skjulte klynger under løv.',
@@ -56,9 +62,12 @@
       fieldTips:'Rørsopp: under hatten er det et <b>svampaktig rørlag</b>, aldri gjeller. Stilken er tykk, kølleformet, med fint hvitt <b>nettmønster</b> øverst. Kjøttet forblir hvitt og blir <b>ikke blått eller rødt</b> ved kutt.',
       lookalike:'Ingen rørsopper i Norge er giftige, men galleboletus (Tylopilus felleus) ligner og smaker svært bittert — sjekk at nettmønsteret er hvitt (ikke mørkt) og smak en liten bit rått (bitter = kast).',
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Boletus_edulis1.jpg/500px-Boletus_edulis1.jpg', artist:'Tocekas', license:'CC BY-SA 3.0', sourcePage:'https://commons.wikimedia.org/wiki/File:Boletus_edulis1.jpg' } },
-    // Kilde: artfakta.se/taxa/245486 — AVVIK: kilden sier INGEN berggrunnspreferanse (inkl. kalkrikt) — 'rik' mangler under.
+    // Kilde: artfakta.se/taxa/245486 — RETTET 2026-08-18: la til 'rik' i
+    // berggrunn (kilden sier arten ikke har noen berggrunnspreferanse i det
+    // hele tatt, inkludert kalkrik grunn), se
+    // docs/artsprofiler-forskningsgrunnlag.md (Del 0).
     { id:'rodskrubb', name:'Rødskrubb / Brunskrubb', latin:'Leccinum versipelle / scabrum', season:[7,10],
-      treslag:['bjork'], skogalder:['middels','gammel'], fuktighet:['frisk','fuktig'], berggrunn:['fattig','moderat'],
+      treslag:['bjork'], skogalder:['middels','gammel'], fuktighet:['frisk','fuktig'], berggrunn:['fattig','moderat','rik'],
       weather:{ minNedbor14:15, idealNedbor14:35, minTempAvg:8 },
       why:(loc,t)=>`Bjørkeinnslag i ${t.treslagTekst}-skog — disse rørsoppene lever i mykorrhiza spesifikt med bjørk.`,
       fieldTips:'Rørsopp med tynn, rank stilk dekket av mørke, skjellete flekker («skrubb»-mønster). Hatten er oransje-rød (rødskrubb) eller gråbrun (brunskrubb). Kjøttet kan mørkne noe ved kutt, men ikke blått/rødt kraftig.',

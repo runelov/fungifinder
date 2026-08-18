@@ -11,31 +11,31 @@ Et forskningspass gikk gjennom kildegrunnlaget for alle artenes vekstvilkår
 i `SPECIES` (`js/app.js`) mot Artfakta/SLU Artdatabanken og Artsdatabankens
 rødliste. Fullt grunnlag, sitater og kildehenvisninger:
 [artsprofiler-forskningsgrunnlag.md](artsprofiler-forskningsgrunnlag.md).
-Ingen scoringsverdier er endret ennå bortsett fra fjerningen av tre arter
-(se under).
+Fjerningen av tre arter og "Del 0"-rettelsene under er nå implementert (se
+CHANGELOG v0.28.7/v0.28.8) — kantarell er eneste gjenstående åpne punkt.
 
-**Hvorfor dette haster mer enn det ser ut som**: "Voksestedslag (fargelag)"
-(shippet v0.27.0, admin-gatet i v0.27.2 med begrunnelsen *"til jeg er
-fornøyd med kvaliteten"*) er et direkte, pikselvist bilde av
-`scoreLocation()`s output. Feilene under er dermed ikke bare en fremtidig
-konsekvens — de er allerede synlige i det live (admin-only) fargelaget
-akkurat nå. Del 0 under bør regnes som en forutsetning for å løfte den
-admin-gaten, ikke en løsrevet fremtidig oppgave.
+**Hvorfor Del 0 hastet**: "Voksestedslag (fargelag)" (shippet v0.27.0,
+admin-gatet i v0.27.2 med begrunnelsen *"til jeg er fornøyd med
+kvaliteten"*) er et direkte, pikselvist bilde av `scoreLocation()`s output
+— Del 0-feilene var dermed allerede synlige i det live (admin-only)
+fargelaget, ikke bare en fremtidig konsekvens. Nå rettet; kantarell-
+usikkerheten (se under) er fortsatt en gjenstående faktor å vurdere før
+gaten løftes.
 
-### Del 0 — klare til å rettes nå (ingen ny kilde, ingen avveining)
+### ~~Del 0 — klare til å rettes nå~~ (rettet 2026-08-18, v0.28.8)
 
 Rene linjeendringer i `SPECIES`-arrayen basert på et allerede dokumentert,
-sitert avvik mot Artfakta. Bør prioriteres foran punktene under, som enten
-krever mer avklaring eller ny data:
+sitert avvik mot Artfakta — implementert, se CHANGELOG v0.28.8:
 
-- **Trompetsopp**: `gran` i `treslag` er trolig feil retning — kilden sier
-  arten sjelden vokser i barskog, og heller foretrekker hassel/eik/asp
-  (som uansett ikke kan skilles fra generisk lauvskog i terrengdata-laget,
-  se strukturell begrensning under).
-- **Traktkantarell**: `furu` mangler i `treslag` — kilden nevner furu på
-  linje med gran.
-- **Rødskrubb**: `'rik'` mangler i `berggrunn` — kilden sier arten ikke har
-  noen berggrunnspreferanse i det hele tatt, inkludert kalkrik grunn.
+- ~~**Trompetsopp**: `gran` i `treslag` er trolig feil retning~~ — fjernet.
+  Kilden sier arten sjelden vokser i barskog, og heller foretrekker
+  hassel/eik/asp (som uansett ikke kan skilles fra generisk lauvskog i
+  terrengdata-laget, se strukturell begrensning under).
+- ~~**Traktkantarell**: `furu` mangler i `treslag`~~ — lagt til. Kilden
+  nevner furu på linje med gran.
+- ~~**Rødskrubb**: `'rik'` mangler i `berggrunn`~~ — lagt til. Kilden sier
+  arten ikke har noen berggrunnspreferanse i det hele tatt, inkludert
+  kalkrik grunn.
 
 ### Venter på tredje kilde
 

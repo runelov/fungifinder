@@ -16,6 +16,12 @@ under for disse tre står likevel som forskningsgrunnlag for en eventuell
 fremtidig gjeninnføring — se [veien-videre.md](veien-videre.md) for planen
 rundt det.
 
+**Oppdatering 2026-08-18 (v0.28.8), "Del 0":** de tre konkrete avvikene
+under (trompetsopp, traktkantarell, rødskrubb) er nå implementert i
+`SPECIES` — se CHANGELOG v0.28.8. Kantarell (furu i treslag) er fortsatt
+ikke endret; se [veien-videre.md](veien-videre.md) for status og forsøket
+på å avklare den mot appens egne data.
+
 ## Metodikk og kildevurdering
 
 Fire kandidater ble vurdert; to ble forkastet, to ble brukt:
@@ -163,16 +169,16 @@ dette er den best dokumenterte arten i settet.
 
 | Art | Verdi |
 |---|---|
-| Trompetsopp | AVVIK — gran bør trolig fjernes fra treslag |
-| Traktkantarell | AVVIK — furu bør trolig legges til treslag |
-| Rødskrubb | AVVIK — 'rik' bør trolig legges til berggrunn |
+| Trompetsopp | **RETTET (v0.28.8)** — gran fjernet fra treslag |
+| Traktkantarell | **RETTET (v0.28.8)** — furu lagt til treslag |
+| Rødskrubb | **RETTET (v0.28.8)** — 'rik' lagt til berggrunn |
 | Kantarell | USIKKER — furu i treslag ikke bekreftet, trenger 3. kilde |
 | Parasollsopp | **FJERNET fra appen** — feil scoringsmodell (saprotrof, ikke mykorrhiza) |
 | Sjampinjong | **FJERNET fra appen** — feil scoringsmodell (saprotrof, ikke mykorrhiza) |
 | Furuknippesopp | **FJERNET fra appen** — trofisk modus faglig omstridt; gran som mulig ekstra vertstre |
 | Steinsopp, Matriske, Piggsopp, Fåresopp, Kransmusserong | BEKREFTET — ingen endring foreslått |
 
-De tre konkrete avvikene (Trompetsopp/Traktkantarell/Rødskrubb) og den ene
-usikre saken (Kantarell) er ikke implementert i scoringen ennå — se
-`SPECIES`-arrayen
-i `js/app.js`, som nå har en kort kildehenvisning per art pekende hit.
+De tre konkrete avvikene (Trompetsopp/Traktkantarell/Rødskrubb) er
+implementert i `js/app.js` v0.28.8 — se CHANGELOG. Kantarell (USIKKER) står
+fortsatt åpen, se [veien-videre.md](veien-videre.md) for status og forsøket
+på å avklare den mot appens egne data.

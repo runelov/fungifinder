@@ -1,5 +1,28 @@
 # Endringslogg
 
+## 0.28.8 — Del 0: tre kildebelagte artsprofil-rettelser
+Implementerer "Del 0" fra `docs/veien-videre.md` — de tre funnene fra
+artsprofil-gjennomgangen (`docs/artsprofiler-forskningsgrunnlag.md`) som
+ikke krevde noen ny kilde eller avveining, kun en linjeendring i `SPECIES`
+basert på et allerede sitert avvik mot Artfakta:
+
+- **Traktkantarell**: la til `furu` i `treslag` (hadde kun `gran`) — kilden
+  nevner furu (tall) på linje med gran. "Hvorfor her?"-teksten bruker nå
+  `t.treslagTekst` i stedet for hardkodet "granskog", slik at den også
+  stemmer når furu er treslaget som faktisk matchet.
+- **Trompetsopp**: fjernet `gran` fra `treslag` (hadde `bjork`+`gran`) —
+  kilden sier arten sjelden vokser i barskog. Igjen kun `bjork`, som
+  uansett er den nærmeste tilnærmingen terrengdata-laget kan gi til den
+  reelle preferansen (hassel/eik/asp — se strukturell begrensning i
+  `docs/veien-videre.md`).
+- **Rødskrubb**: la til `'rik'` i `berggrunn` (hadde `fattig`+`moderat`) —
+  kilden sier arten ikke har noen berggrunnspreferanse i det hele tatt.
+
+Ingen av de tre er store scoreendringer alene, men er direkte relevante for
+Voksestedslaget (fargelaget, admin-gatet i v0.27.2 "til jeg er fornøyd med
+kvaliteten") — se `docs/veien-videre.md` for hvorfor. Kantarell (furu i
+treslag, fortsatt uavklart mot en 3. kilde) er ikke endret.
+
 ## 0.28.7 — Fjernet parasollsopp, sjampinjong og furuknippesopp (foreløpig)
 Direkte konsekvens av artsprofil-gjennomgangen (se
 `docs/artsprofiler-forskningsgrunnlag.md`, forskningspass 2026-08-18 mot
