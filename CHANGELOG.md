@@ -1,5 +1,24 @@
 # Endringslogg
 
+## 0.28.3 — Rettet: resultatlisten forsvant helt (ReferenceError etter v0.28.2)
+Brukerrapport: kun kartvisning synlig, ingenting under "Forslag for
+<soppnavn>", og en `Uncaught ReferenceError: coverageCount is not defined`
+i konsollen (`render()`, app.js:4534).
+
+- Rotårsak: v0.28.2s omlegging av dekningslinjen fjernet
+  `const coverageCount = …` (erstattet med `updateCoverageLine(scoped.length)`),
+  men en SEPARAT, lengre nede i samme `render()`-funksjon —
+  `updateFetchPanel(coverageCount)` — refererte fortsatt til den nå
+  fjernede variabelen. Exception der stanser resten av `render()`, som
+  inkluderer selve listeoppbyggingen — dermed forsvant lista helt, ikke
+  bare "Hent data"-panelet ReferenceError-en faktisk kom fra.
+- Fix: `updateFetchPanel(scoped.length)` — samme verdi `coverageCount`
+  ga tidligere (identisk uttrykk, gjenbrukt fra `updateCoverageLine()`-
+  kallet like over).
+
+Worker (`fungifinder-api`) var ikke berørt av denne — kun frontend
+redeployes via denne versjonsbumpen.
+
 ## 0.28.2 — Kartutsnitt-scope utvidet til hele appen (ikke bare "Foreslå områder")
 Oppfølger til v0.27.3, som løste dette KUN for "Foreslå områder"-knappen.
 Den avgrensingen viste seg selv forvirrende i praksis: knappen kunne telle

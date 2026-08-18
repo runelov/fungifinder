@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.28.2';
-  const APP_BUILD_DATE = '2026-08-17';
+  const APP_VERSION = '0.28.3';
+  const APP_BUILD_DATE = '2026-08-18';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
   // kommentar der) — de to må holdes i sync manuelt siden repoet bevisst
@@ -4531,7 +4531,7 @@
       return b.res.total - a.res.total;
     });
 
-    updateFetchPanel(coverageCount);
+    updateFetchPanel(scoped.length);
 
     // kommuneFilter kommer fra et fritekstfelt (autocomplete, ikke en låst
     // <select>), så den må escapes før den havner i innerHTML nedenfor —
