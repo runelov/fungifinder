@@ -193,8 +193,33 @@ terrengdata-laget (se eget punkt under).
   hassel/eik/asp/bøk fra generisk "lauvdominert" (alt mappes til `bjork`).
   Ville forbedret presisjonen spesifikt for kalkkrevende lauvtre-arter som
   trompetsopp, uavhengig av hvor gode artsprofilene er.
-- **Værterskler (`minNedbor14`/`idealNedbor14`/`minTempAvg`) er ukildet og
-  ukalibrert** — internt konsistente, men ingen kilde og ingen kalibrering
-  mot brukerens egne loggede funn-datoer + værhistorikk, selv om appen har
-  begge datasettene. Vurder kalibrering, eller nedvekting/tydeligere
-  merking som grov heuristikk.
+- **Værterskler (`minNedbor14`/`idealNedbor14`/`minTempAvg`) er ukildet —
+  delvis kalibreringstestet 2026-08-18, oppløftende men ikke avgjørende.**
+  Kjørte kantarells terskler (min=15/ideal=35 mm, minTempAvg=8) mot ekte
+  historisk vær (Open-Meteo sitt archive-API, samme 14-dagers/5-dagers-
+  vindudefinisjon som `loadWeather()` i `js/app.js` bruker) for et
+  tilfeldig utvalg på 25 av de 925 bekreftede kantarell-funnene <500 m fra
+  et terreng_sted, med reell `dato` fra Artskart:
+  - 68 % av funnene skjedde når `precip14` allerede var over
+    `idealNedbor14` (35 mm) — modellen ville gitt "Godt fuktnivå".
+  - 28 % lå i "litt tørt, men innen rekkevidde"-sonen (15-35 mm).
+  - Bare **1 av 25 (4 %)** skjedde i forhold modellen ville kalt "for
+    tørt" (<15 mm) — lav falsk-negativ-rate, et tegn på at
+    `minNedbor14`-grensen ikke er urealistisk streng.
+  - Kaldt-straffen (`tempAvg` 5 dager < `minTempAvg`-4=4°C) utløste kun på
+    2 av 25, begge sent i sesongen (okt/nov) — ser fornuftig ut.
+  - **Bifunn**: 4 av 25 (16 %) skjedde utenfor artens deklarerte sesong
+    (juli-okt) — inkl. 8. juni og to novemberfunn. For lite grunnlag til å
+    endre `season`-feltet på egen hånd, men verdt å se nærmere på.
+
+  **Viktig metodisk forbehold**: dette er presence-only-data (kun
+  bekreftede funn, ingen bekreftede FRAVÆR) — samme grunnleggende
+  begrensning som lift-testen for artsprofilene over. At 96 % av funnene
+  lå over `minNedbor14` beviser ikke at akkurat 15 mm er det optimale
+  tallet, bare at det ikke er satt urealistisk strengt (folk finner
+  faktisk kantarell nesten aldri i forhold modellen ville avvist). En
+  litt lavere ELLER litt høyere grense kunne gitt et like konsistent
+  resultat med dette datagrunnlaget alene. Testet kun kantarell (n=25) —
+  de andre 8 artene er ikke sjekket. Nedvekting/tydeligere merking som
+  grov heuristikk er fortsatt en rimelig konklusjon, men "helt ukalibrert"
+  er ikke lenger riktig beskrivelse for kantarell spesifikt.
