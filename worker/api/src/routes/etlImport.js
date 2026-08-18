@@ -31,6 +31,12 @@ function stedTilRad(sted) {
     nz(sted.parkeringNotat), nz(sted.avstandParkeringM),
     nz(sted.stier), nz(sted.avstandStiM),
     sted.custom ? 1 : 0, sted.kilde, sted.hentetDato,
+    // RETTET 2026-08-18 (se migrasjon 0004): disse fire manglet helt her
+    // siden feltene ble lagt til i fetch_area.py v36 — stille droppet ved
+    // skriving i flere dager, ingen feil kastet. Se migrasjonsfilen for
+    // full begrunnelse.
+    nz(sted.parkeringLat), nz(sted.parkeringLon),
+    nz(sted.parkeringOsmType), nz(sted.parkeringOsmId),
   ];
 }
 
@@ -50,8 +56,9 @@ const STED_UPSERT = `
     id, navn, fylke, kommune, lat, lon, treslag, skogalder, fuktighet, fuktighet_index,
     berggrunn, helning_grader, himmelretning, hoyde_moh, avstand_vei_m, kjorbar_vei, befolkning,
     hogst_ar, hogstaar_sjekket_dato, kjente_funn, kjente_funn_detaljer,
-    parkering_notat, avstand_parkering_m, stier, avstand_sti_m, custom, kilde, hentet_dato, oppdatert
-  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, datetime('now'))
+    parkering_notat, avstand_parkering_m, stier, avstand_sti_m, custom, kilde, hentet_dato,
+    parkering_lat, parkering_lon, parkering_osm_type, parkering_osm_id, oppdatert
+  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, datetime('now'))
   ON CONFLICT(id) DO UPDATE SET
     navn=excluded.navn, fylke=excluded.fylke, kommune=excluded.kommune, lat=excluded.lat, lon=excluded.lon,
     treslag=excluded.treslag, skogalder=excluded.skogalder, fuktighet=excluded.fuktighet,
@@ -61,7 +68,10 @@ const STED_UPSERT = `
     hogstaar_sjekket_dato=excluded.hogstaar_sjekket_dato, kjente_funn=excluded.kjente_funn,
     kjente_funn_detaljer=excluded.kjente_funn_detaljer, parkering_notat=excluded.parkering_notat,
     avstand_parkering_m=excluded.avstand_parkering_m, stier=excluded.stier, avstand_sti_m=excluded.avstand_sti_m,
-    custom=excluded.custom, kilde=excluded.kilde, hentet_dato=excluded.hentet_dato, oppdatert=datetime('now')
+    custom=excluded.custom, kilde=excluded.kilde, hentet_dato=excluded.hentet_dato,
+    parkering_lat=excluded.parkering_lat, parkering_lon=excluded.parkering_lon,
+    parkering_osm_type=excluded.parkering_osm_type, parkering_osm_id=excluded.parkering_osm_id,
+    oppdatert=datetime('now')
 `;
 
 // Artskart-observasjoner endres aldri i ettertid — kun nye id-er kan dukke

@@ -33,6 +33,12 @@ function radTilSted(rad) {
     custom: !!rad.custom,
     kilde: rad.kilde,
     hentetDato: rad.hentet_dato,
+    // RETTET 2026-08-18 (se migrasjon 0004): manglet helt her — samme
+    // årsak som etlImport.js sin stedTilRad(), se den for full begrunnelse.
+    parkeringLat: rad.parkering_lat,
+    parkeringLon: rad.parkering_lon,
+    parkeringOsmType: rad.parkering_osm_type,
+    parkeringOsmId: rad.parkering_osm_id,
   };
 }
 
