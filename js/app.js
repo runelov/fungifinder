@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.28.11';
+  const APP_VERSION = '0.28.12';
   const APP_BUILD_DATE = '2026-08-18';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -115,6 +115,43 @@
       fieldTips:'Lys, kremhvit poresopp som vokser <b>på bakken</b> (ikke på trær), ofte flere sammenvokste hatter. Fine porer under hatten, ikke gjeller. Fast, hvitt kjøtt.',
       lookalike:'Lyse poresopper som vokser på bakken i Norge har ingen farlige forvekslingsarter — hovedregelen er lys farge og bakkevekst (ikke å forveksle med kjuker som vokser på trestammer).',
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Albatrellus_ovinus_1.jpg/500px-Albatrellus_ovinus_1.jpg', artist:'Karelj', license:'Public domain', sourcePage:'https://commons.wikimedia.org/wiki/File:Albatrellus_ovinus_1.jpg' } },
+    // GJENINNFØRT 2026-08-18 — fjernet v0.28.7 (2026-08-18, samme dag)
+    // pga. reell faglig uenighet om trofisk modus: Artfakta (Sverige) sa
+    // saprotrof, Norges egen rødlistevurdering 2021 sa hedget "antas å
+    // danne mykorrhiza". Avklart samme dag ved en tredje, uavhengig,
+    // fagfellevurdert kilde — en genomstudie (Ohta et al., DNA Research,
+    // se pmc.ncbi.nlm.nih.gov/articles/PMC9896470): "Ly. shimeji is known
+    // to be an ectomycorrhizal fungus associated with plants in the
+    // Fagaceae and Pinaceae families." Studien forklarer at arten beholder
+    // enkelte saprotrof-lignende metabolske egenskaper (kan bryte ned
+    // stivelse) og en genomarkitektur som ligner saprotrofe sopp — trolig
+    // derfor Artfakta klassifiserte den feil — men er utvetydig på at
+    // arten selv ER mykorrhiza-dannende, ikke saprotrof. Bekrefter det
+    // norske rødlistevurderingen antok.
+    //
+    // `gran` lagt til i treslag (var kun `furu` før fjerningen) — kilde:
+    // samme norske rødlistevurdering nevner gran som "mulig" ekstra
+    // vertstre ved siden av furu (hedget, ikke bekreftet som Artfakta-nivå
+    // sikkerhet, men eksplisitt fra en offisiell norsk vurdering — lagt
+    // til som sekundær treslag-verdi, furu er fortsatt primær).
+    //
+    // `season`/`weather` UENDRET ved gjeninnføring — kun 4 unike bekreftede
+    // Artskart-funn totalt (langt for lite til kalibrering, se
+    // værterskel-kalibreringstesten i docs/veien-videre.md som brukte
+    // n=20-47 for andre arter). Én av de fire (23. aug 2012) lå før
+    // deklarert sesong (sep-okt) — samme retning som kransmusserongs
+    // sesongfunn, men for tynt datagrunnlag til å handle på alene.
+    { id:'furuknippesopp', name:'Furuknippesopp', latin:'Lyophyllum shimeji', season:[9,10],
+      treslag:['furu','gran'], skogalder:['gammel'], fuktighet:['tørr'], berggrunn:['fattig'],
+      // Kontinentalt lavlandshabitat (sandfuru-moer på Østlandet) — i
+      // motsetning til de fleste andre artene her er høydebegrensningen godt
+      // nok dokumentert til å tallfestes (se elevationScore/scoreLocation).
+      hoydeMoh:{ ideal:400, max:600 },
+      weather:{ minNedbor14:15, idealNedbor14:30, minTempAvg:6 },
+      why:(loc,t)=>`Gammel, tørr furuskog på ${t.berggrunnTekst} sandgrunn — det sjeldne, kontinentale furumo-habitatet furuknippesopp krever.`,
+      fieldTips:'Vokser i tette knipper direkte i sandholdig skogbunn i gammel, lysåpen furuskog, ofte med reinlav og blåbærlyng i bunnsjiktet. Gråbrun, fast hatt og hvitt kjøtt med en karakteristisk, litt melaktig-nøttete lukt. Regnes som en delikatesse i Japan (der kalt "shimeji"), men er svært sjelden i Norge og finnes stort sett i kontinentale furumoer på Østlandet.',
+      lookalike:'⚠ Tilhører slekten knippesopp (Lyophyllum), som har flere likeartede sopper — vær nøye med artsbestemmelsen og bruk soppkontroll ved usikkerhet. Arten er dessuten sjelden/rødlistet i Norge: vis varsomhet og ikke tøm hele forekomsten om du finner den.',
+      image:{ url:'https://upload.wikimedia.org/wikipedia/commons/7/7b/Honshimeji.jpg', artist:'トリュフ (Toryufu)', license:'Public domain', sourcePage:'https://commons.wikimedia.org/wiki/File:Honshimeji.jpg' } },
     // Kilde: artfakta.se/taxa/6276 — STERKT BEKREFTET, matcher appens egen
     // eksisterende vurdering om at dette er den best dokumenterte arten i settet.
     //
@@ -169,6 +206,7 @@
     matriske: '#C2632A',
     piggsopp: '#CBAE82',
     faresopp: '#B7AF92',
+    furuknippesopp: '#8C8268',
     kransmusserong: '#7A4B3A'
   };
 
@@ -207,7 +245,7 @@
   // Arter som er kjent for å foretrekke varme, soleksponerte vokseplasser —
   // brukes til å gi et lite tillegg for sørvendte skråninger når vi har ekte
   // helnings-/himmelretningsdata fra et auto-hentet punkt.
-  const WARMTH_LOVING_SPECIES = new Set(['steinsopp', 'matriske', 'kransmusserong']);
+  const WARMTH_LOVING_SPECIES = new Set(['steinsopp', 'matriske', 'kransmusserong', 'furuknippesopp']);
 
   const TXT = {
     treslag: { gran:'gran', furu:'furu', bjork:'bjørk', apen:'åpen mark', ukjent:'ukjent treslag' },
@@ -3237,6 +3275,7 @@
     matriske: ['Se i glisne furubestand på sandrygger, gjerne nær overgang mot myr.', 'Kantsoner mot lysåpne partier er ofte mer produktive enn tett skog.'],
     piggsopp: ['Sjekk blandingssoner der gran og bjørk møtes, samt kanter langs stier.', 'Mindre kravstor enn kantarell — gi også middels tett skog en sjanse.'],
     faresopp: ['Let direkte i bakken under gammel gran, ofte i sirkulære grupper ("hekseringer").', 'Moserik, åpen skogbunn er mer sannsynlig enn tett kratt.'],
+    furuknippesopp: ['Se spesielt i gammel, lysåpen furuskog med rikelig reinlav i bunnen — tett/mørk skog er mindre aktuelt.', 'Grav forsiktig i sandjorda ved foten av gamle furutrær; knippene kan ligge delvis skjult under strø/lav.'],
     kransmusserong: ['Let i sandholdig, gammel furuskog — kjenner du en kraftig, kanelaktig lukt fra bakken, er du nære.', 'Sjekk gjerne samme sted flere år på rad — arten kommer ofte tilbake til samme punkt om den ikke forstyrres.']
   };
   function terrainMicrotips(species, loc){

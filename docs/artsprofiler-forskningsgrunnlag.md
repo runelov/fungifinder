@@ -14,7 +14,8 @@ under — de er enten feil scoringsmodell (de to saprotrofe artene) eller har
 en omstridt trofisk klassifisering (furuknippesopp). Funnene i seksjonene
 under for disse tre står likevel som forskningsgrunnlag for en eventuell
 fremtidig gjeninnføring — se [veien-videre.md](veien-videre.md) for planen
-rundt det.
+rundt det. **Furuknippesopp er siden gjeninnført samme dag (v0.28.12) —
+se oppdateringen i seksjonen om arten under.**
 
 **Oppdatering 2026-08-18 (v0.28.8), "Del 0":** de tre konkrete avvikene
 under (trompetsopp, traktkantarell, rødskrubb) er nå implementert i
@@ -153,9 +154,21 @@ Artfakta (Sverige) merker denne økologisk som **"Saprotrof/fag, detrivor"**
 Norges egen rødlistevurdering er derimot mer forsiktig: *"antas å danne
 mykorrhiza (primært med furu, mulig også gran)"* — bruker "antas"/"mulig",
 altså reell faglig usikkerhet om trofisk modus, ikke en etablert
-saprotrof-klassifisering. **Ekte faglig uenighet/usikkerhet, ikke en klar
-feil å rette.** Interessant tilleggsfunn: Norges egen vurdering nevner
-**gran som mulig ekstra vertstre** ved siden av furu — app har kun furu.
+saprotrof-klassifisering. Interessant tilleggsfunn: Norges egen vurdering
+nevner **gran som mulig ekstra vertstre** ved siden av furu.
+
+**Oppdatering 2026-08-18, samme dag — AVKLART via en tredje kilde:** en
+genomstudie (Ohta et al., *DNA Research*, se
+[pmc.ncbi.nlm.nih.gov/articles/PMC9896470](https://pmc.ncbi.nlm.nih.gov/articles/PMC9896470))
+konkluderer utvetydig: *"Ly. shimeji is known to be an ectomycorrhizal
+fungus associated with plants in the Fagaceae and Pinaceae families."*
+Studien forklarer samtidig hvorfor Artfakta trolig klassifiserte arten
+feil: den beholder enkelte saprotrof-lignende metabolske egenskaper (kan
+bryte ned stivelse, i motsetning til de fleste mykorrhiza-sopp) og en
+genomarkitektur som ligner saprotrofe sopp, men er selv utvetydig
+mykorrhiza-dannende — bekrefter det Norges rødlistevurdering antok. Arten
+er gjeninnført i appen v0.28.12 (se CHANGELOG), med `gran` lagt til som
+sekundær treslag-verdi.
 
 ### Kransmusserong (*Tricholoma matsutake*)
 Kilde: [artfakta.se/taxa/6276](https://artfakta.se/taxa/6276)
@@ -175,7 +188,7 @@ dette er den best dokumenterte arten i settet.
 | Kantarell | USIKKER — furu i treslag ikke bekreftet, trenger 3. kilde |
 | Parasollsopp | **FJERNET fra appen** — feil scoringsmodell (saprotrof, ikke mykorrhiza) |
 | Sjampinjong | **FJERNET fra appen** — feil scoringsmodell (saprotrof, ikke mykorrhiza) |
-| Furuknippesopp | **FJERNET fra appen** — trofisk modus faglig omstridt; gran som mulig ekstra vertstre |
+| Furuknippesopp | **GJENINNFØRT (v0.28.12)** — trofisk modus avklart via 3. kilde (genomstudie); gran lagt til som sekundær treslag-verdi |
 | Steinsopp, Matriske, Piggsopp, Fåresopp, Kransmusserong | BEKREFTET — ingen endring foreslått |
 
 De tre konkrete avvikene (Trompetsopp/Traktkantarell/Rødskrubb) er

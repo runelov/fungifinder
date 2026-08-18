@@ -176,13 +176,18 @@ terrengdata-laget (se eget punkt under).
   (bygget for mykorrhiza-arter) gir ikke mening for dem. Krever en egen
   scoringsakse først — trolig "åpen mark ja/nei" + sandholdig/gressdekt
   grunn i stedet for treslag, se punktet under om `'apen'`-terrengdata.
-- **Gjeninnfør furuknippesopp** — fjernet samtidig fordi kildene er uenige
-  om trofisk modus (Artfakta/Sverige sier saprotrof, Norges egen
-  rødlistevurdering sier "antas mykorrhiza"). Bør avklares bedre (evt. en
-  tredje kilde, eller kontakt med NSNF/en norsk mykolog) før den
-  gjeninnføres. Norges rødlistevurdering nevner også `gran` som mulig
-  ekstra vertstre ved siden av furu — ta med i vurderingen om/når den
-  kommer tilbake.
+- ~~**Gjeninnfør furuknippesopp**~~ — **gjort 2026-08-18 (v0.28.12), se
+  CHANGELOG.** Trofisk modus avklart samme dag av en tredje, uavhengig,
+  fagfellevurdert kilde (genomstudie, Ohta et al. i *DNA Research*):
+  arten ER ektomykorrhiza-dannende, ikke saprotrof — bekrefter det Norges
+  rødlistevurdering antok, forklarer trolig hvorfor Artfakta klassifiserte
+  den feil (beholder saprotrof-lignende metabolske trekk uten å faktisk
+  være saprotrof). Lagt tilbake i `SPECIES` (+ `SPECIES_HUE`/
+  `WARMTH_LOVING_SPECIES`/`BASE_MICROTIPS`) og `fetch_area.py`s
+  `SPECIES_TAXON_ID`, med `gran` lagt til som sekundær treslag-verdi ved
+  siden av `furu` (kilde: rødlistevurderingens "mulig ekstra vertstre").
+  `season`/`weather` UENDRET — kun 4 unike bekreftede Artskart-funn totalt,
+  for lite til kalibrering.
 - **Ekte "åpen mark"-deteksjon i terrengdata-laget** — NIBIO SR16 (et
   skogressurskart) kan aldri produsere en `'apen'`-verdi for `treslag`/
   `skogalder`, uansett hvor åpent et sted faktisk er (se

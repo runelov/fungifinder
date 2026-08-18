@@ -1,5 +1,39 @@
 # Endringslogg
 
+## 0.28.12 — Gjeninnfør furuknippesopp (trofisk modus avklart)
+Furuknippesopp (*Lyophyllum shimeji*) ble fjernet i v0.28.7 (2026-08-18,
+samme dag) pga. reell faglig uenighet om trofisk modus mellom kildene:
+Artfakta (Sverige) sa saprotrof, Norges egen rødlistevurdering 2021 sa
+hedget "antas å danne mykorrhiza". `docs/veien-videre.md` satte som
+betingelse for gjeninnføring at dette ble avklart av en tredje kilde.
+
+Fant en tredje, uavhengig, fagfellevurdert kilde samme dag: en genomstudie
+(Ohta et al., *DNA Research*, se pmc.ncbi.nlm.nih.gov/articles/PMC9896470)
+konkluderer utvetydig at arten ER ektomykorrhiza-dannende — den beholder
+enkelte saprotrof-lignende metabolske egenskaper (kan bryte ned stivelse)
+og en genomarkitektur som ligner saprotrofe sopp, trolig derfor Artfakta
+klassifiserte den feil, men trofisk modus selv er avklart. Bekrefter det
+den norske rødlistevurderingen antok.
+
+- Lagt tilbake i `SPECIES`, `SPECIES_HUE`, `WARMTH_LOVING_SPECIES` og
+  `BASE_MICROTIPS` i `js/app.js`, med samme profil som før fjerningen
+  (treslag/skogalder/fuktighet/berggrunn/hoydeMoh/weather/fieldTips/
+  lookalike/image), pluss én endring: `gran` lagt til i `treslag` ved
+  siden av `furu` — kilde: den norske rødlistevurderingen nevner gran som
+  "mulig" ekstra vertstre (hedget, men fra en offisiell vurdering).
+- `season`/`weather` UENDRET — kun 4 unike bekreftede Artskart-funn
+  totalt, langt for lite til kalibrering (til sammenligning brukte
+  værterskel-kalibreringstesten n=20-47 for andre arter). Én av de fire
+  (23. aug 2012) lå før deklarert sesong, samme retning som
+  kransmusserongs sesongfunn (se v0.28.10) — for tynt datagrunnlag til å
+  handle på alene, notert i kildekommentaren for senere.
+- Lagt tilbake i `fetch_area.py`s `SPECIES_TAXON_ID` (fungifinder-db) —
+  taxon-IDen var beholdt i en kommentar fra opprydningen i v41 nettopp for
+  denne anledningen.
+
+Verifisert: node --check + py_compile (syntax), live i nettleser — alle
+10 arter i velgeren igjen, ingen nye konsollfeil.
+
 ## 0.28.11 — Senket minNedbor14 for matriske og traktkantarell
 Oppfølging av værterskel-kalibreringstesten, de to artene med høyest
 "for tørt"-andel i den forrige runden testet på nytt med full/større
