@@ -1,5 +1,27 @@
 # Endringslogg
 
+## 0.28.4 — "Hvorfor her?"-kortet fremhever nå faktiske vekstvilkår
+Brukertilbakemelding: kortet var fint, men fremhevet feil ting — avstand
+til vei og befolkningsnærhet er ADKOMST/RO, ikke noe soppen selv bryr seg
+om, mens fuktighet og berggrunn (nest og tredje tyngst i selve
+scoreLocation()s vektbudsjett, 15 og 10 poeng) manglet fra kortet helt.
+
+- `whyHereFactors()` viser nå terrenget i budsjettrekkefølge: **treslag,
+  fuktighet, berggrunn, skogalder, sesong**, og — kun for arter som
+  faktisk har en definert preferanse — **høyde over havet**
+  (`species.hoydeMoh`) og **sørvendt skråning** (varmekrevende arter,
+  samme `WARMTH_LOVING_SPECIES`-sett som selve scoringen bruker). Kjente
+  Artskart-funn < 1,5 km beholdt sist — ikke et vekstvilkår i seg selv,
+  men reell observasjonsevidens.
+- **Avstand til vei og befolkningsnærhet fjernet fra kortet** — begge
+  vises fortsatt tydelig andre steder på kortet (parkering/sti-boksen,
+  og befolkningstaggen blant sp-tags), bare ikke lenger under en
+  overskrift som antydet at de forklarer vekst.
+
+Verifisert live lokalt (wrangler dev + ekte innlogging): alle fem
+felt/betingede felt rendrer riktig verdi og stolpe per sted, ingen
+konsollfeil.
+
 ## 0.28.3 — Rettet: resultatlisten forsvant helt (ReferenceError etter v0.28.2)
 Brukerrapport: kun kartvisning synlig, ingenting under "Forslag for
 <soppnavn>", og en `Uncaught ReferenceError: coverageCount is not defined`

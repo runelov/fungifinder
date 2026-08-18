@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.28.3';
+  const APP_VERSION = '0.28.4';
   const APP_BUILD_DATE = '2026-08-18';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -4162,35 +4162,61 @@
   //
   // Del 1.4 i "Voksestedslaget"-planen (fig. 3): ren UI-eksponering av felt
   // scoreLocation() allerede har lest inn/beregnet et stykke på veien —
-  // avstandVeiM, treslag/skogalder-matchen fra attrScore(), befolkning, og
-  // kjenteFunnDetaljer. Prosentene under styrer KUN stolpelengden i UI-en;
-  // de er ikke koblet til scoreLocation()s faktiske vektbudsjett og
-  // påvirker ikke selve scoren.
+  // attrScore()-matchene for treslag/fuktighet/berggrunn/skogalder,
+  // sesong, høyde, sørvendt skråning, og kjenteFunnDetaljer. Prosentene
+  // under styrer KUN stolpelengden i UI-en; de er ikke koblet til
+  // scoreLocation()s faktiske vektbudsjett og påvirker ikke selve scoren.
+  //
+  // RETTET 2026-08-18 (bruker påpekte at kortet fremhevet feil ting — vei-
+  // avstand og befolkningsnærhet er ADKOMST/RO, ikke noe soppen faktisk
+  // bryr seg om, mens fuktighet og berggrunn — hhv. NEST tyngst og tredje
+  // tyngst i selve vektbudsjettet (15 og 10 poeng, se kommentaren over
+  // scoreLocation()) — manglet fra kortet HELT. Byttet ut med de faktiske
+  // vekstvilkårene i budsjettrekkefølge: treslag, fuktighet, berggrunn,
+  // skogalder, sesong, og (kun når arten faktisk har en definert
+  // preferanse) høyde/sørvendt skråning. Avstand til vei og
+  // befolkningsnærhet er IKKE fjernet fra appen — begge vises fortsatt
+  // tydelig lenger ned på kortet (sp-access-box og sp-tags), bare ikke
+  // lenger under overskriften "hvorfor her" der de ga inntrykk av å være
+  // vekstforklarende. Kjente funn beholdt sist — ikke et vekstvilkår i
+  // seg selv, men reell observasjonsevidens, verdt å vise etter terrenget.
   function whyHereFactors(species, loc){
     const t = locTexts(loc);
     const factors = [];
 
-    if (loc.avstandVeiM != null) {
-      const v = loc.avstandVeiM;
-      let pct;
-      if (v < 100) pct = 40 + (v / 100) * 20;
-      else if (v <= 800) pct = 60 + Math.min(30, (v - 100) / 700 * 30);
-      else pct = Math.max(15, 90 - (v - 800) / 50);
-      factors.push({ label: 'Avstand til vei', valueText: `${Math.round(v)} m`, pct: Math.round(Math.max(5, Math.min(95, pct))) });
-    } else {
-      factors.push({ label: 'Avstand til vei', valueText: 'ukjent', pct: null });
+    // ok===true/false/null (ukjent) fra attrScore() → stolpe høy/lav/ukjent.
+    // Samme 85/25-spredning for alle fire — bevisst IKKE gradert etter
+    // maxPoints (20 vs 10 osv.), siden dette kortet viser MATCH, ikke selve
+    // poengvekten (den er allerede synlig indirekte via rekkefølgen).
+    function attrFactor(label, valueText, r){
+      factors.push({ label, valueText, pct: r.ok === null ? null : (r.ok ? 85 : 25) });
     }
 
-    const treslagOk = attrScore(loc.treslag, species.treslag, 20).ok;
-    const alderOk = attrScore(loc.skogalder, species.skogalder, 10).ok;
-    const matches = [treslagOk, alderOk].filter(x => x === true).length;
-    const unknowns = [treslagOk, alderOk].filter(x => x === null).length;
-    const pctForest = matches === 2 ? 90 : matches === 1 ? 60 : unknowns > 0 ? 40 : 20;
-    factors.push({ label: 'Skogtype & alder', valueText: `${t.treslagTekst}, ${t.alderTekst}`, pct: pctForest });
+    attrFactor('Treslag', t.treslagTekst, attrScore(loc.treslag, species.treslag, 20));
+    attrFactor('Fuktighet', `${t.fuktighetTekst} mark${loc.fuktighetIndex!=null ? ' (målt)' : ''}`, attrScore(loc.fuktighet, species.fuktighet, 15));
+    attrFactor('Berggrunn', t.berggrunnTekst, attrScore(loc.berggrunn, species.berggrunn, 10));
+    attrFactor('Skogalder', t.alderTekst, attrScore(loc.skogalder, species.skogalder, 10));
 
-    const befMap = { lav: { pct: 82, text: 'Lav' }, middels: { pct: 48, text: 'Middels' }, hoy: { pct: 18, text: 'Høy' } };
-    const bef = befMap[loc.befolkning] || { pct: null, text: 'Ukjent' };
-    factors.push({ label: 'Befolkningsnærhet', valueText: bef.text, pct: bef.pct });
+    const inSeason = monthNow >= species.season[0] && monthNow <= species.season[1];
+    factors.push({ label: 'Sesong', valueText: inSeason ? 'i sesong nå' : 'utenfor typisk sesong', pct: inSeason ? 85 : 25 });
+
+    // Kun vist når arten faktisk har en tallfestet høydepreferanse (se
+    // elevationScore()) — de fleste arter mangler denne bevisst (for dårlig
+    // dokumentert høydespenn til å tallfeste), og da sier en stolpe ingenting.
+    if (species.hoydeMoh && loc.hoydeMoh != null) {
+      const { ideal, max } = species.hoydeMoh;
+      const pct = loc.hoydeMoh <= ideal ? 85 : loc.hoydeMoh <= max ? 55 : 20;
+      factors.push({ label: 'Høyde over havet', valueText: `${Math.round(loc.hoydeMoh)} moh`, pct });
+    }
+
+    // Kun relevant for varmekrevende arter (samme WARMTH_LOVING_SPECIES-sett
+    // som scoreLocation() bruker for +4-bonusen) — for andre arter er
+    // himmelretning ikke noe scoren bryr seg om, så en stolpe ville vært støy.
+    if (WARMTH_LOVING_SPECIES.has(species.id) && loc.himmelretning && loc.helningGrader != null) {
+      const sorvendt = ['S','SØ','SV'].includes(loc.himmelretning);
+      const passeHelning = loc.helningGrader >= 3 && loc.helningGrader <= 25;
+      factors.push({ label: 'Sørvendt skråning', valueText: `${loc.helningGrader}°, ${loc.himmelretning}-vendt`, pct: (sorvendt && passeHelning) ? 85 : 35 });
+    }
 
     const funn = (loc.kjenteFunnDetaljer || []).filter(f => f.art === species.id && f.avstandM < 1500);
     const pctFunn = funn.length === 0 ? 12 : Math.min(90, 30 + funn.length * 15);
