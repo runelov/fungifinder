@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.28.5';
+  const APP_VERSION = '0.28.6';
   const APP_BUILD_DATE = '2026-08-18';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -4193,16 +4193,24 @@
   // lenger under overskriften "hvorfor her" der de ga inntrykk av å være
   // vekstforklarende. Kjente funn beholdt sist — ikke et vekstvilkår i
   // seg selv, men reell observasjonsevidens, verdt å vise etter terrenget.
+  // RETTET 2026-08-18 (bruker påpekte at stolper er et rart valg for
+  // binære/kategoriske verdier — en stolpelengde signaliserer konvensjonelt
+  // en gradert størrelse, mens f.eks. Treslag bare er treff/ikke treff/
+  // ukjent, ingen mellomting en 85%-vs-25%-lengde faktisk representerer).
+  // Faktorer med et diskret, ordnet antall tilstander (2 eller 3) bruker nå
+  // `state` og rendres som et lite ikon+farge-merke i stedet for en stolpe.
+  // Kun Kjente funn beholder `pct`/stolpe — det er det ene feltet som
+  // faktisk ER en kontinuerlig, gradert måling (antall funn).
   function whyHereFactors(species, loc){
     const t = locTexts(loc);
     const factors = [];
 
-    // ok===true/false/null (ukjent) fra attrScore() → stolpe høy/lav/ukjent.
-    // Samme 85/25-spredning for alle fire — bevisst IKKE gradert etter
-    // maxPoints (20 vs 10 osv.), siden dette kortet viser MATCH, ikke selve
-    // poengvekten (den er allerede synlig indirekte via rekkefølgen).
+    // ok===true/false/null (ukjent) fra attrScore() → god/dårlig/ukjent.
+    // Samme to-tilstands-vurdering for alle fire — bevisst IKKE gradert
+    // etter maxPoints (20 vs 10 osv.), siden dette kortet viser MATCH, ikke
+    // selve poengvekten (den er allerede synlig indirekte via rekkefølgen).
     function attrFactor(label, valueText, r){
-      factors.push({ label, valueText, pct: r.ok === null ? null : (r.ok ? 85 : 25) });
+      factors.push({ label, valueText, state: r.ok === null ? 'unknown' : (r.ok ? 'good' : 'bad') });
     }
 
     attrFactor('Treslag', t.treslagTekst, attrScore(loc.treslag, species.treslag, 20));
@@ -4211,36 +4219,41 @@
     attrFactor('Skogalder', t.alderTekst, attrScore(loc.skogalder, species.skogalder, 10));
 
     const inSeason = monthNow >= species.season[0] && monthNow <= species.season[1];
-    factors.push({ label: 'Sesong', valueText: inSeason ? 'i sesong nå' : 'utenfor typisk sesong', pct: inSeason ? 85 : 25 });
+    factors.push({ label: 'Sesong', valueText: inSeason ? 'i sesong nå' : 'utenfor typisk sesong', state: inSeason ? 'good' : 'bad' });
 
     // Kun vist når arten faktisk har en tallfestet høydepreferanse (se
     // elevationScore()) — de fleste arter mangler denne bevisst (for dårlig
-    // dokumentert høydespenn til å tallfeste), og da sier en stolpe ingenting.
+    // dokumentert høydespenn til å tallfeste), og da sier et merke ingenting.
+    // Tre ordnede tilstander (ideell/innenfor/for høyt), derfor 'mid' i tillegg
+    // til good/bad.
     if (species.hoydeMoh && loc.hoydeMoh != null) {
       const { ideal, max } = species.hoydeMoh;
-      const pct = loc.hoydeMoh <= ideal ? 85 : loc.hoydeMoh <= max ? 55 : 20;
-      factors.push({ label: 'Høyde over havet', valueText: `${Math.round(loc.hoydeMoh)} moh`, pct });
+      const state = loc.hoydeMoh <= ideal ? 'good' : loc.hoydeMoh <= max ? 'mid' : 'bad';
+      factors.push({ label: 'Høyde over havet', valueText: `${Math.round(loc.hoydeMoh)} moh`, state });
     }
 
     // Kun relevant for varmekrevende arter (samme WARMTH_LOVING_SPECIES-sett
     // som scoreLocation() bruker for +4-bonusen) — for andre arter er
-    // himmelretning ikke noe scoren bryr seg om, så en stolpe ville vært støy.
+    // himmelretning ikke noe scoren bryr seg om, så et merke ville vært støy.
     if (WARMTH_LOVING_SPECIES.has(species.id) && loc.himmelretning && loc.helningGrader != null) {
       const sorvendt = ['S','SØ','SV'].includes(loc.himmelretning);
       const passeHelning = loc.helningGrader >= 3 && loc.helningGrader <= 25;
-      factors.push({ label: 'Sørvendt skråning', valueText: `${loc.helningGrader}°, ${loc.himmelretning}-vendt`, pct: (sorvendt && passeHelning) ? 85 : 35 });
+      factors.push({ label: 'Sørvendt skråning', valueText: `${loc.helningGrader}°, ${loc.himmelretning}-vendt`, state: (sorvendt && passeHelning) ? 'good' : 'bad' });
     }
 
     // Samme 500 m-terskel som scoreLocation()s tetthetsbonus nå bruker (se
     // RETTET 2026-08-18 der) — bevisst IKKE ETL-ens videre 1,5 km-
     // koblingsradius, som er et urealistisk stort "søkeområde" å vise fram
-    // som "kjent funnsted".
+    // som "kjent funnsted". Eneste faktor som beholder pct/stolpe — dette
+    // er en reell kontinuerlig telling, ikke en tilstand.
     const funn = (loc.kjenteFunnDetaljer || []).filter(f => f.art === species.id && f.avstandM < 500);
     const pctFunn = funn.length === 0 ? 12 : Math.min(90, 30 + funn.length * 15);
     factors.push({ label: 'Kjente funn < 500 m', valueText: funn.length ? `${funn.length} stk` : 'ingen kjente', pct: pctFunn });
 
     return factors;
   }
+
+  const WHY_STATE_ICON = { good: '✓', mid: '~', bad: '✗', unknown: '?' };
 
   function matchTier(score){
     if (score >= 75) return { cls: 'high', label: 'Meget god match' };
@@ -4258,12 +4271,15 @@
           <span class="sp-why-here-label">Hvorfor her?</span>
           <span class="sp-why-badge sp-why-badge-${tier.cls}">${tier.label}</span>
         </div>
-        ${factors.map(f => `
+        ${factors.map(f => f.state ? `
+          <div class="sp-why-factor sp-why-factor-state">
+            <span class="sp-why-state-icon sp-why-state-${f.state}" aria-hidden="true">${WHY_STATE_ICON[f.state]}</span>
+            <span class="sp-why-factor-label">${escapeHtml(f.label)}</span>
+            <span class="sp-why-factor-value">${escapeHtml(f.valueText)}</span>
+          </div>` : `
           <div class="sp-why-factor">
             <div class="sp-why-factor-row"><span>${escapeHtml(f.label)}</span><span>${escapeHtml(f.valueText)}</span></div>
-            <div class="sp-why-factor-track">${f.pct != null
-              ? `<div class="sp-why-factor-fill" style="width:${f.pct}%"></div>`
-              : `<div class="sp-why-factor-fill sp-why-unknown"></div>`}</div>
+            <div class="sp-why-factor-track"><div class="sp-why-factor-fill" style="width:${f.pct}%"></div></div>
           </div>`).join('')}
       </div>`;
   }

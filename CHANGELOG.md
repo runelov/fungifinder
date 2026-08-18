@@ -1,5 +1,28 @@
 # Endringslogg
 
+## 0.28.6 — "Hvorfor her?"-faktorene bruker ikon/merke i stedet for stolpe der de er binære
+Brukerobservasjon: fem av de seks (nå syv, med Sørvendt skråning/Høyde over
+havet) faktorene på "Hvorfor her?"-kortet er egentlig bare treff/ikke treff/
+ukjent (evt. tre ordnede nivåer for Høyde over havet), men ble vist med en
+stolpelengde — noe som konvensjonelt signaliserer en gradert størrelse.
+En 85%-stolpe ser ut som "nesten perfekt, 15% å gå på", når det i
+virkeligheten ikke finnes noe mellomnivå: enten passer treslaget eller det
+gjør det ikke.
+
+`whyHereFactors()` (js/app.js) gir nå diskrete faktorer et `state`
+('good'/'mid'/'bad'/'unknown') i stedet for `pct`, rendret som et lite
+farget ikon-merke (✓/~/✗/?) foran etiketten fremfor en stolpe. Gjelder
+Treslag, Fuktighet, Berggrunn, Skogalder, Sesong, Sørvendt skråning (alle
+binære) og Høyde over havet (tre ordnede nivåer: ideell/innenfor/for høyt).
+Kjente funn < 500 m er den ENESTE faktoren som beholder stolpen — det er
+det ene feltet som faktisk er en kontinuerlig, gradert telling (antall
+funn), ikke en tilstand.
+
+Verifisert visuelt lokalt (midlertidig testside mot den ekte css/styles.css,
+alle fire ikon-tilstander + den gjenværende stolpen) — inkludert en liten
+justering underveis: bar-radens etikett fikk egen venstremarg (23px) for å
+linje opp visuelt med etikettene på ikon-radene over/under den.
+
 ## 0.28.5 — Strammet "kjente funn i nærheten" fra 1,5 km til 500 m
 Oppfølger til v0.28.4. Brukerspørsmål: er 1,5 km (~7 km²) ikke et
 urealistisk stort område å kalle "kjent funnsted" — det er mye jobb å lete
