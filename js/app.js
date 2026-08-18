@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.28.8';
+  const APP_VERSION = '0.28.9';
   const APP_BUILD_DATE = '2026-08-18';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -2483,12 +2483,53 @@
   // — resten forekommer over et for bredt/dårlig dokumentert høydespenn til
   // at en tallfestet grense ville vært noe annet enn gjetning. Nøytral (0)
   // når arten ikke har en satt preferanse, eller stedet mangler høydedata.
+  //
+  // RETTET 2026-08-18 (se docs/veien-videre.md, "Voksestedslag-finkorning"):
+  // var tidligere en TRINNVIS funksjon (≤ideal→5, ≤max→2, ellers flatt -5)
+  // — et sted rett under `max` og et sted rett over fikk et hardt sprang på
+  // 7 poeng selv om høydeforskjellen kunne være under 1 m. Samme to
+  // kildebelagte grensepunkter (ideal/max) brukes fortsatt, kun glidende
+  // interpolert i stedet for trinn — ingen ny data, ingen nye tallfestede
+  // grenser. Lineær helning fra +5 (ved ideal) til +2 (ved max) fortsetter
+  // så med samme stigningstall forbi max, klippet ved -5 (samme bunnverdi
+  // som før).
   function elevationScore(species, loc){
     if (!species.hoydeMoh || loc.hoydeMoh == null) return 0;
     const { ideal, max } = species.hoydeMoh;
-    if (loc.hoydeMoh <= ideal) return 5;
-    if (loc.hoydeMoh <= max) return 2;
-    return -5;
+    const h = loc.hoydeMoh;
+    if (h <= ideal) return 5;
+    const span = max - ideal;
+    const t = (h - ideal) / span;
+    return Math.max(-5, 5 - 3 * t);
+  }
+
+  // Kontinuerlig vekt (0-1) for hvor "sørvendt + passe bratt" et punkt er,
+  // brukt av både selve scoringen (scoreLocation) og "Hvorfor her?"-kortet
+  // — én kilde til sannhet i stedet for at de to stedene kan gå ut av synk.
+  //
+  // RETTET 2026-08-18 (se docs/veien-videre.md, "Voksestedslag-finkorning"):
+  // erstatter en binær AND av to ja/nei-sjekker (himmelretning i {S,SØ,SV}
+  // OG helning 3-25°) med en glidende vekt. `himmelretning` er allerede
+  // lagret som én av 8 diskrete kompassretninger (se compute_slope_aspect()
+  // i fetch_area.py) — ingen rådata i grader å interpolere fra uten en egen
+  // ETL-endring — så S/SØ/SV vektes ulikt (S er sentrum av det varme
+  // vinduet, SØ/SV skrår 45° ut mot kantene) ut fra ren solgeometri, ikke en
+  // ny artsspesifikk påstand. `helningGrader` ER derimot allerede en
+  // kontinuerlig måling: samme 3-25°-grense som før, men med en myk 3°-
+  // skulder på hver side i stedet for et hardt sprang midt i et reelt
+  // kontinuerlig tall (f.eks. 2,9° fikk før 0, mens 3,0° fikk fullt utslag).
+  function sorvendtVekt(loc){
+    if (!loc.himmelretning || loc.helningGrader == null) return 0;
+    const aspectWeight = { S: 1, SØ: 0.7, SV: 0.7 }[loc.himmelretning] || 0;
+    if (aspectWeight === 0) return 0;
+    const lo = 3, hi = 25, soft = 3;
+    const d = loc.helningGrader;
+    let slopeWeight;
+    if (d >= lo && d <= hi) slopeWeight = 1;
+    else if (d > lo - soft && d < lo) slopeWeight = (d - (lo - soft)) / soft;
+    else if (d > hi && d < hi + soft) slopeWeight = 1 - (d - hi) / soft;
+    else slopeWeight = 0;
+    return aspectWeight * slopeWeight;
   }
 
   // ---------------------------------------------------------------------
@@ -2647,10 +2688,9 @@
     total += acc.pts; breakdown.push(['Adkomst (parkeringsavstand/stier)', acc.pts]);
 
     if (WARMTH_LOVING_SPECIES.has(species.id) && loc.himmelretning && loc.helningGrader != null) {
-      const sorvendt = ['S','SØ','SV'].includes(loc.himmelretning);
-      const passeHelning = loc.helningGrader >= 3 && loc.helningGrader <= 25;
-      if (sorvendt && passeHelning) {
-        total += 4; breakdown.push(['Sørvendt skråning (varmekrevende art)', 4]);
+      const varmeBonus = Math.round(4 * sorvendtVekt(loc));
+      if (varmeBonus > 0) {
+        total += varmeBonus; breakdown.push(['Sørvendt skråning (varmekrevende art)', varmeBonus]);
       }
     }
 
@@ -4230,9 +4270,13 @@
     // som scoreLocation() bruker for +4-bonusen) — for andre arter er
     // himmelretning ikke noe scoren bryr seg om, så et merke ville vært støy.
     if (WARMTH_LOVING_SPECIES.has(species.id) && loc.himmelretning && loc.helningGrader != null) {
-      const sorvendt = ['S','SØ','SV'].includes(loc.himmelretning);
-      const passeHelning = loc.helningGrader >= 3 && loc.helningGrader <= 25;
-      factors.push({ label: 'Sørvendt skråning', valueText: `${loc.helningGrader}°, ${loc.himmelretning}-vendt`, state: (sorvendt && passeHelning) ? 'good' : 'bad' });
+      // Samme glidende vekt (sorvendtVekt()) som selve +4-bonusen i
+      // scoreLocation() — se den for begrunnelse. Terskel-mappet til
+      // kortets tre visningstilstander (good/mid/bad), som fortsatt er
+      // diskrete av UI-grunner selv om selve vekten er kontinuerlig.
+      const vekt = sorvendtVekt(loc);
+      const state = vekt >= 0.85 ? 'good' : vekt > 0 ? 'mid' : 'bad';
+      factors.push({ label: 'Sørvendt skråning', valueText: `${loc.helningGrader}°, ${loc.himmelretning}-vendt`, state });
     }
 
     // Samme 500 m-terskel som scoreLocation()s tetthetsbonus nå bruker (se

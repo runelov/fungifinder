@@ -1,5 +1,35 @@
 # Endringslogg
 
+## 0.28.9 — Kontinuerlig høyde-/helningsscoring (Voksestedslag-finkorning)
+Implementerer forslaget fra `docs/veien-videre.md` om å gjøre
+høyde-/sørvendt-skråning-scoringen glidende i stedet for trinnvis — ingen
+ny data, kun samme kildebelagte grensepunkter interpolert i stedet for
+hardt sprang. Gjelder kun artene som allerede har en satt preferanse
+(`species.hoydeMoh` / `WARMTH_LOVING_SPECIES`), ikke utvidet til flere
+arter uten kilde.
+
+- **`elevationScore()`**: var en trinnfunksjon (≤ideal→+5, ≤max→+2, ellers
+  flatt -5) — et sted rett under `max` og et sted rett over kunne få et
+  sprang på 7 poeng for under 1 m høydeforskjell. Nå lineær interpolasjon
+  mellom de samme to grensepunktene (ideal→+5, max→+2), fortsetter med
+  samme stigningstall forbi `max`, klippet ved samme bunnverdi -5.
+- **Sørvendt skråning-bonusen** (varmekrevende arter): var en binær AND av
+  himmelretning ∈ {S,SØ,SV} og helning 3-25° (alt-eller-ingenting, +4).
+  Ny delt funksjon `sorvendtVekt()` (brukt av både scoreLocation() og
+  "Hvorfor her?"-kortet) gir S full vekt og SØ/SV 0,7× (ren solgeometri —
+  himmelretning er allerede diskretisert til 8 kompassretninger i
+  `fetch_area.py`, ingen rådata i grader tilgjengelig), og en myk 3°-skulder
+  på hver side av 3-25°-vinduet i stedet for et hardt sprang midt i et reelt
+  kontinuerlig tall (helningGrader). "Hvorfor her?"-kortet viser nå også en
+  ekte "mid"-tilstand (delvis sørvendt) i stedet for kun god/dårlig.
+
+Verifisert: node --check (syntax), separat aritmetikk-sjekk av begge
+formlene mot en rekke representative verdier (grenseverdier, midtpunkt,
+ekstremer) — bekrefter samme verdi som før nøyaktig ved de gamle
+grensepunktene (ideal/max, 3°/25°) og glidende overgang der det tidligere
+var et hardt sprang. Live i nettleser mot lokal static server: ingen nye
+konsollfeil, artspanelene rendrer som før.
+
 ## 0.28.8 — Del 0: tre kildebelagte artsprofil-rettelser
 Implementerer "Del 0" fra `docs/veien-videre.md` — de tre funnene fra
 artsprofil-gjennomgangen (`docs/artsprofiler-forskningsgrunnlag.md`) som

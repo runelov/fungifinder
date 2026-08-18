@@ -119,29 +119,23 @@ terrengdata-laget (se eget punkt under).
   er splittet til ett kall per art nettopp pga. timeout) for arter ingen
   ser i appen lenger. De tre linjene er fjernet fra dict'en (taxon-IDene
   beholdt i en kommentar for enkel gjeninnføring senere).
-- **Gjør høyde-/helningsscoring kontinuerlig i stedet for trinnvis (billig
-  Voksestedslag-finkorning)** — bruker sammenlignet Voksestedslaget
-  (fargelaget) mot bärher.no 2026-08-18 og observerte at bärher gir langt
-  mer presise fargevariasjoner, bl.a. langs høydekurver. Kildesjekk: den
-  store gevinsten der er trolig tetthet (bärher: kontinuerlig 16 m
-  raster nasjonalt vs. fungifinders spredte 0,5 km-punkter) — allerede
+- ~~**Gjør høyde-/helningsscoring kontinuerlig i stedet for trinnvis**~~ —
+  **gjort 2026-08-18 (v0.28.9), se CHANGELOG.** Bruker sammenlignet
+  Voksestedslaget (fargelaget) mot bärher.no og observerte at bärher gir
+  langt mer presise fargevariasjoner, bl.a. langs høydekurver. Kildesjekk
+  den gang: den store gevinsten der er trolig tetthet (bärher: kontinuerlig
+  16 m raster nasjonalt vs. fungifinders spredte 0,5 km-punkter) — fortsatt
   riktig identifisert som Del 3 i Voksestedslaget-planen (bulk
   SR16R/DTM/berggrunn/markfuktighet), fortsatt riktig prioritert som den
-  store, senere investeringen. MEN: `helningGrader`/`himmelretning`
-  regnes allerede ut per punkt fra 4 nabopunkter **70 m unna**
-  (`compute_slope_aspect()` i `fetch_area.py`) — reell, lokal terrengform,
-  ikke interpolert fra det grove rutenettet, i motsetning til
-  treslag/berggrunn (polygonlag, ofte ensartet over hundrevis av meter).
-  Denne dataen brukes i dag kun som en FLAT, binær bonus (+4/0, kun for
-  `WARMTH_LOVING_SPECIES` — 3 av 9 arter) i `scoreLocation()`, og
-  `hoydeMoh` scores kun for 1 av 9 arter (kransmusserong) med en 2-trinns
-  terskel i stedet for en glidende kurve. Å gjøre disse tersklene
-  kontinuerlige (for de artene som allerede har en kildebelagt
-  høyde-/varmepreferanse — IKKE utvide til flere arter uten kilde, samme
-  prinsipp som artsprofil-gjennomgangen selv fulgte) krever ingen ny data
-  og ingen nye nettverkskall — en liten kvalitetsheving av hvert
-  eksisterende punkts fargepresisjon mens Del 3 (tetthet) venter. Erstatter
-  ikke tetthetsinvesteringen, men er en gratis mellomting.
+  store, senere investeringen; dette punktet var kun en billig mellomting,
+  ikke en erstatning. `elevationScore()` er nå en lineær interpolasjon
+  mellom de samme kildebelagte grensepunktene (ideal/max) i stedet for et
+  hardt sprang, og sørvendt-skråning-bonusen (`sorvendtVekt()`, delt mellom
+  scoreLocation() og "Hvorfor her?"-kortet) gir nå S full vekt og SØ/SV
+  0,7×, med en myk 3°-skulder på hver side av det samme 3-25°-vinduet som
+  før — ingen ny data, ingen nye tallfestede grenser, ikke utvidet til
+  flere arter enn de som allerede hadde en kildebelagt preferanse
+  (`WARMTH_LOVING_SPECIES`/`species.hoydeMoh`).
 - **OSM `natural`/`landuse`-tags som billig `apen`-proxy** — planen under
   peker på AR5 som eneste vei til ekte "åpen mark"-deteksjon, men
   `fetch_area_features_in_bbox()` gjør allerede ett batched Overpass-kall
