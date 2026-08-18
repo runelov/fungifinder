@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.28.12';
+  const APP_VERSION = '0.28.13';
   const APP_BUILD_DATE = '2026-08-18';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -4083,7 +4083,7 @@
 
   async function suggestAreas(){
     if (!personalFeaturesEnabled()) {
-      alert('Logg inn under ⚙ Preferanser & Config → Konto for å foreslå områder.');
+      alert('Logg inn under ⚙ Preferanser & Konto → Konto for å foreslå områder.');
       return;
     }
     const summary = document.getElementById('sp-route-summary');
@@ -4944,7 +4944,7 @@
   function openFindModal(locId, opts){
     opts = opts || {};
     if (!personalFeaturesEnabled()) {
-      alert('Logg inn under ⚙ Preferanser & Config → Konto for å registrere funn.');
+      alert('Logg inn under ⚙ Preferanser & Konto → Konto for å registrere funn.');
       return;
     }
     const editingFind = opts.editingFind || null;
@@ -5172,7 +5172,7 @@
     addBtn.style.display = enabled ? '' : 'none';
     hogstBtn.style.display = enabled ? '' : 'none';
     if (!enabled) {
-      el.innerHTML = `<div class="sp-empty-mine">Logg inn under ⚙ Preferanser &amp; Config → Konto for å registrere funn og hogstfelt.</div>`;
+      el.innerHTML = `<div class="sp-empty-mine">Logg inn under ⚙ Preferanser &amp; Konto → Konto for å registrere funn og hogstfelt.</div>`;
       return;
     }
     if (!userFinds.length) { el.innerHTML = `<div class="sp-empty-mine">Ingen funn registrert ennå.</div>`; return; }

@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.28.12"/>
+<link rel="stylesheet" href="css/styles.css?v=0.28.13"/>
 </head>
 <body>
 
@@ -60,7 +60,7 @@
       De blå prikkene i kartet er ekte, verifiserte artsobservasjoner fra Artsdatabanken sin Artskart-database
       — dine egne funn vises med en annen farge. Artsobservasjoner vises først når du har valgt et mindre
       kartutsnitt. Værdata hentes <b>live</b>. Dine personlige data (funn, hogst-merker, egne steder) lagres
-      på din innloggede konto — logg inn under ⚙ Preferanser &amp; Config → Konto.
+      på din innloggede konto — logg inn under ⚙ Preferanser &amp; Konto → Konto.
       </div>
     </details>
 
@@ -79,7 +79,7 @@
     </details>
 
     <details class="sp-collapsible sp-preferences sp-tabbed-panel" id="sp-preferences">
-      <summary><b>⚙ Preferanser &amp; Config</b> <span class="sp-collapse-hint">(klikk for å skjule/vise)</span></summary>
+      <summary><b>⚙ Preferanser &amp; Konto</b> <span class="sp-collapse-hint">(klikk for å skjule/vise)</span></summary>
       <div class="sp-collapsible-body">
         <div class="sp-tab-bar" id="sp-tab-bar">
           <button class="sp-tab-btn active" data-tab="preferences">Preferanser</button>
@@ -290,7 +290,7 @@
             <div id="sp-route-summary" style="display:none;"></div>
           </div>
           <div id="sp-route-disabled-note" style="display:none;font-size:var(--fs-sm);color:var(--ink-soft);">
-            Logg inn under ⚙ Preferanser &amp; Config → Konto for å foreslå områder.
+            Logg inn under ⚙ Preferanser &amp; Konto → Konto for å foreslå områder.
           </div>
 
           <div id="sp-fetch-panel" style="display:none; margin-top:14px; padding-top:12px; border-top: 1px dashed var(--line); border-left: 3px solid var(--gold); padding-left: 12px;">
@@ -373,7 +373,7 @@
      worker/api/README.md). Testnøkkelen (1x00000000000000000000AA) hører
      kun hjemme i worker/api/.dev.vars for lokal utvikling, aldri her. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<script src="js/api-client.js?v=0.28.12"></script>
-<script src="js/app.js?v=0.28.12"></script>
+<script src="js/api-client.js?v=0.28.13"></script>
+<script src="js/app.js?v=0.28.13"></script>
 </body>
 </html>

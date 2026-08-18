@@ -1,5 +1,12 @@
 # Endringslogg
 
+## 0.28.13 — "Preferanser & Config" → "Preferanser & Konto"
+Brukeren påpekte at "Config" ikke lenger er et representativt navn — det
+ligger ikke noe GitHub-oppsett i panelet lenger, kun to faner:
+"Preferanser" og "Konto". Rettet alle 6 forekomster (heading, tre
+innloggingsoppfordringer i `index.html`, to tilsvarende i `js/app.js`) +
+én CSS-kommentar. Ingen funksjonell endring.
+
 ## 0.28.12 — Gjeninnfør furuknippesopp (trofisk modus avklart)
 Furuknippesopp (*Lyophyllum shimeji*) ble fjernet i v0.28.7 (2026-08-18,
 samme dag) pga. reell faglig uenighet om trofisk modus mellom kildene:

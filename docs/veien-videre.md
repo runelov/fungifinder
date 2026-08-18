@@ -346,3 +346,24 @@ terrengdata-laget (se eget punkt under).
   riktig beskrivelse — de fleste artene ser brukbare ut, og de to-tre som
   ikke gjør det har nå en konkret, navngitt retning å undersøke videre i
   stedet for en generell bekymring.
+
+## UX-forbedringer
+
+- ~~**"Preferanser & Config" → "Preferanser & Konto"**~~ — **gjort
+  2026-08-18.** Navnet var ikke lenger representativt (brukeren påpekte:
+  ingen GitHub-oppsett ligger der lenger) — panelet har uansett kun to
+  faner, "Preferanser" og "Konto", så heading-teksten matcher nå faktisk
+  innholdet. Rettet alle 6 forekomster i `index.html`/`js/app.js` + én
+  CSS-kommentar.
+- **Mobil: plassbruk over kart/liste må ses på** — brukeren påpekte
+  2026-08-18 at komponentene som ligger over selve kartet/resultatlisten
+  (banner/varsler/paneler — "Legg til på hjemskjermen", "Om dataene",
+  "Viktig om artsbestemmelse", "Preferanser & Konto", artsvelgeren) til
+  sammen tar for mye vertikal plass på mobil før brukeren når det de
+  faktisk kom for (kart/liste). Ikke undersøkt eller løst ennå — trenger
+  en egen gjennomgang av rekkefølge/synlighet/default-kollaps-tilstand for
+  disse komponentene spesifikt på mobilbredde, ikke bare en generell
+  "gjør ting mindre"-øvelse. Mulige retninger å vurdere når dette tas fatt
+  på: strengere default-kollaps på mobil for banner/varsler, flytte
+  sjeldnere brukte paneler lenger ned, eller en helt annen topp-struktur
+  på smale skjermer enn desktop.

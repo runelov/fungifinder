@@ -454,7 +454,7 @@
   .sp-collapsible.sp-notice summary { font-size: var(--fs-sm); }
   .sp-collapsible.sp-safety { background: #F3E3DA; border: 1.5px solid var(--danger); border-radius: 4px; padding: 14px 16px; }
   .sp-collapsible.sp-safety summary h4 { color: var(--danger); font-family: 'Fraunces', serif; font-size: 15px; }
-  /* Preferanser/Config flyttet ut av den alltid-synlige venstrekolonnen og inn
+  /* Preferanser/Konto flyttet ut av den alltid-synlige venstrekolonnen og inn
      hit — inspirert av MyCrate sin sammenleggbare "Setup & Sync"-plassering i
      toppen i stedet for en fast sidepanel-fane (se samtalen 2026-07-11). */
   .sp-collapsible.sp-preferences { background: var(--paper-deep); border: 1px solid var(--line); border-radius: 4px; padding: 14px 16px; }
