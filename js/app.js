@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.28.6';
+  const APP_VERSION = '0.28.7';
   const APP_BUILD_DATE = '2026-08-18';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -88,42 +88,6 @@
       fieldTips:'Lys, kremhvit poresopp som vokser <b>på bakken</b> (ikke på trær), ofte flere sammenvokste hatter. Fine porer under hatten, ikke gjeller. Fast, hvitt kjøtt.',
       lookalike:'Lyse poresopper som vokser på bakken i Norge har ingen farlige forvekslingsarter — hovedregelen er lys farge og bakkevekst (ikke å forveksle med kjuker som vokser på trestammer).',
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Albatrellus_ovinus_1.jpg/500px-Albatrellus_ovinus_1.jpg', artist:'Karelj', license:'Public domain', sourcePage:'https://commons.wikimedia.org/wiki/File:Albatrellus_ovinus_1.jpg' } },
-    // Kilde: artfakta.se/taxa/4977 — STRUKTURELT PROBLEM: kilden klassifiserer arten som saprotrof
-    // (lever av dødt organisk materiale), IKKE mykorrhiza-dannende — treslag som scoringsakse er
-    // trolig feil modell for denne arten, ikke bare unøyaktige verdier. Se docs/artsprofiler-forskningsgrunnlag.md.
-    { id:'parasollsopp', name:'Parasollsopp (stor)', latin:'Macrolepiota procera', season:[7,10],
-      treslag:['apen','bjork'], skogalder:['apen','middels'], fuktighet:['frisk'], berggrunn:['moderat','rik'],
-      weather:{ minNedbor14:10, idealNedbor14:25, minTempAvg:8 },
-      why:(loc,t)=>`Åpne skogkanter og lysninger på ${t.berggrunnTekst} grunn — store parasollsopper trives i gress- og feltsjikt i overgangssoner.`,
-      fieldTips:'Stor sopp (kan bli 20-40 cm høy) med lang, slank stilk som har et tydelig <b>slangeskinn-mønster</b> og en løs, bevegelig <b>dobbeltring</b>. Hatten er brun-skjellete og parasollformet når utsprunget.',
-      lookalike:'⚠ Bruk kun STORE eksemplarer med tydelig slangemønster på stilken og fri, bevegelig ring — små, brune paraplysopper (Lepiota-arter) kan være dødelig giftige og ligner unge parasollsopper. Er soppen liten, la den stå.',
-      image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/1_-_Macrolepiota_procera_%28St%C5%AFl%29.JPG/500px-1_-_Macrolepiota_procera_%28St%C5%AFl%29.JPG', artist:'Fredy.00', license:'Public domain', sourcePage:'https://commons.wikimedia.org/wiki/File:1_-_Macrolepiota_procera_(St%C5%AFl).JPG' } },
-    // Kilde: artfakta.se/taxa/2917 — STRUKTURELT PROBLEM, samme som parasollsopp over: ren saprotrof
-    // grasmarksart, ingen treslagstilknytning i det hele tatt. Se docs/artsprofiler-forskningsgrunnlag.md.
-    { id:'sjampinjong', name:'Markjordbær-sjampinjong', latin:'Agaricus campestris', season:[7,10],
-      treslag:['apen'], skogalder:['apen'], fuktighet:['frisk'], berggrunn:['moderat','rik'],
-      weather:{ minNedbor14:10, idealNedbor14:25, minTempAvg:8 },
-      why:(loc,t)=>`Åpen beitemark/eng på ${t.berggrunnTekst} grunn — sjampinjong vokser i gress, liker kalkholdig jord.`,
-      fieldTips:'Sjekk tre ting: <b>rosa gjeller</b> som mørkner til sjokoladebrune, en løs <b>ring på stilken</b>, og kjøtt som <b>ikke blir gult</b> ved trykk.',
-      lookalike:'⚠ Unge, hvite fluesopp-knapper kan i sjeldne tilfeller minne om sjampinjong før hatten er utsprunget. Sjekk ALLTID gjellefargen (rosa/brun hos sjampinjong, aldri hvit) og grav opp foten — ekte sjampinjong har ingen "eggeskall" (volva) ved roten.',
-      image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/2010-08-07_Agaricus_campestris.jpg/500px-2010-08-07_Agaricus_campestris.jpg', artist:'Andreas Kunze', license:'CC BY-SA 3.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2010-08-07_Agaricus_campestris.jpg' } },
-    // Kilder: artfakta.se/taxa/6003323 (Sverige, LC) og Artsdatabankens norske
-    // rødlistevurdering 2021 (NT) — USIKKER: Artfakta klassifiserer arten som
-    // saprotrof (ikke mykorrhiza), men den norske rødlistevurderingen sier
-    // "antas å danne mykorrhiza (primært med furu, mulig også gran)" — reell
-    // faglig uenighet/usikkerhet om trofisk modus, ikke en klar feil å rette.
-    // Norges egen vurdering nevner gran som mulig ekstra vertstre — mangler i treslag under.
-    { id:'furuknippesopp', name:'Furuknippesopp', latin:'Lyophyllum shimeji', season:[9,10],
-      treslag:['furu'], skogalder:['gammel'], fuktighet:['tørr'], berggrunn:['fattig'],
-      // Kontinentalt lavlandshabitat (sandfuru-moer på Østlandet) — i
-      // motsetning til de fleste andre artene her er høydebegrensningen godt
-      // nok dokumentert til å tallfestes (se elevationScore/scoreLocation).
-      hoydeMoh:{ ideal:400, max:600 },
-      weather:{ minNedbor14:15, idealNedbor14:30, minTempAvg:6 },
-      why:(loc,t)=>`Gammel, tørr furuskog på ${t.berggrunnTekst} sandgrunn — det sjeldne, kontinentale furumo-habitatet furuknippesopp krever.`,
-      fieldTips:'Vokser i tette knipper direkte i sandholdig skogbunn i gammel, lysåpen furuskog, ofte med reinlav og blåbærlyng i bunnsjiktet. Gråbrun, fast hatt og hvitt kjøtt med en karakteristisk, litt melaktig-nøttete lukt. Regnes som en delikatesse i Japan (der kalt "shimeji"), men er svært sjelden i Norge og finnes stort sett i kontinentale furumoer på Østlandet.',
-      lookalike:'⚠ Tilhører slekten knippesopp (Lyophyllum), som har flere likeartede sopper — vær nøye med artsbestemmelsen og bruk soppkontroll ved usikkerhet. Arten er dessuten sjelden/rødlistet i Norge: vis varsomhet og ikke tøm hele forekomsten om du finner den.',
-      image:{ url:'https://upload.wikimedia.org/wikipedia/commons/7/7b/Honshimeji.jpg', artist:'トリュフ (Toryufu)', license:'Public domain', sourcePage:'https://commons.wikimedia.org/wiki/File:Honshimeji.jpg' } },
     // Kilde: artfakta.se/taxa/6276 — STERKT BEKREFTET, matcher appens egen
     // eksisterende vurdering om at dette er den best dokumenterte arten i settet.
     { id:'kransmusserong', name:'Kransmusserong', latin:'Tricholoma matsutake', season:[9,10],
@@ -164,9 +128,6 @@
     matriske: '#C2632A',
     piggsopp: '#CBAE82',
     faresopp: '#B7AF92',
-    parasollsopp: '#A9895E',
-    sjampinjong: '#B98A7A',
-    furuknippesopp: '#8C8268',
     kransmusserong: '#7A4B3A'
   };
 
@@ -205,7 +166,7 @@
   // Arter som er kjent for å foretrekke varme, soleksponerte vokseplasser —
   // brukes til å gi et lite tillegg for sørvendte skråninger når vi har ekte
   // helnings-/himmelretningsdata fra et auto-hentet punkt.
-  const WARMTH_LOVING_SPECIES = new Set(['steinsopp', 'matriske', 'kransmusserong', 'furuknippesopp']);
+  const WARMTH_LOVING_SPECIES = new Set(['steinsopp', 'matriske', 'kransmusserong']);
 
   const TXT = {
     treslag: { gran:'gran', furu:'furu', bjork:'bjørk', apen:'åpen mark', ukjent:'ukjent treslag' },
@@ -3195,9 +3156,6 @@
     matriske: ['Se i glisne furubestand på sandrygger, gjerne nær overgang mot myr.', 'Kantsoner mot lysåpne partier er ofte mer produktive enn tett skog.'],
     piggsopp: ['Sjekk blandingssoner der gran og bjørk møtes, samt kanter langs stier.', 'Mindre kravstor enn kantarell — gi også middels tett skog en sjanse.'],
     faresopp: ['Let direkte i bakken under gammel gran, ofte i sirkulære grupper ("hekseringer").', 'Moserik, åpen skogbunn er mer sannsynlig enn tett kratt.'],
-    parasollsopp: ['Søk i skogkanter, veikanter og lysninger med gress — sjelden inne i tett skog.', 'Se etter store, distinkte eksemplarer; unngå unge/små individer.'],
-    sjampinjong: ['Søk i gresskledde kanter av beitemarken, gjerne der det har vært husdyr eller gjødsling.', 'Se etter «hekseringer» — sirkulære mønstre i gresset.'],
-    furuknippesopp: ['Se spesielt i gammel, lysåpen furuskog med rikelig reinlav i bunnen — tett/mørk skog er mindre aktuelt.', 'Grav forsiktig i sandjorda ved foten av gamle furutrær; knippene kan ligge delvis skjult under strø/lav.'],
     kransmusserong: ['Let i sandholdig, gammel furuskog — kjenner du en kraftig, kanelaktig lukt fra bakken, er du nære.', 'Sjekk gjerne samme sted flere år på rad — arten kommer ofte tilbake til samme punkt om den ikke forstyrres.']
   };
   function terrainMicrotips(species, loc){

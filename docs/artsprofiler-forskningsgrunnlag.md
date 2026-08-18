@@ -7,6 +7,15 @@ kvalitetssikret grunnlag for artenes vekstvilkår (`treslag`/`fuktighet`/
 `berggrunn`/`skogalder`/`sesong` i `SPECIES`-arrayen) enn det som lå der fra
 appens første commit (8. juli 2026, ukildet).
 
+**Oppdatering 2026-08-18, samme dag:** parasollsopp, sjampinjong og
+furuknippesopp er fjernet fra `SPECIES` (og `SPECIES_HUE`/
+`WARMTH_LOVING_SPECIES`/`BASE_MICROTIPS`) som direkte konsekvens av funnene
+under — de er enten feil scoringsmodell (de to saprotrofe artene) eller har
+en omstridt trofisk klassifisering (furuknippesopp). Funnene i seksjonene
+under for disse tre står likevel som forskningsgrunnlag for en eventuell
+fremtidig gjeninnføring — se [veien-videre.md](veien-videre.md) for planen
+rundt det.
+
 ## Metodikk og kildevurdering
 
 Fire kandidater ble vurdert; to ble forkastet, to ble brukt:
@@ -158,10 +167,12 @@ dette er den best dokumenterte arten i settet.
 | Traktkantarell | AVVIK — furu bør trolig legges til treslag |
 | Rødskrubb | AVVIK — 'rik' bør trolig legges til berggrunn |
 | Kantarell | USIKKER — furu i treslag ikke bekreftet, trenger 3. kilde |
-| Parasollsopp | STRUKTURELT PROBLEM — feil scoringsmodell (saprotrof, ikke mykorrhiza) |
-| Sjampinjong | STRUKTURELT PROBLEM — feil scoringsmodell (saprotrof, ikke mykorrhiza) |
-| Furuknippesopp | USIKKER — trofisk modus faglig omstridt; gran som mulig ekstra vertstre |
+| Parasollsopp | **FJERNET fra appen** — feil scoringsmodell (saprotrof, ikke mykorrhiza) |
+| Sjampinjong | **FJERNET fra appen** — feil scoringsmodell (saprotrof, ikke mykorrhiza) |
+| Furuknippesopp | **FJERNET fra appen** — trofisk modus faglig omstridt; gran som mulig ekstra vertstre |
 | Steinsopp, Matriske, Piggsopp, Fåresopp, Kransmusserong | BEKREFTET — ingen endring foreslått |
 
-Ingenting av dette er implementert i scoringen ennå — se `SPECIES`-arrayen
+De tre konkrete avvikene (Trompetsopp/Traktkantarell/Rødskrubb) og den ene
+usikre saken (Kantarell) er ikke implementert i scoringen ennå — se
+`SPECIES`-arrayen
 i `js/app.js`, som nå har en kort kildehenvisning per art pekende hit.

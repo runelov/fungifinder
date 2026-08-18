@@ -112,6 +112,13 @@ totalt, ukjent verdi teller alltid nøytralt/50%):
 Treslag veier tyngst av terrengfaktorene (sterkeste mykorrhiza-indikator).
 Egen funnhistorikk kan trumfe alt annet.
 
+Artenes vekstvilkår (`SPECIES` i `js/app.js`) er kildehenvist per art mot
+Artfakta/SLU Artdatabanken og Artsdatabankens rødliste, se
+[docs/artsprofiler-forskningsgrunnlag.md](docs/artsprofiler-forskningsgrunnlag.md).
+Åpne funn og andre mulige fremtidige utvidelser (bl.a. tre arter fjernet
+2026-08-18 pga. feil scoringsmodell) står i
+[docs/veien-videre.md](docs/veien-videre.md).
+
 ## Sikkerhet
 
 - Innlogging skjer via magic-link + sesjonscookie (`fungifinder_sesjon`,

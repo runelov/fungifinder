@@ -1,5 +1,33 @@
 # Endringslogg
 
+## 0.28.7 — Fjernet parasollsopp, sjampinjong og furuknippesopp (foreløpig)
+Direkte konsekvens av artsprofil-gjennomgangen (se
+`docs/artsprofiler-forskningsgrunnlag.md`, forskningspass 2026-08-18 mot
+Artfakta/SLU Artdatabanken + Artsdatabankens rødliste):
+
+- **Parasollsopp og sjampinjong** er begge saprotrofe grasmarksarter (lever
+  av dødt organisk materiale), ikke mykorrhiza-dannende — appens
+  `treslag`/`skogalder`-scoringsmodell (bygget for mykorrhiza-arter) gir
+  ikke mening for dem. Kombinert med at `'apen'` (åpen mark) uansett aldri
+  kan produseres av terrengdata-laget (NIBIO SR16 er et skogressurskart),
+  var scoringen for disse to strukturelt ute av stand til å fungere, ikke
+  bare unøyaktig.
+- **Furuknippesopp**: kildene er uenige om trofisk modus (Artfakta/Sverige
+  sier saprotrof, Norges egen rødlistevurdering sier "antas mykorrhiza") —
+  reell faglig usikkerhet, ikke en klar feil, men for usikkert til å stå i
+  produksjon som er.
+
+Fjernet fra `SPECIES`, `SPECIES_HUE`, `WARMTH_LOVING_SPECIES` og
+`BASE_MICROTIPS` i `js/app.js`. Ingen andre steder i kodebasen refererte
+til disse tre artenes id-er (verifisert med søk) — brukere som allerede har
+loggede funn av disse artene fra før mister ikke dataen, men "finn"-listen
+faller tilbake til å vise rå id-en i stedet for pent artsnavn siden
+oppslaget allerede hadde en `?? id`-fallback.
+
+Alle tre står på listen over fremtidige mulige utvidelser i
+`docs/veien-videre.md`, med hva som må avklares/bygges før de kan komme
+tilbake.
+
 ## 0.28.6 — "Hvorfor her?"-faktorene bruker ikon/merke i stedet for stolpe der de er binære
 Brukerobservasjon: fem av de seks (nå syv, med Sørvendt skråning/Høyde over
 havet) faktorene på "Hvorfor her?"-kortet er egentlig bare treff/ikke treff/
