@@ -173,11 +173,11 @@ terrengdata-laget (se eget punkt under).
   under full AR5-satsing (se punktet under) fremfor som en mellomstasjon,
   med mindre et mye større utvalg reelle funnsteder (i dag kun n=3, for
   lite til å konkludere hardt) senere viser et annet bilde.
-- **Gjeninnfør parasollsopp og sjampinjong — scoping 2026-08-18, klar til
-  implementering.** Fjernet fordi begge er saprotrofe grasmarksarter
-  (lever av dødt organisk materiale), ikke mykorrhiza-dannende — dagens
-  `treslag`/`skogalder`-scoringsmodell (bygget for mykorrhiza-arter) gir
-  ikke mening for dem.
+- ~~**Gjeninnfør parasollsopp og sjampinjong**~~ — **gjort 2026-08-18
+  (v0.28.14 + fungifinder-db), se CHANGELOG.** Fjernet fordi begge er
+  saprotrofe grasmarksarter (lever av dødt organisk materiale), ikke
+  mykorrhiza-dannende — dagens `treslag`/`skogalder`-scoringsmodell
+  (bygget for mykorrhiza-arter) ga ikke mening for dem uten `'apen'`-data.
 
   **Viktig funn under scopingen: trenger IKKE en ny scoringsakse.**
   `attrScore()` (`js/app.js`) matcher allerede `loc.treslag`/
@@ -209,16 +209,19 @@ terrengdata-laget (se eget punkt under).
      som kun dumper rå API-svar): Jæren ga `treslag:['apen']` med
      fuktighet/berggrunn populert normalt, Nordmarka beholdt uendret
      skog-sti (AR5 aldri kalt), Oslo sentrum fortsatt korrekt forkastet.
-  3. **Eksisterende terreng_steder får fortsatt INGEN åpne naboer av
-     `--refresh-existing` alene** — gjenstår, bevisst ikke gjort i (1)/(2).
-     Allerede lagrede steder ble per definisjon godkjent av den GAMLE
-     (skog-only) portvakten, så en attributt-oppfriskning finner ingen nye
-     punkter. Ekte åpen-mark-punkter krever et FERSKT rutenett-sveip over
-     samme områder (samme kostnadsbilde som er scopet i
-     Voksestedslaget-artifaktets Del 4-kalibrering — ikke en gratis bonus,
-     en reell ny ETL-kjøring per område). Samme "spor D er en egen, senere
-     handling"-prinsipp som kalibreringsplanen allerede bruker — venter på
-     eksplisitt beslutning før det kjøres.
+  3. ~~**Eksisterende terreng_steder får INGEN åpne naboer av
+     `--refresh-existing` alene**~~ — **testet og bekreftet 2026-08-18.**
+     Kjørte et `--dry-run`-sveip (ny, ikke `--refresh-existing`) for
+     Vestby kommune først (605 kandidater sjekket, 15 godkjent — 14 med
+     `treslag:['apen']`, realistiske verdier: tørr/frisk fuktighet, fattig
+     berggrunn, lav høyde over havet konsistent med kystnær/jordbruksmark).
+     Deretter kjørt på nytt UTEN `--dry-run` — 14 nye åpne punkter + 1
+     skogpunkt reelt skrevet til produksjons-D1 for Vestby.
+     **Gjenstår**: kun Vestby har åpne punkter så langt — resten av landet
+     har fortsatt ingen, siden alle andre områder ble hentet under den
+     gamle skog-only-portvakten. Nasjonal utrulling (samme kostnadsbilde
+     som Voksestedslaget-artifaktets Del 4) er en bevisst, separat,
+     senere beslutning — ikke gjort automatisk av dette.
 - ~~**Gjeninnfør furuknippesopp**~~ — **gjort 2026-08-18 (v0.28.12), se
   CHANGELOG.** Trofisk modus avklart samme dag av en tredje, uavhengig,
   fagfellevurdert kilde (genomstudie, Ohta et al. i *DNA Research*):

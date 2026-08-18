@@ -1,5 +1,25 @@
 # Endringslogg
 
+## 0.28.14 — Gjeninnfør parasollsopp og sjampinjong (åpen-mark-data på plass)
+Fjernet i v0.28.7 (2026-08-18, samme dag) fordi treslag/skogalder-
+scoringsmodellen ikke kunne produsere `'apen'`-verdien disse to saprotrofe
+grasmarksartene trenger. Den strukturelle forutsetningen er nå på plass
+(fungifinder-db v42: åpen-mark-deteksjon via AR5, se
+`docs/veien-videre.md`) — testet og bekreftet med en ekte produksjons-
+kjøring for Vestby kommune samme dag (14 nye `treslag:['apen']`-punkter).
+
+- Lagt tilbake i `SPECIES`, `SPECIES_HUE` og `BASE_MICROTIPS` i
+  `js/app.js`, og i `fetch_area.py`s `SPECIES_TAXON_ID`
+  (fungifinder-db) — profilene er UENDRET fra originalen. Begge hadde
+  allerede `'apen'` i `treslag`/`skogalder` fra før fjerningen — det var
+  aldri artsprofilene som var problemet, bare at ETL-en ikke kunne
+  produsere dataen de trengte.
+- Merk: eksisterende terreng_steder (fra før dagens AR5-endring) har
+  ingen åpne naboer ennå — disse to artene vil kun gi treff i områder som
+  er sveipet på nytt (foreløpig kun Vestby). Full nasjonal dekning krever
+  et bevisst, senere rutenett-sveip over flere/alle områder, se
+  `docs/veien-videre.md`.
+
 ## 0.28.13 — "Preferanser & Config" → "Preferanser & Konto"
 Brukeren påpekte at "Config" ikke lenger er et representativt navn — det
 ligger ikke noe GitHub-oppsett i panelet lenger, kun to faner:
