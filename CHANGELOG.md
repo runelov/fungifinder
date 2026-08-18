@@ -1,5 +1,21 @@
 # Endringslogg
 
+## 0.28.10 — Kransmusserongs sesong utvidet til å starte i august
+Oppfølging av værterskel-kalibreringstesten (se `docs/veien-videre.md`):
+4 av 8 unike bekreftede kransmusserong-funn i Artskart-dataene lå FØR den
+deklarerte sesongen (sep-okt) — tett klynget rett før september (31. juli,
+30. aug, 8. aug, 15. aug, på tvers av 1992/2022/2023/2024), ikke spredt
+gjennom året slik man ville forvente av tilfeldige feilbestemmelser.
+Uavhengig kildesøk fant en svensk artikkel om goliatmusseron (samme art)
+som eksplisitt nevner et tidlig funn "12 augusti" i Bjurholm, Västerbotten,
+ved siden av hovedsesongen sep-okt — samme mønster som i egne data.
+
+- `season` for kransmusserong endret fra `[9,10]` til `[8,10]` i
+  `js/app.js`. Ingen endring i sluttmåned — ingen funn i datasettet støttet
+  juli som reell sesongstart (kun ett funn, helt på grensen 31. juli).
+- Sourcing-kommentar lagt til i `SPECIES`-arrayen som forklarer
+  begrunnelsen og peker til kalibreringstesten.
+
 ## 0.28.9 — Kontinuerlig høyde-/helningsscoring (Voksestedslag-finkorning)
 Implementerer forslaget fra `docs/veien-videre.md` om å gjøre
 høyde-/sørvendt-skråning-scoringen glidende i stedet for trinnvis — ingen

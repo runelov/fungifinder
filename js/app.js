@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.28.9';
+  const APP_VERSION = '0.28.10';
   const APP_BUILD_DATE = '2026-08-18';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -99,7 +99,21 @@
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Albatrellus_ovinus_1.jpg/500px-Albatrellus_ovinus_1.jpg', artist:'Karelj', license:'Public domain', sourcePage:'https://commons.wikimedia.org/wiki/File:Albatrellus_ovinus_1.jpg' } },
     // Kilde: artfakta.se/taxa/6276 — STERKT BEKREFTET, matcher appens egen
     // eksisterende vurdering om at dette er den best dokumenterte arten i settet.
-    { id:'kransmusserong', name:'Kransmusserong', latin:'Tricholoma matsutake', season:[9,10],
+    //
+    // RETTET 2026-08-18 (season): værterskel-kalibreringstesten (se
+    // docs/veien-videre.md) fant at 4 av 8 unike bekreftede Artskart-funn
+    // (31. juli, 30. aug, 8. aug, 15. aug — på tvers av 1992/2023/2024/2022)
+    // lå FØR den tidligere deklarerte sesongen (sep-okt), alle tett klynget
+    // rett før september i stedet for spredt gjennom året (som man ville
+    // forvente av feilbestemmelser, ikke en reell sesongstart). Uavhengig
+    // kildebekreftelse: en svensk artikkel om goliatmusseron (samme art,
+    // svensk navn) nevner eksplisitt et tidlig funn "12 augusti" i
+    // Bjurholm, Västerbotten, ved siden av hovedsesongen sep-okt. Sesongen
+    // er derfor utvidet til å starte i august i stedet for september —
+    // ingen endring i sluttmåned (okt), ingen funn i datasettet støttet
+    // juli som en reell sesongstart (kun ett funn, 31. juli, helt i
+    // grensen mellom juli/august).
+    { id:'kransmusserong', name:'Kransmusserong', latin:'Tricholoma matsutake', season:[8,10],
       treslag:['furu'], skogalder:['gammel'], fuktighet:['tørr'], berggrunn:['fattig'],
       hoydeMoh:{ ideal:400, max:600 },
       weather:{ minNedbor14:15, idealNedbor14:30, minTempAvg:6 },

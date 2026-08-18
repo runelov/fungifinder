@@ -253,15 +253,18 @@ terrengdata-laget (se eget punkt under).
     samtidig de strengeste tersklene i hele settet (min=20/ideal=45 mm,
     mot kantarells 15/35 for en økologisk ganske lik art). Verdt å
     vurdere å senke litt.
-  - **Kransmusserong sin sesong sticker seg ut mest i hele testen**: 37 %
-    av bekreftede funn (7 av 19) lå utenfor det deklarerte
-    september-oktober-vinduet — langt høyere enn noen annen art, selv om
-    n er lite (24 totalt). Kransmusserong er samtidig arten med best
-    kildedekning i settet (se `docs/artsprofiler-forskningsgrunnlag.md`)
-    og en art folk aktivt leter etter og kan feilbestemme blant nære
-    slektninger i Tricholoma — begge er plausible forklaringer, ikke
-    utelukkende hverandre. Høyeste prioritet av bifunnene til å se
-    nærmere på.
+  - ~~**Kransmusserong sin sesong**~~ — **rettet 2026-08-18 (v0.28.10), se
+    CHANGELOG.** Så på de 24 rå funnene som 8 unike observasjonsdatoer i
+    stedet (flere Artskart-rader kan dele samme reelle funnhendelse) — 4 av
+    8 lå FØR det deklarerte sep-okt-vinduet, alle tett klynget rett før
+    september (31. juli, 30. aug, 8. aug, 15. aug, på tvers av
+    1992/2022/2023/2024) i stedet for spredt gjennom året, som man ville
+    forvente av tilfeldige feilbestemmelser snarere enn en reell
+    sesongstart. Fant uavhengig kildebekreftelse: en svensk artikkel om
+    goliatmusseron (samme art) nevner eksplisitt et tidlig funn "12
+    augusti" i Bjurholm, Västerbotten, ved siden av hovedsesongen sep-okt —
+    samme mønster. `season` endret fra `[9,10]` til `[8,10]`; ingen endring
+    i sluttmåned (ingen funn støttet juli som reell start).
 
   Testet kun n≈20-25 per art (kantarell) — små tall, spesielt for artene
   med lite totalt datagrunnlag (kransmusserong n=24, matriske n=47).
