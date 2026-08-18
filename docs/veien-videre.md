@@ -370,3 +370,103 @@ terrengdata-laget (se eget punkt under).
   på: strengere default-kollaps på mobil for banner/varsler, flytte
   sjeldnere brukte paneler lenger ned, eller en helt annen topp-struktur
   på smale skjermer enn desktop.
+
+## Del 3 — bulk-ETL-migrasjon (scoping 2026-08-18)
+
+**Hvorfor dette er en forutsetning, ikke en kvalitetsforbedring.**
+Voksestedslaget-artifaktets Del 4-kalibreringer (Vågå/Hitra/Nannestad,
+2026-08-16) konkluderte at en full sekvensiell nasjonal sveip med dagens
+live-pipeline tar **11,6–24,2 dager**, selv etter de billige fiksene som
+allerede er shippet (batchet høydekall, bbox-scopet duplikatsjekk). Ingen
+nasjonal utrulling (verken det generelle datagrunnlaget eller AR5-
+åpen-mark-punktene fra i dag) er praktisk mulig før dette er løst.
+
+**Hva som allerede er reelt undersøkt** (Voksestedslaget-artifaktet,
+seksjon 3.5, 2026-08-16 — nedlastingsMEKANIKKEN, ikke selve
+per-punkt-oppslaget, er testet og validert):
+
+| Faktor | Kilde | Tilgang | Status |
+|---|---|---|---|
+| Berggrunn | NGU (N50) | Åpen, `nedlasting.ngu.no` REST-ordre-API, fylkesnivå | ✓ Bygget + validert (100 % paritet) |
+| DTM/høyde | Kartverket | Åpen, `hoydedata.no` ArcGIS ImageServer, vilkårlig bbox | ✓ Prototyp validert |
+| SR16 (treslag/alder/hogstår) | NIBIO | Åpen, `kart8.nibio.no/api/v2`, samme mønster som NGU | ✓ Bygget + validert (delvis, 80 %) |
+| Markfuktighet | NIBIO | Åpen, samme API som SR16, kun "hele landet" (ingen fylkesfilter) | ✓ Bygget + validert |
+| Skog/ikke-skog-porten (selve gaten) | FKB-AR5 bulk (Geovekst) | **Krever spesialtilgang** (nd.filnedlasting m.fl.) | ✗ Droppet fra planen |
+
+**Ny informasjon fra i dag som endrer bildet for den siste raden**: AR5
+sin **live WMS-tjeneste** (`wms.nibio.no/cgi-bin/ar5`, brukt i
+åpen-mark-arbeidet over) er IKKE underlagt samme Geovekst-sperre som bulk
+FKB-AR5-nedlastingen — verifisert ved faktisk bruk i dag. Dette er ikke en
+motsigelse (ulike tilgangsveier til samme datasett), men betyr at
+skog/ikke-skog-porten kan flyttes vekk fra det kostbare høydekallet
+(Hitra-kalibreringen: 85,3 % av alle kandidater betaler dette kallet
+UTELUKKENDE for skog/ikke-skog-svaret, før noen av de fire faktorene over
+kommer i spill) ved å bruke AR5 WMS i stedet — fortsatt ett live-kall per
+kandidat, altså IKKE den fulle "null nettverkskall"-gevinsten Del 3 sikter
+mot for denne porten spesifikt, men uavhengig implementerbart og langt
+billigere enn dagens vei via høyde-API + påfølgende SR16/markfuktighet/
+berggrunn-kall for kandidater som uansett blir forkastet.
+
+**Hva som IKKE var undersøkt før i dag — testet nå, med ekte cachet data**
+(`data/bulk-cache/`, gjenglemt fra 2026-08-16-økten, gitignoret men
+fortsatt lokalt tilgjengelig — ingen nye nedlastinger gjort):
+
+- **DTM-punktoppslag** (`rasterio`, allerede installert): fungerer.
+  Reell høyde hentet fra den cachede Nannestad-GeoTIFF-en på et vilkårlig
+  punkt, EPSG:4326 direkte (ingen reprojisering nødvendig, bekrefter
+  artifaktets 3.4-notat). Testfilen er ~100 m/px, ikke DTM10s 10 m —
+  trolig en bevisst grov testeksport, oppløsningsvalg for produksjon er
+  ikke avgjort.
+- **Berggrunn punkt-i-polygon** (`pyshp` + `shapely`, begge allerede
+  installert): fungerer. 2378 ekte polygoner for Akershus lest inn på
+  0,79s, punkt-i-polygon-søk 31ms (naiv lineær søk — trenger en
+  romlig indeks, f.eks. `shapely.STRtree`, for nasjonal skala med
+  vesentlig flere polygoner enn ett fylke). CRS bekreftet `GCS_ETRS_1989`
+  (samme som EPSG:4258/4326 for dette formålet), matcher artifaktets
+  3.4-konklusjon om at `pyproj`-reprojisering ikke er nødvendig. Feltet
+  `hovedberg`/`hovedberg_` (bergartsnavn) matcher direkte dagens
+  streng-baserte `classify_berggrunn()`-logikk i `fetch_area.py`
+  (fattig/moderat/rik ut fra nøkkelord som "kalkstein"/"skifer") — samme
+  klassifiseringsregler kan gjenbrukes uendret, kun datakilden byttes.
+- **SR16 raster-lesing og markfuktighet raster-lesing**: IKKE testet i
+  dag (ingen cachede filer for disse to lokalt) — neste konkrete steg,
+  se under. Artifaktet advarer allerede om én reell fallgruve her:
+  SR16R (rasterversjonen) bruker et ANNET kodeskjema enn SR16V
+  (vektorversjonen `fetch_sr16()` leser i dag) — `1=Gran/2=Furu/3=Lauv`,
+  ikke samme 7-klasses skjema. `TRESLAG_MAP` kan IKKE gjenbrukes uendret
+  for rasterkilden.
+
+**Nye avhengigheter** (`scripts/requirements.txt` har i dag kun `requests`
+og `shapely`): `rasterio` (raster) og `pyshp` (vektor-shapefiler) — begge
+allerede tilgjengelige i dette miljøet, men ikke committet til
+`requirements.txt` ennå. `pyproj` trolig IKKE nødvendig (se over).
+**Merk**: `rasterio` krever GDAL-systembiblioteker under panseret — må
+verifiseres at `pip install rasterio` fungerer rent i GitHub Actions
+Ubuntu-runneren (ikke bare i dette forhåndskonfigurerte miljøet) før dette
+committes, siden det er der ETL-en faktisk kjører.
+
+**Foreslått rekkefølge for videre arbeid**:
+1. Verifiser `rasterio`/`pyshp` faktisk installerer rent i en frisk GitHub
+   Actions Ubuntu-runner (billig, isolert sjekk — samme "verifiser
+   mekanikken før du bygger på den"-prinsipp som resten av planen).
+2. Test SR16- og markfuktighet-rasterlesing mot ferske nedlastede filer
+   (samme paritetstest-metodikk som artifaktet allerede brukte for
+   berggrunn — sammenlign mot `fetch_sr16()`/`fetch_markfuktighet()` sine
+   LIVE svar for et sett kjente punkter, ikke bare anta parity).
+3. Bygg `enrich_point()`s nye lokale versjon FAKTOR FOR FAKTOR (berggrunn
+   først — mest modent, deretter DTM, så SR16, så markfuktighet), med et
+   feature-flag som lar den fortsatt falle tilbake til live-WMS-kall per
+   faktor til hver er verifisert — ikke én stor rewrite som bytter alt på
+   én gang.
+4. Legg til en romlig indeks (`shapely.STRtree` e.l.) for
+   vektoroppslagene før nasjonal skala testes — 31ms lineært søk for ett
+   fylkes 2378 polygoner skalerer ikke uendret til et nasjonalt datasett.
+5. Avgjør AR5-skog-porten separat: bruk live WMS (fungerer allerede, se
+   over) som interim/permanent løsning for selve porten, siden bulk
+   FKB-AR5 er reelt blokkert — dette gir fortsatt store deler av
+   Hitra-funnets gevinst (unngår SR16/markfuktighet/berggrunn-kall for
+   forkastede kandidater), bare ikke det aller siste "null live-kall"-
+   steget for selve skog/ikke-skog-avgjørelsen.
+6. Kjør en ny Del 4-lignende paritetstest (Spor B/C fra artifaktet, som
+   sto åpent nettopp fordi Del 3 ikke var bygget nok til å måle mot) før
+   noe av dette rulles ut i produksjon.
