@@ -1,5 +1,30 @@
 # Endringslogg
 
+## 0.28.11 — Senket minNedbor14 for matriske og traktkantarell
+Oppfølging av værterskel-kalibreringstesten, de to artene med høyest
+"for tørt"-andel i den forrige runden testet på nytt med full/større
+utvalg mot ekte historisk vær (Open-Meteo archive-API):
+
+- **Matriske**: testet ALLE 47 bekreftede Artskart-funn (fullt utvalg,
+  ikke stikkprøve) — 26 % lå under den gamle grensen (15 mm), med en
+  klynge på 8,9 mm (tre funn) som gulv. `minNedbor14` senket fra 15 til 8.
+  Passer også bedre med at arten allerede er modellert som tørketolerant
+  (`fuktighet:['tørr','frisk']`) — delte tidligere samme fuktighetsgrense
+  som kantarell/traktkantarell til tross for at fuktighet-aksen sier de er
+  ulike.
+- **Traktkantarell**: testet n=40 av 610 (etter å ha filtrert bort noen få
+  Artskart-poster med en tydelig feilregistrert dato, år=1 — egen
+  dataknute, ikke rettet her) — 15 % lå under den gamle grensen (20 mm),
+  med en klynge på 11,5 mm (to funn) som gulv, to enkeltstående lavere
+  verdier (7,0/8,8 mm) behandlet som outliers. `minNedbor14` senket fra 20
+  til 11.
+
+Ingen endring i `idealNedbor14` for noen av artene — datagrunnlaget pekte
+kun på at nedre grense var for streng, ikke at toppen var feil.
+
+Verifisert: node --check (syntax), live i nettleser — ingen nye
+konsollfeil, artspanelene rendrer som før.
+
 ## 0.28.10 — Kransmusserongs sesong utvidet til å starte i august
 Oppfølging av værterskel-kalibreringstesten (se `docs/veien-videre.md`):
 4 av 8 unike bekreftede kransmusserong-funn i Artskart-dataene lå FØR den

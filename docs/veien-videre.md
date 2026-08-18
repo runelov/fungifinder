@@ -237,22 +237,21 @@ terrengdata-laget (se eget punkt under).
   | Kransmusserong | 24 | 0 % | **37 %** |
 
   De fleste artene ligner kantarell (lav "for tørt"-andel, ingen urealistisk
-  streng terskel synlig). To avvik peker seg ut som verdt å følge opp
-  konkret:
-  - **Matriske**: 35 % av bekreftede funn skjedde i forhold modellen ville
-    kalt "for tørt" — klart høyest i settet. Kan være at
-    `minNedbor14`=15 er satt for strengt for denne arten, ELLER en reell
-    økologisk forklaring: appens egen `why`-tekst for matriske nevner
-    allerede "sandholdig, veldrenert jord" — godt drenert furuskogsbunn
-    tørker fortere ut igjen enn mosedekket granskogsbunn, så samme
-    `precip14`-tall kan tilsvare en tørrere bakke i praksis for denne
-    arten enn for kantarell. Samme grunnleggende begrensning
-    (`daysSinceRain`-korreksjonen finnes allerede i koden av nøyaktig
-    denne typen grunn) som er nevnt i `scoreLocation()`.
-  - **Traktkantarell**: 20 % "for tørt" — nest høyest, og arten har
-    samtidig de strengeste tersklene i hele settet (min=20/ideal=45 mm,
-    mot kantarells 15/35 for en økologisk ganske lik art). Verdt å
-    vurdere å senke litt.
+  streng terskel synlig). To avvik pekte seg ut og er nå **rettet
+  2026-08-18 (v0.28.11), se CHANGELOG**:
+  - ~~**Matriske**: 35 % "for tørt"~~ — testet på nytt med ALLE 47
+    bekreftede funn (fullt utvalg, ikke stikkprøve): 26 % under gammel
+    grense, klynge på 8,9 mm (tre funn) som gulv. `minNedbor14` senket fra
+    15 til 8 — passer også bedre med at arten allerede er modellert som
+    tørketolerant (`fuktighet:['tørr','frisk']`), i motsetning til
+    kantarell/traktkantarell som den tidligere delte fuktighetsgrense med.
+  - ~~**Traktkantarell**: 20 % "for tørt"~~ — testet på nytt med n=40 (av
+    610, etter å ha filtrert bort noen Artskart-poster med en tydelig
+    feilregistrert dato, år=1): 15 % under gammel grense, klynge på
+    11,5 mm (to funn) som gulv. `minNedbor14` senket fra 20 til 11.
+
+  Ingen endring i `idealNedbor14` for noen av artene — datagrunnlaget pekte
+  kun på at nedre grense var for streng, ikke at toppen var feil.
   - ~~**Kransmusserong sin sesong**~~ — **rettet 2026-08-18 (v0.28.10), se
     CHANGELOG.** Så på de 24 rå funnene som 8 unike observasjonsdatoer i
     stedet (flere Artskart-rader kan dele samme reelle funnhendelse) — 4 av

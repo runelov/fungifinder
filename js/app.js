@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.28.10';
+  const APP_VERSION = '0.28.11';
   const APP_BUILD_DATE = '2026-08-18';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -37,7 +37,15 @@
     // docs/artsprofiler-forskningsgrunnlag.md (Del 0).
     { id:'traktkantarell', name:'Traktkantarell', latin:'Craterellus tubaeformis', season:[8,11],
       treslag:['gran','furu'], skogalder:['middels','gammel'], fuktighet:['fuktig'], berggrunn:['fattig','moderat'],
-      weather:{ minNedbor14:20, idealNedbor14:45, minTempAvg:4 },
+      // RETTET 2026-08-18 (minNedbor14): værterskel-kalibreringstesten (se
+      // docs/veien-videre.md) fant at 15 % av bekreftede Artskart-funn
+      // (n=40, ekte historisk vær fra Open-Meteo) skjedde med precip14
+      // UNDER den gamle grensen (20 mm) — laveste observerte klynge lå på
+      // 11,5 mm (to funn). Senket til 11 for å dekke den klyngen, uten å
+      // strekke helt ned til de to enkeltstående laveste verdiene (7,0/8,8
+      // mm), som behandles som outliers heller enn reelt sesongmønster —
+      // samme prinsipp som kransmusserong-sesongfiksen samme dag.
+      weather:{ minNedbor14:11, idealNedbor14:45, minTempAvg:4 },
       why:(loc,t)=>`Fuktig, mosekledd ${t.treslagTekst}-skog — traktkantarellens favorittmiljø. Tåler kjøligere vær enn kantarell.`,
       fieldTips:'Liten, gråbrun-gulbrun sopp med <b>trakt-/pipeformet hatt</b> og hul stilk. Undersiden har lave, grålilla-gule ribber. Vokser ofte i <b>tette forekomster</b> i tykt mosedekke.',
       lookalike:'Få farlige forvekslingsarter. Skilles fra svart trompetsopp på farge (gulbrun, ikke gråsvart) og fra rørsopper ved at det ikke er noe rørlag under hatten.',
@@ -76,7 +84,17 @@
     // Kilde: artfakta.se/taxa/4723 — BEKREFTET, godt samsvar.
     { id:'matriske', name:'Furumatriske', latin:'Lactarius deliciosus', season:[8,10],
       treslag:['furu'], skogalder:['middels','gammel'], fuktighet:['tørr','frisk'], berggrunn:['moderat','rik'],
-      weather:{ minNedbor14:15, idealNedbor14:30, minTempAvg:8 },
+      // RETTET 2026-08-18 (minNedbor14): værterskel-kalibreringstesten (se
+      // docs/veien-videre.md) fant at 26 % av ALLE 47 bekreftede
+      // Artskart-funn (fullt utvalg, ikke stikkprøve — ekte historisk vær
+      // fra Open-Meteo) skjedde med precip14 under den gamle grensen
+      // (15 mm) — en klynge på 8,9 mm (tre funn) satte gulvet. Senket til
+      // 8 for å dekke denne klyngen. Passer også bedre med at arten
+      // allerede er modellert som tørketolerant (fuktighet:['tørr','frisk'],
+      // i motsetning til kantarell/traktkantarells fuktighetskrav) — de to
+      // artene delte tidligere samme fuktighetsgrense selv om
+      // fuktighet-aksen sier de er ulike.
+      weather:{ minNedbor14:8, idealNedbor14:30, minTempAvg:8 },
       why:(loc,t)=>`Furudominert skog på ${t.berggrunnTekst} grunn. Matriske trenger furu som partner og sandholdig, veldrenert jord.`,
       fieldTips:'Kutt i lamellene: ekte matriske gir en <b>gulrotoransje melkesaft</b> som gradvis blir <b>grønnlig</b> ved oksidering. Hatten har ofte konsentriske, mørkere ringer. Vokser nesten utelukkende under furu.',
       lookalike:'⚠ De fleste alvorlige soppforgiftninger i Norge skjer fordi folk forveksler spiss giftslørsopp med matriske. Sjekk ALLTID melkesaften: ekte matriske "blør" tydelig gulrotoransje når du kutter i den — giftslørsopp gjør ikke det. Er du i tvil, la soppen stå.',
