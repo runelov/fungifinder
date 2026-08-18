@@ -62,10 +62,18 @@ terrengdata-laget selv.
 Kilde: [artfakta.se/taxa/3213](https://artfakta.se/taxa/3213)
 > "Bildar mykorrhiza med gran, asp, björk, bok, lind, ek och hassel i både barr- och lövskog."
 
-App har `treslag:['gran','furu','bjork']`. **Avvik: furu er ikke nevnt i
-kilden i det hele tatt.** Ett oppfølgende søk ga ingen klar bekreftelse
-eller avkreftelse av furu-tilknytning for kantarell — **usikker, bør
-kryss-sjekkes mot en tredje kilde før noe endres.**
+App har `treslag:['gran','furu','bjork']`. Furu er ikke nevnt i Artfakta
+i det hele tatt.
+
+**Oppdatering 2026-08-18, samme dag — AVKLART via to uavhengige,
+fagfellevurderte kilder:** Pachlewski (*Acta Mycologica* 1996, tittel:
+"Studies of *Cantharellus cibarius* — a mycorrhizal fungus of **pine and
+spruce**") og Danell (*Mycorrhiza* 1994, "Formation and growth of the
+ectomycorrhiza of *Cantharellus cibarius*") — sistnevnte dokumenterer
+vellykket in vitro-syntetisert mykorrhiza mellom *C. cibarius* og *Pinus
+sylvestris* (furu), selv fra en stamme opprinnelig hentet fra gran
+(*Picea abies*). `furu` i treslag er dermed **bekreftet riktig**, ikke
+lenger en åpen usikkerhet.
 
 ### Traktkantarell (*Craterellus tubaeformis*)
 Kilde: [artfakta.se/taxa/3217](https://artfakta.se/taxa/3217)
@@ -185,13 +193,13 @@ dette er den best dokumenterte arten i settet.
 | Trompetsopp | **RETTET (v0.28.8)** — gran fjernet fra treslag |
 | Traktkantarell | **RETTET (v0.28.8)** — furu lagt til treslag |
 | Rødskrubb | **RETTET (v0.28.8)** — 'rik' lagt til berggrunn |
-| Kantarell | USIKKER — furu i treslag ikke bekreftet, trenger 3. kilde |
+| Kantarell | **BEKREFTET (samme dag)** — furu i treslag avklart via 2 uavhengige 3. kilder, ingen dataendring nødvendig |
 | Parasollsopp | **FJERNET fra appen** — feil scoringsmodell (saprotrof, ikke mykorrhiza) |
 | Sjampinjong | **FJERNET fra appen** — feil scoringsmodell (saprotrof, ikke mykorrhiza) |
 | Furuknippesopp | **GJENINNFØRT (v0.28.12)** — trofisk modus avklart via 3. kilde (genomstudie); gran lagt til som sekundær treslag-verdi |
 | Steinsopp, Matriske, Piggsopp, Fåresopp, Kransmusserong | BEKREFTET — ingen endring foreslått |
 
 De tre konkrete avvikene (Trompetsopp/Traktkantarell/Rødskrubb) er
-implementert i `js/app.js` v0.28.8 — se CHANGELOG. Kantarell (USIKKER) står
-fortsatt åpen, se [veien-videre.md](veien-videre.md) for status og forsøket
-på å avklare den mot appens egne data.
+implementert i `js/app.js` v0.28.8 — se CHANGELOG. Kantarell er avklart
+samme dag (se over) — ingen av de opprinnelige åpne funnene i dette
+dokumentet står lenger uløst.

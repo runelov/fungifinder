@@ -24,7 +24,15 @@
   // kort verdikt (BEKREFTET/AVVIK/USIKKER/STRUKTURELT). Se dokumentet for
   // sitater og full begrunnelse før du endrer noe her.
   const SPECIES = [
-    // Kilde: artfakta.se/taxa/3213 — USIKKER: furu ikke nevnt i kilden, trenger 3. kilde før endring.
+    // Kilde: artfakta.se/taxa/3213 (nevner ikke furu blant vertstrærne).
+    // AVKLART 2026-08-18 via to uavhengige, fagfellevurderte 3. kilder:
+    // Pachlewski (Acta Mycologica 1996, "Studies of Cantharellus cibarius —
+    // a mycorrhizal fungus of pine and spruce") og Danell (Mycorrhiza 1994,
+    // "Formation and growth of the ectomycorrhiza of Cantharellus
+    // cibarius") — sistnevnte dokumenterer vellykket in vitro-mykorrhiza
+    // mellom C. cibarius og Pinus sylvestris (furu), selv fra en stamme
+    // opprinnelig hentet fra gran. `furu` i treslag under er dermed
+    // bekreftet riktig, ikke bare beholdt uavklart.
     { id:'kantarell', name:'Kantarell', latin:'Cantharellus cibarius', season:[7,10],
       treslag:['gran','furu','bjork'], skogalder:['middels','gammel'], fuktighet:['frisk','fuktig'], berggrunn:['fattig','moderat'],
       weather:{ minNedbor14:15, idealNedbor14:35, minTempAvg:8 },

@@ -37,16 +37,17 @@ sitert avvik mot Artfakta — implementert, se CHANGELOG v0.28.8:
   arten ikke har noen berggrunnspreferanse i det hele tatt, inkludert
   kalkrik grunn.
 
-### Venter på tredje kilde
+### ~~Venter på tredje kilde~~ — Kantarell avklart (2026-08-18, samme dag)
 
-- **Kantarell**: `furu` i `treslag` er ikke bekreftet av kilden (kun
-  gran/asp/bjørk/bøk/lind/eik/hassel nevnt) — usikkert, bør kryss-sjekkes
-  mot en tredje kilde før noe endres, ikke bare fjernes på ett funn.
-  **Testet mot appens egne data 2026-08-18 (se ny seksjon under) — fortsatt
-  uavklart.** furu-lift på kantarell-steder (n=670) var 1.07× bakgrunnsraten
-  — for svakt til å bekrefte eller avkrefte. Trenger enten en faktisk
-  tredje litteraturkilde, eller mer presis egen-data (se anbefalingen
-  under) før dette kan avgjøres.
+- ~~**Kantarell**: `furu` i `treslag` er ikke bekreftet av kilden~~ —
+  **bekreftet, ingen dataendring nødvendig.** Egen-datavalideringen under
+  (lift=1.07× på n=670) var for svak til å avgjøre saken alene, så et nytt
+  litteratursøk ble gjort samme dag: to uavhengige, fagfellevurderte
+  kilder (Pachlewski, *Acta Mycologica* 1996, "...a mycorrhizal fungus of
+  pine and spruce"; Danell, *Mycorrhiza* 1994, dokumenterer vellykket in
+  vitro-mykorrhiza mellom *C. cibarius* og *Pinus sylvestris*) bekrefter
+  furu-tilknytningen. Se `docs/artsprofiler-forskningsgrunnlag.md` for
+  full sitering.
 
 ### Egen-datavalidering: `terreng_steder` × `kjenteFunnDetaljer` (testet 2026-08-18)
 
@@ -91,10 +92,12 @@ forbedringen som ville gjort dette reelt kraftig: **lagre Artskart-funnets
 egne lat/lon** (finnes allerede i Artskart-API-responsen, blir kastet i
 dag — kun `avstandM` beholdes) og slå opp terrengdata direkte på
 funnpunktet i stedet for å låne nærmeste terreng_steds attributter —
-fjerner unøyaktigheten i punkt 3 over, og gjør spesielt
-kantarell/furu-spørsmålet mer avgjørbart etter hvert som flere funn
-samles. Punkt 2 (sparsom `'rik'`-dekning) løses ikke av dette alene og bør
-undersøkes separat. Samme lift-metodikk kan gjenbrukes på de planlagte
+fjerner unøyaktigheten i punkt 3 over, og gjør fremtidig
+artsprofil-validering mer avgjørbart etter hvert som flere funn samles
+(kantarell/furu-spørsmålet ble løst via litteratur i stedet, se over —
+men prinsippet gjelder for eventuelle fremtidige åpne spørsmål). Punkt 2
+(sparsom `'rik'`-dekning) løses ikke av dette alene og bør undersøkes
+separat. Samme lift-metodikk kan gjenbrukes på de planlagte
 kalibreringsløpene for Indre Østfold/Vågå/Hitra (se
 Voksestedslaget-artifaktet), som uansett produserer ferske
 Artskart×terreng-koblinger for tre representative kommuner.
