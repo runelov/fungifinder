@@ -191,12 +191,38 @@ terrengdata-laget (se eget punkt under).
   siden av `furu` (kilde: rødlistevurderingens "mulig ekstra vertstre").
   `season`/`weather` UENDRET — kun 4 unike bekreftede Artskart-funn totalt,
   for lite til kalibrering.
-- **Ekte "åpen mark"-deteksjon i terrengdata-laget** — NIBIO SR16 (et
-  skogressurskart) kan aldri produsere en `'apen'`-verdi for `treslag`/
-  `skogalder`, uansett hvor åpent et sted faktisk er (se
-  `fetch_area.py`/`TRESLAG_MAP`). Ville trengt et arealtypelag som AR5,
-  eller lignende. Forutsetning for at parasollsopp/sjampinjong kan
-  gjeninnføres med en scoringsmodell som faktisk virker.
+- **Ekte "åpen mark"-deteksjon i terrengdata-laget — gjennomførbarhet
+  bekreftet 2026-08-18, klar for scoping.** NIBIO SR16 (et skogressurskart)
+  kan aldri produsere en `'apen'`-verdi for `treslag`/`skogalder`, uansett
+  hvor åpent et sted faktisk er (se `fetch_area.py`/`TRESLAG_MAP`).
+  Testet AR5 (`wms.nibio.no/cgi-bin/ar5`, samme NIBIO-tjenestefamilie som
+  SR16/markfuktighet) live mot tre kjente kontrollpunkter (Oslo/Nesodden
+  nær ekte parasollsopp-funn, Nordmarka som skog-kontroll, Jæren som
+  jordbruks-kontroll):
+  - `GetFeatureInfo` (samme metode som fungerer for SR16) ga **tomt svar
+    for alle AR5-underlag** (`Arealtype`, `AR5`, `Hovedgrupper`,
+    `Jordbruksareal`) — samme rasterlag-begrensning som markfuktighet
+    allerede har (se `fetch_markfuktighet()`), IKKE en indikasjon på
+    manglende dekning.
+  - **Samme løsning som markfuktighet allerede bruker fungerer også
+    her**: et lite `GetMap`-utsnitt + lese av pikselfargen
+    (`decode_png_pixel()`), matchet mot `GetLegendGraphic`. Verifisert
+    treffsikkert: Nordmarka og punktet nær det ekte Oslo-parasollsoppfunnet
+    ga begge fargen for **Skog** (158,204,115); Jæren ga fargene for
+    **Innmarksbeite** (255,255,173) og **Fulldyrka jord** (255,209,110) —
+    presist samsvar med kjent terreng. AR5 har en egen, distinkt klasse
+    **"Åpen fastmark"** (217,217,217) — nøyaktig kategorien
+    parasollsopp/sjampinjong trenger.
+  - Ingen ny infrastruktur nødvendig utover å gjenbruke det eksisterende
+    `decode_png_pixel()`-mønsteret på et nytt lag — samme teknikk, ikke
+    et nytt problem å løse. Klar for full scoping (ny scoringsakse,
+    ETL-integrasjon, `refresh-existing`-backfill for eksisterende
+    terreng_steder) når det prioriteres.
+  - Merk: at det ekte parasollsopp-funnstedet i Oslo klassifiseres som
+    "Skog" (ikke "Åpen fastmark") av AR5 er ikke en motsigelse — samme
+    presisjonsbegrensning som OSM-testen traff på (terreng_stedet er et
+    punkt ~0,5 km-rutenett, ikke nøyaktig der soppen sto; arten vokser i
+    skogbryn/lysninger som kan ligge noen titalls meter unna selve punktet).
 - **Lauvtreslag-oppløsning i terrengdata-laget** — SR16 skiller ikke
   hassel/eik/asp/bøk fra generisk "lauvdominert" (alt mappes til `bjork`).
   Ville forbedret presisjonen spesifikt for kalkkrevende lauvtre-arter som
