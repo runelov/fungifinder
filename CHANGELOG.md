@@ -1,5 +1,33 @@
 # Endringslogg
 
+## 0.28.5 — Strammet "kjente funn i nærheten" fra 1,5 km til 500 m
+Oppfølger til v0.28.4. Brukerspørsmål: er 1,5 km (~7 km²) ikke et
+urealistisk stort område å kalle "kjent funnsted" — det er mye jobb å lete
+gjennom et areal på flere kvadratkilometer?
+
+Svaret var ja — 1,5 km var opprinnelig kun ETL-ens (`fetch_area.py`)
+KOBLINGSradius for å knytte et Artskart-funn til et sted i utgangspunktet
+(nødvendig fordi Artskart kun lar seg filtrere på fylke server-side, se
+fungifinder-db/README.md), ikke et bevisst valg om hva som er "nært nok"
+for en sanker. Strammet til 500 m to steder, begge nå samme terskel:
+
+- **`scoreLocation()`s tetthetsbonus** (opptil +10 poeng) og
+  nedprioriterings-motstykket (`deprioritizeKnownFinds`) — teller nå kun
+  funn <500 m, i stedet for hele ETL-ens 1,5 km-pool. Endrer faktisk
+  totalscore for steder som tidligere fikk bonus utelukkende fra funn i
+  500 m–1,5 km-sonen. `avstandM` er allerede lagret presist per funn, så
+  dette er en terskeljustering, ingen ny data nødvendig.
+- **"Hvorfor her?"-kortets "Kjente funn"-stolpe** — samme 500 m, etikett
+  oppdatert fra "< 1,5 km" til "< 500 m".
+
+ETL-ens 1,5 km-koblingsradius selv er UENDRET (fortsatt riktig for
+datainnsamling — et funn 1,4 km unna er fortsatt relevant kontekst for
+stedet), og `knownFindsHtml()` (den detaljerte funnlisten på kortet, med
+eksakt meter-avstand per funn) er også uendret — den påstår ikke "nært",
+den viser bare rå avstand, så ingen villedende ramme å rette der.
+
+Verifisert live lokalt (wrangler dev + ekte innlogging).
+
 ## 0.28.4 — "Hvorfor her?"-kortet fremhever nå faktiske vekstvilkår
 Brukertilbakemelding: kortet var fint, men fremhevet feil ting — avstand
 til vei og befolkningsnærhet er ADKOMST/RO, ikke noe soppen selv bryr seg

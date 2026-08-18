@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.28.4';
+  const APP_VERSION = '0.28.5';
   const APP_BUILD_DATE = '2026-08-18';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -2579,7 +2579,20 @@
     // mer enn ett enkelt gammelt funn langt unna. Eldre steder som kun har
     // det gamle boolske kjenteFunn-feltet (fra før artsfunn-oppgraderingen
     // 2026-07-09) faller tilbake til den enkle, faste bonusen.
-    const funnDetaljer = (loc.kjenteFunnDetaljer || []).filter(f => f.art === species.id);
+    //
+    // RETTET 2026-08-18 (bruker påpekte at 1,5 km — arealet ETL-en i
+    // fetch_area.py bruker for å KOBLE et Artskart-funn til et sted i
+    // utgangspunktet, se fungifinder-db/README.md — er et urealistisk stort
+    // søkeområde å tolke som "kjent funnsted": ca. 7 km², langt mer enn noen
+    // realistisk leter gjennom på ett besøk): denne bonusen (og
+    // nedprioriterings-motstykket under, og "✓ kjent funnsted"-badgen, se
+    // hasEvidence) strammes nå til <500 m her, UAVHENGIG av ETL-ens 1,5
+    // km-koblingsradius (den er fortsatt riktig for datainnsamling — et
+    // Artskart-funn 1,4 km unna ER fortsatt relevant kontekst for STEDET,
+    // bare ikke lenger noe scoreLocation() teller som "kjent nærliggende
+    // funn"). avstandM finnes allerede presist per funn, så dette er en ren
+    // terskeljustering, ingen ny data nødvendig.
+    const funnDetaljer = (loc.kjenteFunnDetaljer || []).filter(f => f.art === species.id && f.avstandM < 500);
     let naerFunn = false;
     if (funnDetaljer.length) {
       naerFunn = funnDetaljer.some(f => f.avstandM < 300);
@@ -4218,9 +4231,13 @@
       factors.push({ label: 'Sørvendt skråning', valueText: `${loc.helningGrader}°, ${loc.himmelretning}-vendt`, pct: (sorvendt && passeHelning) ? 85 : 35 });
     }
 
-    const funn = (loc.kjenteFunnDetaljer || []).filter(f => f.art === species.id && f.avstandM < 1500);
+    // Samme 500 m-terskel som scoreLocation()s tetthetsbonus nå bruker (se
+    // RETTET 2026-08-18 der) — bevisst IKKE ETL-ens videre 1,5 km-
+    // koblingsradius, som er et urealistisk stort "søkeområde" å vise fram
+    // som "kjent funnsted".
+    const funn = (loc.kjenteFunnDetaljer || []).filter(f => f.art === species.id && f.avstandM < 500);
     const pctFunn = funn.length === 0 ? 12 : Math.min(90, 30 + funn.length * 15);
-    factors.push({ label: 'Kjente funn < 1,5 km', valueText: funn.length ? `${funn.length} stk` : 'ingen kjente', pct: pctFunn });
+    factors.push({ label: 'Kjente funn < 500 m', valueText: funn.length ? `${funn.length} stk` : 'ingen kjente', pct: pctFunn });
 
     return factors;
   }
