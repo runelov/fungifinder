@@ -190,38 +190,35 @@ terrengdata-laget (se eget punkt under).
   vektbudsjett. Fuktighet/berggrunn scores som normalt (samme WMS-kall som
   for skogpunkter, uavhengig av om SR16 har noe å si).
 
-  **Tre reelle strukturelle endringer, i rekkefølge:**
-  1. **`fetch_area.py`s kandidat-portvakt** (`enrich_point()`) forkaster i
-     dag ETHVERT punkt der høgde-API-ets `terreng`-felt ikke er
-     `"skog"`/`"skogbevokst myr"` — FØR SR16/markfuktighet/berggrunn i det
-     hele tatt kalles. Verifisert live 2026-08-18: API-et returnerer
-     `"ÅpentOmråde"` for et kjent jordbrukspunkt (Jæren), `"Skog"` for
-     Nordmarka, `"BymessigBebyggelse"` for Oslo sentrum — et konkret,
-     bekreftet nytt terrengtype-navn (`"åpentområde"` etter `.lower()`) å
-     legge til en utvidet aksept-liste ved siden av `FOREST_TERRAIN_VALUES`.
-     Uten denne endringen blir åpne punkter fortsatt forkastet på første
-     sjekk, uansett hvor god AR5-klassifiseringen er.
-  2. **Ny AR5-henting** (`fetch_ar5_arealtype()`, samme
-     `GetMap`+pikselfarge-mønster som `fetch_markfuktighet()`) kalles for
-     kandidater som ikke er skog, og setter `treslag`/`skogalder` til
-     `'apen'` når AR5 sier "Åpen fastmark" (evt. "Innmarksbeite" —
-     avgjøres empirisk mot flere kontrollpunkter enn de tre fra
-     gjennomførbarhetstesten). Kun ett nytt WMS-kall per tidligere
-     FORKASTET kandidat — ingen ekstra kostnad for skogpunkter.
-  3. **Eksisterende terreng_steder får INGEN åpne naboer av
-     `--refresh-existing` alene** — allerede lagrede steder ble per
-     definisjon godkjent av den GAMLE (skog-only) portvakten, så en
-     attributt-oppfriskning finner ingen nye punkter. Ekte åpen-mark-punkter
-     krever et FERSKT rutenett-sveip over samme områder (samme kostnadsbilde
-     som er scopet i Voksestedslaget-artifaktets Del 4-kalibrering — ikke
-     en gratis bonus, en reell ny ETL-kjøring per område).
-
-  **Rekkefølge foreslått**: (1) og (2) er rene kodeendringer, ingen
-  produksjonskjøring — trygge å implementere og teste isolert (f.eks.
-  `--test-point` mot Jæren-koordinatene fra gjennomførbarhetstesten) før
-  noe rulles ut. (3) er en bevisst, separat, senere beslutning — samme
-  "spor D er en egen, senere handling"-prinsipp som kalibreringsplanen
-  allerede bruker.
+  **Tre reelle strukturelle endringer:**
+  1. ~~**`fetch_area.py`s kandidat-portvakt**~~ — **gjort 2026-08-18
+     (fungifinder-db v42), se CHANGELOG.** Forkastet tidligere ETHVERT
+     punkt der høgde-API-ets `terreng`-felt ikke var `"skog"`/
+     `"skogbevokst myr"` — FØR SR16/markfuktighet/berggrunn i det hele
+     tatt ble kalt. Ny `OPEN_TERRAIN_VALUES = {"åpentområde"}` (verifisert
+     live mot Jæren) slipper nå disse kandidatene videre til en uavhengig
+     AR5-sjekk.
+  2. ~~**Ny AR5-henting**~~ — **gjort 2026-08-18 (fungifinder-db v42), se
+     CHANGELOG.** `fetch_ar5_arealtype()` (samme `GetMap`+pikselfarge-
+     mønster som `fetch_markfuktighet()`) kalles kun for de nye
+     kandidatene fra (1) — ingen ekstra kostnad for skogpunkter. Setter
+     `treslag:['apen']`/`skogalder:'apen'` når AR5 bekrefter "Åpen
+     fastmark" eller "Innmarksbeite"; forkaster kandidaten hvis AR5 er
+     uenig med høgde-API-et (bebygd/vann/dyrket mark/udekodbar piksel).
+     Verifisert direkte mot `enrich_point()` (ikke bare `--test-point`,
+     som kun dumper rå API-svar): Jæren ga `treslag:['apen']` med
+     fuktighet/berggrunn populert normalt, Nordmarka beholdt uendret
+     skog-sti (AR5 aldri kalt), Oslo sentrum fortsatt korrekt forkastet.
+  3. **Eksisterende terreng_steder får fortsatt INGEN åpne naboer av
+     `--refresh-existing` alene** — gjenstår, bevisst ikke gjort i (1)/(2).
+     Allerede lagrede steder ble per definisjon godkjent av den GAMLE
+     (skog-only) portvakten, så en attributt-oppfriskning finner ingen nye
+     punkter. Ekte åpen-mark-punkter krever et FERSKT rutenett-sveip over
+     samme områder (samme kostnadsbilde som er scopet i
+     Voksestedslaget-artifaktets Del 4-kalibrering — ikke en gratis bonus,
+     en reell ny ETL-kjøring per område). Samme "spor D er en egen, senere
+     handling"-prinsipp som kalibreringsplanen allerede bruker — venter på
+     eksplisitt beslutning før det kjøres.
 - ~~**Gjeninnfør furuknippesopp**~~ — **gjort 2026-08-18 (v0.28.12), se
   CHANGELOG.** Trofisk modus avklart samme dag av en tredje, uavhengig,
   fagfellevurdert kilde (genomstudie, Ohta et al. i *DNA Research*):
