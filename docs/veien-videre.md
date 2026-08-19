@@ -1037,3 +1037,56 @@ committes, siden det er der ETL-en faktisk kjører.
      markfuktighet) er dermed nå PÅ som standard i hele produksjons-
      pipelinen** — kun SR16 og AR5-porten gjenstår AV, med kjente,
      kvantifiserte, uløste avvik dokumentert over.
+
+## Ytelse utenom Del 3: batchet høyde-/terrengport (2026-08-19)
+
+Brukeren spurte om tre ting etter å ha lest en sveip-logg: (1) om "20"-en
+i fremdriftsutskriften ("behandlet 420/589 punkter …") var et gjennomtenkt
+batch-tall, (2) om datahenting kan optimaliseres mer generelt (mange kall
+med "like" resultater), (3) om ulike datakilder på sikt bør ha ulik
+oppfriskingsfrekvens.
+
+**Svar 1**: `% 20` er REN fremdrifts-utskrift (`if (i+1) % 20 == 0: print(...)`),
+ikke en batch-størrelse — ingen kostnad tilknyttet tallet i det hele
+tatt. Ingen endring nødvendig.
+
+**Svar 2 — utforsket videre og implementert**: selve høyde-/terreng-PORTEN
+(`fetch_elevation_point()`, kalt av HVERT kandidatpunkt uansett utfall)
+var det ene stedet som fortsatt gjorde ett live-kall per punkt til tross
+for at et fungerende batch-endepunkt allerede fantes i kodebasen (brukt
+for helning/himmelretning). Verifisert live: Kartverkets batch-API tåler
+maks 50 koordinater per kall ("Man kan sende inn maksimum 50
+koordinater, minimum 1" — 422 ved flere). `enrich_point()` fikk en ny
+`precomputed_elev_info`-parameter (kun brukt i AR5_GATE_ENABLED sin
+AV-gren, dagens produksjonssti — SAMME datakilde/API, bare batchet, så
+ingen feature-flag/paritetstest var nødvendig ulikt Del 3s faktorer).
+`main()` sitt hovedsveip forhåndsfiltrerer mot kjente D1-steder (billig,
+lokalt) og batcher resten i grupper av 50 før selve punkt-for-punkt-
+løkken. Verifisert bit-identisk resultat (elevation/terrain/aksept/
+avvisning) mot enkeltkall, lokalt og i ekte CI (samme Nannestad-sveip,
+149 punkt, 110 godkjent — uendret fra alle tidligere kjøringer).
+
+Resultat: **149 punkt sjekket på 172,9s** (3 batch-kall for porten i
+stedet for 149 enkeltkall) — ned fra 199,6s (Del 3-faktorene alene) og
+316,0s (opprinnelig, før noe av dagens arbeid) for SAMME sveip. Cirka
+**45 % raskere enn utgangspunktet** samlet sett. Fant også og rettet en
+liten regresjon underveis: `fetch_elevation_points_batch()` oppdaterer
+ikke `STATS` selv (delt med `compute_slope_aspect()`s nabo-batch, som
+aldri har blitt talt der) — lagt tilbake i selve batch-løkken i `main()`
+i stedet, samme regel som enkelt-kallet brukte.
+
+**Svar 3 — delvis allerede løst, resten en fremtidig retning**:
+`REFRESH_INTERVALS_DAYS` styrer allerede `--refresh-existing`-stien
+(`hogstaar: 180` dager, `osm_infra: 60` dager), bevisst UTEN Artskart
+(kontinuerlig). Del 3s nye lokale faktorer (berggrunn/DTM) bruker
+GitHub Actions-cache med en MANUELT bumpet versjonsnøkkel
+(`berggrunn-n1350-v1`/`dtm10-tiles-v1`) — allerede riktig matchet mot
+hvor sjelden disse kildene faktisk endres (berggrunn: praktisk talt
+aldri, DTM: kun ved en ny nasjonal høydemodell), men er en MANUELL
+prosess uten noe automatisk varsel om at NGU/Kartverket har gitt ut en
+ny utgave. En fremtidig, ikke bygget retning: en liten
+"friskhets-registrering" — én linje per datakilde med kjent
+oppdateringstakt + nåværende oppfriskingsmekanisme — pluss en periodisk
+sjekk mot kildenes egne `oppdateringsdato`/`datauttaks`-felt for å
+automatisk oppdage når en versjon faktisk BØR bumpes, i stedet for å
+stole på at noen husker det.
