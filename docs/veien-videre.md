@@ -888,14 +888,53 @@ committes, siden det er der ETL-en faktisk kjører.
    Nannestad spesifikt har bedre dekning enn landsgjennomsnittet; begge
    er mulige, ikke skilt fra hverandre her. **`treslag` (82 %) bekrefter
    steg 2/3s antakelse** (67–84 % i mindre utvalg) — nå et mer robust
-   tall å planlegge rundt. **`skogalder` (66 %) er et NYTT, svakere funn**
-   — ikke spesifikt paritetstestet tidligere i Del 3 (kun sjekket at
-   størrelsesordenen virket rimelig, se steg 2) — bøtte-grensene
-   (`ung<40, middels 40–79, gammel≥80`) anvendt på `SRRTREALDER` ser ut
-   til å gi merkbart flere avvik enn selve treslag-koden, mulig fordi
-   SR16R og SR16V sin alder-beregning er systematisk forskjøvet nær
-   bøttegrensene — IKKE undersøkt videre her, egen oppfølging anbefalt
-   før SR16-flagget vurderes.
+   tall å planlegge rundt. **`skogalder` (66 %)**, undersøkt videre
+   2026-08-19 (samme dag, på brukerens forespørsel — se under).
+
+   **`skogalder`-oppfølging (2026-08-19): den opprinnelige
+   bøttegrense-hypotesen var FEIL, testet og motbevist, ikke bare antatt
+   forkastet.** Hentet RÅ alder (ikke bare bøtte-navn) for alle 103
+   punkt fra begge kilder (`srtrealder` live vs. `SRRTREALDER` lokalt) og
+   sammenlignet tallene direkte:
+   - Ekskludert de 2 punktene som ble reklassifisert til `apen` av
+     AR5-porten (ikke en alders-uenighet i det hele tatt, se steg 5/6) —
+     rendyrket skog-mot-skog-sammenligning: **68/96 = 71 % bøtte-match**
+     (litt bedre enn det opprinnelige 66 %-tallet, som inkluderte disse
+     2 urelaterte punktene).
+   - **Gjennomsnittlig avvik: 0,1 år, median: 0,0 år — INGEN systematisk
+     forskyvning i noen retning** (48 av 98 punkt har raster eldre enn
+     vektor, 48 har raster yngre — perfekt symmetrisk). Dette motbeviser
+     direkte den opprinnelige "systematisk forskjøvet nær
+     bøttegrensene"-hypotesen — det er ikke en liten, retningsbestemt
+     forskyvning som bøttegrense-justering kunne fikset.
+   - I stedet: **ekte, symmetrisk HØY-VARIANS uenighet**. 44/96 (46 %)
+     er innenfor 10 år (fin presisjon), men 11/96 (11 %) har et avvik på
+     40+ år — for eksempel ett punkt der live sa 13 år (nylig
+     hogd/plantet, `hogstÅr=2024`) og raster sa 127 år (gammelskog) for
+     nøyaktig samme koordinat.
+   - Fulgt opp med `hogstÅr` for de 7 største avvikene (≥40 år): kun 2 av
+     7 hadde et nylig `hogstÅr` (2024) i live-svaret — nylig hogst
+     forklarer altså NOEN, men ikke de fleste, av de største avvikene.
+     Mest sannsynlige forklaring, i tråd med NIBIOs egen
+     produktbeskrivelse (SR16V generaliserer pikselkartet til større,
+     "relativt homogene" bestandspolygoner): en vektor-polygon kan i
+     praksis IKKE være aldersmessig homogen (f.eks. et nylig hogd felt
+     rett ved eldre skog, generalisert inn i samme polygon fordi
+     treslaget er likt) — da vil ETT punkt inni polygonen kunne treffe
+     en alder som avviker kraftig fra polygonets ene rapporterte
+     gjennomsnitts-/dominansverdi, mens rasteret ser det faktiske,
+     lokale pikselnivået. Samme grunnleggende årsak som
+     treslag-avvikene, bare med større praktisk utslag siden alder kan
+     endre seg brått (hogst→0) over svært korte avstander på en måte
+     treslag sjelden gjør.
+   - **Konklusjon: dette er IKKE noe en bøttegrense-justering kan fikse**
+     — de rå tallene selv avviker med opptil 100+ år på enkeltpunkt, ikke
+     bare noen få år nær en 40- eller 80-årsgrense. `skogalder` bør
+     fortsatt IKKE brukes fra lokal lesing i produksjon; en fremtidig
+     retning verdt å vurdere er heller å FLAGGE lav presisjon nær
+     hogstår-relaterte avvik enn å prøve å presist matche SR16V, siden
+     de to kildene måler reelt forskjellige ting (polygon-generalisering
+     vs. rå piksel) heller enn at én av dem har "feil" tall.
 
    **Anbefaling**: `FUNGIFINDER_LOCAL_BERGGRUNN` og `FUNGIFINDER_LOCAL_DTM`
    er klare for en vurdert produksjonsuttesting på dette grunnlaget.
