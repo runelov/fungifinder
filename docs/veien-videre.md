@@ -1090,3 +1090,60 @@ oppdateringstakt + nåværende oppfriskingsmekanisme — pluss en periodisk
 sjekk mot kildenes egne `oppdateringsdato`/`datauttaks`-felt for å
 automatisk oppdage når en versjon faktisk BØR bumpes, i stedet for å
 stole på at noen husker det.
+
+## Nasjonalt sveip: revidert tidsestimat (2026-08-19)
+
+Etter dagens arbeid (Del 3-faktorene i produksjon + batchet høydeport)
+ba brukeren om en fylkesskala-validering av det opprinnelige
+Del 4-anslaget (11,6–24,2 dager for et fullt sekvensielt nasjonalt
+sveip, se Del 3-scoping over) — for å bekrefte at forbedringene faktisk
+holder ved reell skala, ikke bare på 149–589-punkts kommune-sveip.
+
+**Kjørt: `--mode fylke --value Akershus`, dry-run** — desidert største
+sveip testet så langt denne økten:
+- 5590 rå rutenett-kandidater → 2742 innenfor fylkesgrensen (49 %
+  overlevelse, samme størrelsesorden som Nannestad 59 % og Vågå 37 %).
+- Batchet høydeport: 2420 kandidater i 49 batch-kall (322 forhåndsfiltrert
+  som duplikat av kjente D1-steder — Akershus/Nannestad har mye
+  eksisterende dekning fra all testingen i dag).
+- Markfuktighet-fallbacken holdt ved skala: 397/1492 (27 %) aksepterte
+  punkt trengte live-fallback, ALLE fikk likevel en reell verdi (0 endte
+  som "ukjent") — bekrefter Vågå-fiksen fungerer for en hel fylke, ikke
+  bare ett kommune-utvalg.
+- **2742 punkt sjekket på 2322,3s = 0,85s/punkt** — raskere enn selv
+  Nannestad/Vågås 1,16–1,26s/punkt, trolig pga. varme
+  SR16/berggrunn-cacher fra dagens tidligere kjøringer.
+
+**Revidert nasjonalt estimat** (Norges fastlandsareal ~385 000 km²,
+gridKm=1,5 → 171 111 rå kandidater; overlevelsesrate snitt 48,3 % fra de
+tre reelle testene → ~82 700 reelle kandidater nasjonalt):
+
+| Scenario | Rate | Estimert tid |
+|---|---|---|
+| Optimistisk (varme cacher, som Akershus) | 0,85 s/punkt | **~19,5 timer** |
+| Realistisk (kalde cacher, ny fylke hver gang) | 1,2 s/punkt | **~27,6 timer** |
+
+Ned fra **11,6–24,2 dager** i det opprinnelige anslaget — grovt **10–13x
+raskere**, og bekreftet med ekte tall ved fylkesskala, ikke bare
+ekstrapolert fra små kommune-utvalg.
+
+**Fortsatt for langt for ÉN GitHub Actions-jobb** — GitHub-hostede
+runnere har et hardt 6-timers jobbtak som ikke kan økes, uansett hvor
+raskt selve sveipet er blitt. Et fullt sekvensielt nasjonalt sveip i
+allerede eksisterende `--mode fylke`-form MÅ derfor deles opp — men
+dette er allerede løst arkitektonisk: 15 separate `fetch-area.yml
+--mode fylke`-kjøringer (én per fylke), som API-et allerede støtter
+uendret. Basert på Akershus (2742 kandidater, 39 min) og at nasjonale
+kandidater fordeler seg over 15 fylker (~5500 i snitt, opptil et par
+ganger så mange for de største som Innlandet/Nordland/Trøndelag) vil
+selv den STØRSTE enkeltfylken trolig holde seg godt under 6-timers-
+taket. Kjørt i PARALLELL (GitHub Actions tillater mange samtidige
+workflow-kjøringer på samme repo) ville total klokketid for et fullt
+nasjonalt sveip trolig lande på et par-tre timer — styrt av den
+tregeste enkeltfylken, ikke summen av alle 15.
+
+**Ikke gjort**: selve det nasjonale sveipet (dette er kun et revidert
+tidsestimat + arkitekturbekreftelse, ikke en utført nasjonal kjøring —
+en ekte nasjonal produksjonskjøring er en egen, mye større beslutning
+som fortjener en egen samtale før den eventuelt startes, ikke noe å
+gli inn i som et "neste steg").
