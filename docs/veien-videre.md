@@ -905,3 +905,27 @@ committes, siden det er der ETL-en faktisk kjører.
    produksjon ennå — treslag/skogalder-usikkerheten og
    gate-churn-raten er reelle, kvantifiserte, men uløste avvik, ikke bare
    teoretiske bekymringer lenger.
+
+   **Berggrunn+DTM slått PÅ i produksjon 2026-08-19, samme dag**
+   (eksplisitt godkjent av brukeren — redigeringen ble først blokkert av
+   Claude Codes tillatelses-klassifiserer som en konsekvensfull
+   produksjonsendring, spurte, fikk et klart ja):
+   - `fetch-area.yml`: `localBerggrunn`/`localDtm` sin standardverdi
+     endret `false`→`true` (fortsatt overstyrbar per manuell kjøring for
+     feilsøking/sammenligning mot live).
+   - `refresh-areas.yml` (ukentlig cron, alle tidligere hentede områder
+     nasjonalt) og `enrich-point.yml` (brukerregistrerte funn):
+     `FUNGIFINDER_LOCAL_BERGGRUNN=1`/`FUNGIFINDER_LOCAL_DTM=1` hardkodet i
+     env-blokken — ingen input å overstyre med her, i motsetning til
+     fetch-area.yml.
+   - SR16/markfuktighet/AR5-porten er BEVISST fortsatt AV overalt i
+     produksjon.
+   - Verifisert i ekte CI at selve DEFAULT-verdien faktisk slår inn (ikke
+     bare når flagget sendes eksplisitt): en [kjøring uten noen
+     `local*`-input i det hele tatt](https://github.com/runelov/fungifinder-db/actions/runs/32263059940) viste likevel
+     `FUNGIFINDER_LOCAL_BERGGRUNN: 1`/`FUNGIFINDER_LOCAL_DTM: 1` i loggen,
+     cache-treff, korrekt indeksering og `berggrunn: 1 ok`.
+   - `refresh-areas.yml` sin ukentlige mandagskjøring ikke fremtvunget
+     manuelt for å teste dette — den plukker opp endringen av seg selv
+     ved neste ordinære kjøring, i tråd med normal drift, i stedet for et
+     ekstra nasjonalt sveip kun for verifikasjonens skyld.
