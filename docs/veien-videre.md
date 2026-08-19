@@ -543,9 +543,70 @@ committes, siden det er der ETL-en faktisk kjører.
    feature-flag som lar den fortsatt falle tilbake til live-WMS-kall per
    faktor til hver er verifisert — ikke én stor rewrite som bytter alt på
    én gang.
-4. Legg til en romlig indeks (`shapely.STRtree` e.l.) for
-   vektoroppslagene før nasjonal skala testes — 31ms lineært søk for ett
-   fylkes 2378 polygoner skalerer ikke uendret til et nasjonalt datasett.
+
+   ~~Berggrunn portert~~ — **gjort 2026-08-19** (`fungifinder-db`,
+   `scripts/fetch_area.py`). `fetch_berggrunn()` er nå et dispatch-lag
+   styrt av `FUNGIFINDER_LOCAL_BERGGRUNN=1` (AV som standard — uendret
+   produksjonsatferd) mellom `fetch_berggrunn_live()` (uendret, gammel
+   kode) og ny `fetch_berggrunn_local()`. Klassifiseringsregelen
+   (kalkstein/marmor→rik, skifer/fyllitt→moderat, ellers fattig) er
+   flyttet til én delt `classify_bergart()` slik at de to kildene kun kan
+   avvike i rådata, aldri i tolkning.
+
+   **Viktig korreksjon underveis**: 2026-08-16-øktens lokalt cachede
+   `BerggrunnN50`-datasett (fylkesscopet, Akershus, 2378 polygoner) viste
+   seg IKKE å være samme kilde som selve live WMS-laget
+   (`Berggrunn_nasjonal_hovedbergarter`) faktisk bruker — paritetstest
+   mot N50 ga 24/25 (96 %, ett reelt avvik: N50 sa "Sandstein" der live
+   sa "Kalkstein"/rik for samme punkt). Undersøkt med rå GML fra live-
+   kallet: laget er NGUs **"Berggrunn N1350"**-produkt
+   (1:1 350 000-skala, landsdekkende i ÉN fil, kun 4637 polygoner totalt
+   — hele Norge, ikke bare ett fylke). Byttet til N1350
+   (`nedlasting.ngu.no`, samme bestillings-API-mønster som NIBIO-
+   funnene i steg 2, men `deliveryNotificationByEmail:true` her — måtte
+   polles/verifiseres at et tomt e-postfelt likevel fungerer synkront,
+   noe det gjorde når format-/areanavn matchet kodelisten eksakt).
+   Ny paritetstest mot N1350: **37/37 (100 %)** — 25 punkt i
+   Akershus-området + 12 spredt over hele landet (Rogaland til Finnmark),
+   sammenlignet mot ekte `fetch_berggrunn_live()`-svar. Det tidligere
+   N50-datasettet i `data/bulk-cache/berggrunn/` er nå feilaktig og bør
+   IKKE brukes — `data/bulk-cache/berggrunn_n1350/norge_n1350.zip` er
+   riktig kilde.
+
+   Siden N1350 er landsdekkende i ÉN ~82 MB fil (i motsetning til SR16s
+   per-fylke-oppdeling), var det praktisk å laste den ned i sin helhet i
+   stedet for `/vsicurl/`-vindusnedlasting — `_download_berggrunn_n1350_if_missing()`
+   bestiller og laster ned automatisk ved første bruk (verifisert fra
+   tom tilstand: bestilling → nedlasting → STRtree-indeksering tar ~8s
+   totalt), til `data/bulk-cache/berggrunn_n1350/` (gitignored, IKKE
+   committet — dette betyr GitHub Actions-runnere laster ned filen på
+   nytt for hver jobbkjøring når flagget er på, siden runnere er
+   forkastet mellom kjøringer og det ikke er satt opp noen
+   `actions/cache`-lagring for denne mappen ennå — en reell, ikke løst,
+   kostnadsavveining å ta stilling til før flagget faktisk slås på i
+   produksjon: enten aksepter ~8s/kjøring, eller sett opp
+   `actions/cache` nøkkelet på filens uendrede innhold).
+
+   `shapely.strtree.STRtree` bygges ÉN gang per prosess (~5s for 4637
+   polygoner) og gjenbrukes for alle punkt i kjøringen (lazy singleton,
+   `_LOCAL_BERGGRUNN_INDEX`) — samme oppslagstid som artifaktets
+   opprinnelige N50-test viste (sub-millisekund per punkt), **dette
+   dekker punkt 4 under for berggrunn spesifikt** (spatial-indeks var
+   allerede en del av implementasjonen, ikke en egen etterfølgende
+   jobb). `pyshp` er nå lagt til `scripts/requirements.txt` (`rasterio`
+   fortsatt ikke — trengs først når DTM/SR16/markfuktighet porteres, se
+   under).
+
+   **Ikke gjort ennå**: DTM, SR16, markfuktighet er fortsatt live-only —
+   dette var kun berggrunn, det mest modne sporet. `hogstår`s manglende
+   SR16-rasterekvivalent (se steg 2) er heller ikke avgjort.
+4. ~~Legg til en romlig indeks~~ (`shapely.STRtree`) — **gjort for
+   berggrunn 2026-08-19**, se steg 3 over (bygget inn i selve
+   berggrunn-porteringen i stedet for som et eget etterfølgende steg).
+   DTM/SR16/markfuktighet trenger ingen tilsvarende indeks når de
+   porteres — de er rasterpunktoppslag via `rasterio` (vindussampling),
+   ikke vektor-punkt-i-polygon-søk, så dette punktet er i praksis løst
+   for alle fire faktorene, ikke bare berggrunn.
 5. Avgjør AR5-skog-porten separat: bruk live WMS (fungerer allerede, se
    over) som interim/permanent løsning for selve porten, siden bulk
    FKB-AR5 er reelt blokkert — dette gir fortsatt store deler av
