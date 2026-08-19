@@ -600,6 +600,31 @@ committes, siden det er der ETL-en faktisk kjører.
    **Ikke gjort ennå**: DTM, SR16, markfuktighet er fortsatt live-only —
    dette var kun berggrunn, det mest modne sporet. `hogstår`s manglende
    SR16-rasterekvivalent (se steg 2) er heller ikke avgjort.
+
+   **GitHub Actions-cache lagt til og verifisert 2026-08-19, samme dag**
+   (den ubesvarte kostnadsavveiningen over): `actions/cache@v4` lagt til i
+   alle tre workflowene som kan nå `fetch_berggrunn()`
+   (`fetch-area.yml`/`refresh-areas.yml`/`enrich-point.yml`), nøkkel
+   `berggrunn-n1350-v1` (manuelt bumpet versjon, ikke innholdshash —
+   berggrunnsgeologi endres praktisk talt aldri). `fetch-area.yml` fikk i
+   tillegg en `localBerggrunn` workflow_dispatch-input for å kunne teste
+   flagget i ekte CI uten å endre standardatferden i de to andre
+   workflowene (fortsatt AV der, venter på steg 6). Verifisert med tre
+   ekte kjøringer, ikke bare antatt:
+   - [Kjøring 1](https://github.com/runelov/fungifinder-db/actions/runs/32254256440) (Oslo sentrum, radius 2 km): 0 av 4 kandidatpunkter bestod
+     skog-porten — INGEN treff på `fetch_berggrunn()`, altså ingen
+     nedlasting, og cache-steget hoppet over lagring siden mappen aldri
+     ble opprettet (harmløst, som forventet — men et tegn på at
+     testpunktet var dårlig valgt, rettet i kjøring 2).
+   - [Kjøring 2](https://github.com/runelov/fungifinder-db/actions/runs/32254404504) (Nannestad-området, radius 2 km, samme skogpunkt som
+     paritetstesten i steg 2/3): "Cache not found for input keys:
+     berggrunn-n1350-v1" → ekte nedlasting i selve Actions-runneren
+     ("lastet ned 81.9 MB", samme størrelse som lokalt) → "Cache saved
+     with key: berggrunn-n1350-v1".
+   - [Kjøring 3](https://github.com/runelov/fungifinder-db/actions/runs/32254566794), identiske parametre: "Cache hit for: berggrunn-n1350-v1"
+     → "Cache restored from key" → rett til "indeksert 4637 polygoner",
+     INGEN ny bestilling/nedlasting denne gangen. Cache-mekanikken
+     fungerer altså som tiltenkt i produksjonsmiljøet, ikke bare lokalt.
 4. ~~Legg til en romlig indeks~~ (`shapely.STRtree`) — **gjort for
    berggrunn 2026-08-19**, se steg 3 over (bygget inn i selve
    berggrunn-porteringen i stedet for som et eget etterfølgende steg).
