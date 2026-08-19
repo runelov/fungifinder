@@ -829,6 +829,79 @@ committes, siden det er der ETL-en faktisk kjører.
    marginale punkt, ikke en feil. Verdt å være tydelig på: å bytte port
    endrer FAKTISK hvilke punkt som havner i databasen for et lite
    mindretall, ikke bare hvordan de blir scoret.
-6. Kjør en ny Del 4-lignende paritetstest (Spor B/C fra artifaktet, som
-   sto åpent nettopp fordi Del 3 ikke var bygget nok til å måle mot) før
-   noe av dette rulles ut i produksjon.
+6. ~~Kjør en ny Del 4-lignende paritetstest~~ — **gjort 2026-08-19, samme
+   dag.** ("Spor B/C fra artifaktet" er ikke gjenfunnet — det var innhold i
+   en 2026-08-16 Claude-artifakt-økt, ikke committet noe sted i repoene —
+   så dette er en ny, selvstendig test bygget på samme prinsipp: en reell
+   kommune-skala sveip med alle flagg AV vs. alle flagg PÅ samtidig,
+   sammenlignet punkt for punkt.)
+
+   **Metode**: to parallelle `fetch-area.yml --dry-run`-kjøringer mot
+   Nannestad kommune (`gridKm=1.5`, 252 rutenett-kandidater → 149 innenfor
+   kommunegrensen) — én med alle Del 3/steg 5-flagg av (dagens
+   produksjonsvei), én med `localBerggrunn`+`localDtm`+`localSr16`+
+   `localMarkfuktighet`+`ar5Gate` alle PÅ samtidig (full lokal kombo).
+   Begge lastet ned som dry-run-artifacts og sammenlignet direkte,
+   punkt-for-punkt via `id`-feltet (som koder lat/lon deterministisk).
+
+   **Reell treghet funnet OG rettet FØR sluttresultatet**: første
+   full-lokal-kjøring var faktisk **14 % TREGERE** enn live (359,5s mot
+   316,0s for samme 149 punkt) — stikk i strid med hele Del 3s
+   motivasjon. Rotårsak: `_find_sr16_fylke_code()` kalte
+   `reverse_geocode()` (Nominatim, PÅKREVD 1s sleep per faktisk kall) for
+   hvert punkt, men cachet kun på Nominatim-funksjonens eget
+   ~1 km-rutenett — ved `gridKm=1.5` (større enn cellen) traff nesten
+   hvert punkt en ny celle, altså ~100 unødvendige 1-sekunders sleep BARE
+   for å slå opp SAMME fylke om og om igjen. Rettet med en egen, mye
+   grovere cache (~11 km-rutenett) i selve funksjonen, testet lokalt, og
+   kjørt på nytt. **Etter fiksen: 199,6s mot 316,0s — full-lokal er nå
+   37 % RASKERE enn live**, altså Del 3s kjernepremiss faktisk bekreftet
+   ved reell skala, ikke bare antatt. Dette er nøyaktig den typen ting en
+   produksjonsskala-test skal fange opp — verdt å være tydelig på at det
+   IKKE fungerte første forsøk, og hvorfor.
+
+   **Punkt-for-punkt-resultater** (149 kandidater, begge kjøringer
+   aksepterte 110 — men IKKE de samme 110):
+   - 103 punkt akseptert av BEGGE veiene, 7 kun av live-porten, 7 kun av
+     AR5-porten — **~6,4 % reell "gate-churn"**, konsistent med det
+     mindre 1/13-utvalget fra steg 5, nå bekreftet på et større utvalg.
+   - Feltvis enighet blant de 103 punktene begge aksepterte (grei-
+     toleranse 5 for høyde/helning, gitt eksisterende dokumenterte
+     avvik):
+     | Felt | Enighet |
+     |---|---|
+     | `berggrunn` | 103/103 (100 %) |
+     | `hoydeMoh` | 103/103 (100 %) |
+     | `fuktighet` | 102/103 (99 %) |
+     | `helningGrader` | 102/103 (99 %) |
+     | `fuktighetIndex` | 98/103 (95 %) |
+     | `himmelretning` | 89/103 (86 %) |
+     | `treslag` | 84/103 (82 %) |
+     | `skogalder` | 68/103 (66 %) |
+
+   **Tolkning — berggrunn og DTM (høyde) er produksjonsklare** på dette
+   grunnlaget: 100 % feltvis enighet på et reelt, 103-punkts utvalg, ikke
+   bare de små stikkprøvene fra steg 3. **Markfuktighet ser bedre ut enn
+   den lille stikkprøven i steg 3 fryktet** (99 %/95 % her mot 50–92 % i
+   et utvalg på 6–12 punkt) — trolig var det tidlige utvalget uheldig
+   (traff tilfeldigvis flere av de spredte dekningshullene), eller
+   Nannestad spesifikt har bedre dekning enn landsgjennomsnittet; begge
+   er mulige, ikke skilt fra hverandre her. **`treslag` (82 %) bekrefter
+   steg 2/3s antakelse** (67–84 % i mindre utvalg) — nå et mer robust
+   tall å planlegge rundt. **`skogalder` (66 %) er et NYTT, svakere funn**
+   — ikke spesifikt paritetstestet tidligere i Del 3 (kun sjekket at
+   størrelsesordenen virket rimelig, se steg 2) — bøtte-grensene
+   (`ung<40, middels 40–79, gammel≥80`) anvendt på `SRRTREALDER` ser ut
+   til å gi merkbart flere avvik enn selve treslag-koden, mulig fordi
+   SR16R og SR16V sin alder-beregning er systematisk forskjøvet nær
+   bøttegrensene — IKKE undersøkt videre her, egen oppfølging anbefalt
+   før SR16-flagget vurderes.
+
+   **Anbefaling**: `FUNGIFINDER_LOCAL_BERGGRUNN` og `FUNGIFINDER_LOCAL_DTM`
+   er klare for en vurdert produksjonsuttesting på dette grunnlaget.
+   `FUNGIFINDER_LOCAL_MARKFUKTIGHET` ser lovende ut, men bør bekreftes på
+   minst ett utvalg til (annen kommune/landsdel) før samme konklusjon.
+   `FUNGIFINDER_LOCAL_SR16` og `FUNGIFINDER_AR5_GATE` bør IKKE slås på i
+   produksjon ennå — treslag/skogalder-usikkerheten og
+   gate-churn-raten er reelle, kvantifiserte, men uløste avvik, ikke bare
+   teoretiske bekymringer lenger.
