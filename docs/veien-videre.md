@@ -737,6 +737,41 @@ committes, siden det er der ETL-en faktisk kjører.
    SR16-rasterlags-motstykke finnes (bekreftet steg 2), og bevisst IKKE
    tilnærmet fra lav alder for å unngå å innføre systematisk skjevhet i et
    reelt scoringsfelt uten dokumentert grunnlag for terskelen.
+
+   ~~Markfuktighet portert~~ — **gjort 2026-08-19, samme dag. Alle fire
+   faktorer i Del 3 er nå portert** (berggrunn, DTM, SR16, markfuktighet),
+   alle AV som standard bak hvert sitt flagg. Ny
+   `fetch_markfuktighet_local()`, styrt av
+   `FUNGIFINDER_LOCAL_MARKFUKTIGHET=1`. Arkitektonisk den enkleste av de
+   fire: samme `/vsicurl/`-mønster som SR16 (ingen lokal
+   nedlasting/cache — filen er 7,4 GB), men uten SR16s fylkesoppslag i
+   det hele tatt, siden datasettet kun finnes som ÉN landsdekkende fil.
+   Rasterklassen ER appens klasseindeks direkte, ingen
+   kodeskjema-oversettelse nødvendig (ulikt SR16).
+
+   **Reell begrensning oppdaget under paritetstesting, ikke en kode-
+   /projeksjonsbug**: et første tilfeldig utvalg (n=6, filtrert til
+   punkt som består skog-porten) ga 3/6 eksakt match — resten fikk
+   `local=('ukjent', None)` der live sa `('tørr', 6)`. Bekreftet ved rå
+   pikselinspeksjon at dette IKKE er en koordinat-/CRS-feil (punktene lå
+   godt innenfor rasterets `bounds`, men traff selve pikselverdien 0/
+   `nodata`) — datasettet har ekte, spredte dekningshull. Et andre
+   utvalg (n=12, kjente norske tettsteder/områder spredt fra Rogaland
+   til Finnmark, samme punkter som berggrunn-testen) ga et mye bedre
+   bilde: **11/12 eksakt match**, ett hull (Nordland/Trøndelag-grensen).
+   Hullene ser ut til å klynge seg i fjellstrøk/spredtbygde områder,
+   plausibelt fordi markfuktighet er AVLEDET fra høydedata og arver
+   samme datagrunnlagshull der høyoppløst DTM er tynnere. Sann
+   dekningsrate ikke presist fastslått — samme "burde måles på et større
+   utvalg før produksjon"-forbehold som SR16. Faller uansett trygt
+   tilbake til `("ukjent", None)`, samme vei som live-funksjonens egne
+   feilhåndteringstilfeller — ingen krasj, bare mindre presis scoring
+   for de berørte punktene.
+
+   Verifisert i ekte CI med samme mønster som de tre andre — ny
+   `localMarkfuktighet`-input, [kjøring](https://github.com/runelov/fungifinder-db/actions/runs/32257988935) ga
+   `markfuktighet: 1 ok / 0 feil`, dry-run-artifact bekreftet reell verdi
+   (`fuktighet: "tørr"`, `fuktighetIndex: 6`) skrevet til slutt.
 4. ~~Legg til en romlig indeks~~ (`shapely.STRtree`) — **gjort for
    berggrunn 2026-08-19**, se steg 3 over (bygget inn i selve
    berggrunn-porteringen i stedet for som et eget etterfølgende steg).
