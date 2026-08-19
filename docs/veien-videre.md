@@ -685,6 +685,58 @@ committes, siden det er der ETL-en faktisk kjører.
    plausible verdier faktisk skrives helt til slutt (ikke bare at koden
    kjører uten feil): `hoydeMoh: 434.3`, `helningGrader: 13.4`,
    `himmelretning: "V"` for det godkjente punktet.
+
+   ~~SR16 portert~~ — **gjort 2026-08-19, samme dag.** Ny
+   `fetch_sr16_local()`, styrt av `FUNGIFINDER_LOCAL_SR16=1` (AV som
+   standard). Enklere å koble inn enn DTM (rent drop-in-bytte, ingen
+   `enrich_point()`-grenselinje-logikk å endre — treslag/alder har ingen
+   gate-avhengighet slik høyde/terreng har).
+
+   **Arkitekturvalg, ulikt berggrunn/DTM**: INGEN lokal nedlasting/cache.
+   SR16 raster tilbys kun fylkesscopet (Akershus: 846 MB for 23 lag), og
+   kun 2 av dem trengs (`SRRTRESLAG`/`SRRTREALDER`) — en full nedlasting
+   ville kastet bort >95 % av dataen. Leser i stedet direkte via
+   `/vsizip//vsicurl/` mot NIBIOs server (samme mekanikk steg 2 allerede
+   validerte for selve paritetstesten, nå gjenbrukt i selve ETL-koden).
+   Dette besvarer også et åpent spørsmål fra steg 2 ("ikke bekreftet at
+   dette fungerer likt fra en GitHub Actions-runners nettverk") — **bekreftet
+   2026-08-19**: [ekte CI-kjøring](https://github.com/runelov/fungifinder-db/actions/runs/32257263375) åpnet raster remote og ga
+   `sr16: 1 ok / 0 feil`, ingen lokal fil involvert. Fylkeskoden for et
+   punkt slås opp via `reverse_geocode()` (samme Nominatim-funksjon
+   radius-modus allerede bruker) matchet mot NIBIOs egen fylkeskodeliste —
+   kun ett nytt Nominatim-kall per NYTT fylke kjøringen støter på, ikke
+   per punkt (samme cache-mønster som DTM-flisene).
+
+   **Reell bug funnet og rettet underveis**: Oslo (fylke `"03"`) sine
+   zip-interne filnavn dropper den ledende nullen
+   (`sr16_3_SRRTRESLAG.tif`, ikke `sr16_03_...`), mens selve area-koden i
+   bestillingen MÅ være to-sifret for å matche NIBIOs kodeliste — oppdaget
+   ved å liste Oslo-zip-ens faktiske innhold live i stedet for å anta
+   samme mønster som Akershus. Alle andre fylker er allerede to-sifrede
+   uten ledende null, så fiksen (`str(int(fylke_kode))` for filnavnet) er
+   et no-op for dem.
+
+   **Paritetstesting — metodikk korrigert underveis**: en første, rask
+   test med tilfeldige punkter UANSETT terrengtype ga en mye høyere
+   "ulik dekning"-rate (6/14) enn steg 2s opprinnelige tall — men dette
+   var et metodikkfeil, ikke et reelt funn: `fetch_sr16()` kalles i
+   PRODUKSJON kun for punkt som allerede har bestått skog-porten
+   (`enrich_point()`), så å teste mot vilkårlige punkter (inkludert vann/
+   åker/bebygd mark, der SR16 raster korrekt returnerer nodata) er ikke
+   representativt. Rettet test (kun punkter der høgdeprofil-APIets
+   `terreng` faktisk sier "skog" FØRST, samme filter som ekte bruk):
+   **10/15 = 67 % match, 0 ulik dekning** (n=15). Lavere enn steg 2s 84 %,
+   men samme underliggende årsak til avvikene (gran/furu-uenighet i
+   blandingsskog nær bestandsgrenser, SR16V vs SR16R) — begge tallene er
+   trolig innenfor rimelig varians for et lite utvalg av samme reelle
+   fenomen, ikke motstridende funn. **Ikke fullstendig avklart** hvor den
+   sanne raten ligger — burde måles på et større utvalg (Del 3 steg 6) før
+   flagget vurderes slått på i produksjon.
+
+   **`hogstAr` returneres ALLTID `None`** fra lokal lesing — ingen
+   SR16-rasterlags-motstykke finnes (bekreftet steg 2), og bevisst IKKE
+   tilnærmet fra lav alder for å unngå å innføre systematisk skjevhet i et
+   reelt scoringsfelt uten dokumentert grunnlag for terskelen.
 4. ~~Legg til en romlig indeks~~ (`shapely.STRtree`) — **gjort for
    berggrunn 2026-08-19**, se steg 3 over (bygget inn i selve
    berggrunn-porteringen i stedet for som et eget etterfølgende steg).
