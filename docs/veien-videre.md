@@ -1147,3 +1147,83 @@ tidsestimat + arkitekturbekreftelse, ikke en utført nasjonal kjøring —
 en ekte nasjonal produksjonskjøring er en egen, mye større beslutning
 som fortjener en egen samtale før den eventuelt startes, ikke noe å
 gli inn i som et "neste steg").
+
+## Oppsummering: Del 3 + ytelsesarbeid, 2026-08-19
+
+Én lang økt, fra "kjør steg 6" til et validert, produksjonsklart, ~10x
+raskere nasjonalt sveip-estimat. Detaljene ligger dated gjennom hele
+Del 3-seksjonen og de to påfølgende seksjonene over — dette er kun et
+overordnet kart for en fremtidig leser (eller økt) som ikke vil lese alt.
+
+**Hva som faktisk kjører i produksjon nå** (alle tre PÅ som standard i
+`fetch-area.yml`/`refresh-areas.yml`/`enrich-point.yml`):
+- `FUNGIFINDER_LOCAL_BERGGRUNN` — NGU Berggrunn N1350, 100 % feltvis
+  enighet mot live (n=103, kommune-skala).
+- `FUNGIFINDER_LOCAL_DTM` — Kartverket DTM10, 254 fliser, 100 % enighet
+  på høyde (samme utvalg).
+- `FUNGIFINDER_LOCAL_MARKFUKTIGHET` — landsdekkende raster med
+  fall-tilbake til live ved lokal nodata, 100 % dekning og 99,6 %
+  eksakt-klasse-enighet, validert på BÅDE en lavlandskommune
+  (Nannestad) og en fjellkommune (Vågå) OG en hel fylke (Akershus, 27 %
+  fallback-rate der).
+- Ny batchet høyde-/terrengport (ikke et Del 3-flagg — samme datakilde,
+  bare batchet 50 om gangen i stedet for ett kall per punkt).
+
+**Hva som er BYGGET og CI-verifisert, men BEVISST fortsatt AV**:
+- `FUNGIFINDER_LOCAL_SR16` — treslag 82 % enighet, skogalder 66→71 %
+  (undersøkt: ekte SR16V/SR16R-generaliseringsuenighet, IKKE en
+  bøttegrense-feil — se skogalder-oppfølgingen). `hogstÅr` alltid
+  `None` lokalt (ingen rasterlags-motstykke).
+- `FUNGIFINDER_AR5_GATE` — ~6 % av kandidater får ulik aksept/avvisning
+  mot dagens Kartverk-baserte port. Målt (ikke antatt): AR5 er IKKE
+  raskere per kall enn Kartverket (147ms vs 130ms) — gevinsten er
+  smalere enn opprinnelig antatt (fjerner kun dobbeltkallet for
+  åpen-mark-kandidater + muliggjør null Kartverk-kall i kombinasjon med
+  lokal DTM), ikke en generell hastighetsgevinst alene.
+
+Ingen av disse to er "kodefeil å fikse" — begge er ekte uenighet mellom
+to legitimt forskjellige datakilder (generalisert vektor vs. rå
+piksel/klassifisering), IKKE noe videre koding trolig løser. Verdt å
+revidere kun om et NYTT datagrunnlag dukker opp, ikke ved å presse mer
+på dagens tilnærming.
+
+**Tallene som faktisk endret seg** (samme 149-punkts Nannestad-sveip
+brukt gjennom hele økten, for sammenlignbarhet):
+316,0s (utgangspunkt) → 199,6s (Del 3-faktorene, etter en reell
+SR16-fylkesoppslag-treghetsbug funnet+rettet underveis) → 172,9s
+(+ batchet høydeport). Skalert opp til en hel fylke (Akershus, 2742
+punkt): 0,85s/punkt — konsistent, ikke bare et lite-utvalg-artefakt.
+Nasjonalt revidert estimat: **~19,5–27,6 timer sekvensielt**, ned fra
+**11,6–24,2 dager** i det opprinnelige Del 4-anslaget.
+
+**Tre reelle bugs funnet og rettet underveis** (verdt å huske MØNSTERET,
+ikke bare fikset-listen — alle tre ble funnet FORDI noe ble testet ved
+reell skala/reelle data, ikke ved kode-gjennomlesning):
+1. Oslo (fylke `"03"`) sine SR16-zip-interne filnavn dropper den
+   ledende nullen — funnet ved å faktisk liste zip-innholdet.
+2. `reverse_geocode()`s ~1 km-cache var for finmasket for SR16s
+   fylkesoppslag ved `gridKm>1km` — ga ~100 unødvendige
+   Nominatim-kall/sleep i én kommune-sveip, funnet ved å faktisk
+   TIDMÅLE en full kommune-kjøring, ikke anta at "lokalt = raskt".
+3. Markfuktighet-rasterets dekningshull (77 % i Vågå) — funnet ved å
+   bevisst velge en GEOGRAFISK ANNERLEDES testkommune enn den første,
+   ikke ved å stole på ett godt resultat.
+
+**Anbefalte neste steg, i prioritert rekkefølge**:
+1. **Nasjonalt sveip — krever en egen, eksplisitt beslutningssamtale
+   FØR oppstart**, ikke noe å gli inn i. Planen er klar (15
+   `--mode fylke`-kjøringer, kjørbare parallelt, trolig 2–3 timers
+   klokketid totalt) og tallgrunnlaget er nå fylkesskala-validert — men
+   selve utførelsen skriver ekte data til produksjons-D1 for HELE
+   landet, en ordre av magnitude større handling enn noe annet gjort i
+   denne økten.
+2. **Frisk hets-registrering** (bruker sitt spørsmål 3, ikke bygget):
+   én linje per datakilde med kjent oppdateringstakt + nåværende
+   oppfriskingsmekanisme, pluss en periodisk sjekk mot kildenes egne
+   `oppdateringsdato`/`datauttaks`-felt — gjør den manuelle
+   versjons-bump-konvensjonen (`berggrunn-n1350-v1`/`dtm10-tiles-v1`)
+   til noe som varsler av seg selv i stedet for å stole på at noen
+   husker det.
+3. SR16/AR5-porten: IKKE en aktiv oppgave — begge er reelt begrenset av
+   datagrunnlaget, ikke av implementasjonen. La stå AV til en eventuell
+   fremtidig anledning gir grunn til å se på dem igjen.
