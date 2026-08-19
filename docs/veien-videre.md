@@ -446,9 +446,18 @@ Ubuntu-runneren (ikke bare i dette forhåndskonfigurerte miljøet) før dette
 committes, siden det er der ETL-en faktisk kjører.
 
 **Foreslått rekkefølge for videre arbeid**:
-1. Verifiser `rasterio`/`pyshp` faktisk installerer rent i en frisk GitHub
-   Actions Ubuntu-runner (billig, isolert sjekk — samme "verifiser
-   mekanikken før du bygger på den"-prinsipp som resten av planen).
+1. ~~Verifiser `rasterio`/`pyshp` faktisk installerer rent i en frisk
+   GitHub Actions Ubuntu-runner~~ — **gjort 2026-08-19.** Ny
+   `verify-del3-deps.yml` (workflow_dispatch, ingen cache, kaldt
+   `pip install`) kjørt mot `fungifinder-db`s `main`:
+   [run 32251199113](https://github.com/runelov/fungifinder-db/actions/runs/32251199113)
+   — grønn. `rasterio` 1.4.4 / GDAL 3.10.3 / `pyshp` 3.1.6 / `shapely`
+   2.1.2, GTiff-driver bekreftet tilgjengelig (70 drivere totalt). Verken
+   workflowen (`.github/workflows/verify-del3-deps.yml`) eller
+   sjekk-scriptet (`scripts/verify_del3_deps.py`) er fjernet — begge kan
+   kjøres på nytt om GDAL-relatert usikkerhet dukker opp igjen senere.
+   `scripts/requirements.txt` er bevisst IKKE endret ennå (se punkt 3 —
+   avhengighetene legges til når selve bygget faktisk starter).
 2. Test SR16- og markfuktighet-rasterlesing mot ferske nedlastede filer
    (samme paritetstest-metodikk som artifaktet allerede brukte for
    berggrunn — sammenlign mot `fetch_sr16()`/`fetch_markfuktighet()` sine
