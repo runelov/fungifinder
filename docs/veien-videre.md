@@ -1016,6 +1016,24 @@ committes, siden det er der ETL-en faktisk kjører.
    - `FUNGIFINDER_LOCAL_MARKFUKTIGHET` er etter dette i praksis like
      produksjonsklar som berggrunn/DTM — anbefalingen over ("bør
      bekreftes på ett utvalg til") er dermed innfridd, med et enda
-     sterkere resultat enn Nannestad-testen alene ga grunnlag for. IKKE
-     slått på i produksjon ennå i denne økten — egen vurdering/godkjenning
-     anbefalt før det gjøres, samme mønster som berggrunn/DTM fulgte.
+     sterkere resultat enn Nannestad-testen alene ga grunnlag for.
+
+   **Markfuktighet slått PÅ i produksjon 2026-08-19, samme dag**
+   (eksplisitt godkjent av brukeren, "Ja, slå på" — samme mønster som
+   berggrunn/DTM):
+   - `fetch-area.yml`: `localMarkfuktighet` sin standardverdi endret
+     `false`→`true`.
+   - `refresh-areas.yml` og `enrich-point.yml`:
+     `FUNGIFINDER_LOCAL_MARKFUKTIGHET=1` hardkodet i env-blokken. Merk:
+     ulikt `FUNGIFINDER_LOCAL_DTM` (som er et no-op i
+     `enrich-point.yml`s modus) brukes markfuktighet FAKTISK der —
+     `enrich_single_point_in_personal()` kaller `fetch_markfuktighet()`.
+   - SR16/AR5-porten fortsatt AV som standard overalt.
+   - Verifisert i ekte CI at [en kjøring uten noen `local*`-input i det
+     hele tatt](https://github.com/runelov/fungifinder-db/actions/runs/32267664729) satte alle tre
+     (`FUNGIFINDER_LOCAL_BERGGRUNN`/`_DTM`/`_MARKFUKTIGHET`) til `1` og
+     ga `markfuktighet: 1 ok`, `berggrunn: 1 ok`.
+   - **Alle tre klare, testede lokale faktorer (berggrunn, DTM,
+     markfuktighet) er dermed nå PÅ som standard i hele produksjons-
+     pipelinen** — kun SR16 og AR5-porten gjenstår AV, med kjente,
+     kvantifiserte, uløste avvik dokumentert over.
