@@ -768,6 +768,32 @@ committes, siden det er der ETL-en faktisk kjører.
    feilhåndteringstilfeller — ingen krasj, bare mindre presis scoring
    for de berørte punktene.
 
+   **Regional oppfølging (2026-08-19, samme dag, på brukerens
+   forespørsel)**: full kommune-sveip av **Vågå** (fjellkommune,
+   Jotunheimen-området — bevisst valgt som motsetning til Nannestads
+   lavland, og samme kommune som Voksestedslagets egen Del 4-kalibrering
+   2026-08-16 brukte) — 589 kandidater, 246 godkjent, sammenlignet
+   punkt-for-punkt mot live (samme metodikk som steg 6).
+
+   Bekrefter fjell-hypotesen tydelig, med tall i stedet for et
+   plausibelt gjettverk: **190/246 = 77 % fikk `"ukjent"` lokalt** i
+   Vågå — mot praktisk talt 0 % i Nannestad. MEN: av de 56 punktene der
+   rasteret FAKTISK hadde en verdi, var **56/56 (100 %) kategori-match
+   og 55/56 (98 %) eksakt klasse-match** mot live — altså identisk høy
+   presisjon som i Nannestad. **Dette er et rendyrket
+   DEKNINGS-problem, ikke et NØYAKTIGHETS-problem**: der datasettet har
+   en verdi, er den pålitelig; det er bare at det ofte ikke har noen i
+   fjellterreng. Sann landsdekkende dekningsrate ligger etter dette
+   trolig et sted mellom Nannestads ~100 % og Vågås 23 %, sterkt
+   avhengig av hvor mye av et gitt sveip som faktisk er fjell/utmark —
+   **`FUNGIFINDER_LOCAL_MARKFUKTIGHET` bør IKKE slås på i produksjon**
+   før enten (a) dekningen forbedres/suppleres på annet vis for
+   fjellområder, eller (b) koden endres til å falle tilbake til
+   live-kallet spesifikt når rasteret gir `nodata`, i stedet for å gi
+   `"ukjent"` — det andre alternativet er sannsynligvis den raskeste,
+   tryggeste veien til et faktisk produksjonsklart flagg, siden selve
+   nøyaktigheten der data finnes ikke er problemet.
+
    Verifisert i ekte CI med samme mønster som de tre andre — ny
    `localMarkfuktighet`-input, [kjøring](https://github.com/runelov/fungifinder-db/actions/runs/32257988935) ga
    `markfuktighet: 1 ok / 0 feil`, dry-run-artifact bekreftet reell verdi
@@ -936,10 +962,10 @@ committes, siden det er der ETL-en faktisk kjører.
      de to kildene måler reelt forskjellige ting (polygon-generalisering
      vs. rå piksel) heller enn at én av dem har "feil" tall.
 
-   **Anbefaling**: `FUNGIFINDER_LOCAL_BERGGRUNN` og `FUNGIFINDER_LOCAL_DTM`
-   er klare for en vurdert produksjonsuttesting på dette grunnlaget.
-   `FUNGIFINDER_LOCAL_MARKFUKTIGHET` ser lovende ut, men bør bekreftes på
-   minst ett utvalg til (annen kommune/landsdel) før samme konklusjon.
+   **Anbefaling (oppdatert etter markfuktighet-fiksen under)**:
+   `FUNGIFINDER_LOCAL_BERGGRUNN`, `FUNGIFINDER_LOCAL_DTM` OG (etter
+   fall-tilbake-fiksen) `FUNGIFINDER_LOCAL_MARKFUKTIGHET` er alle klare
+   for en vurdert produksjonsuttesting på dette grunnlaget.
    `FUNGIFINDER_LOCAL_SR16` og `FUNGIFINDER_AR5_GATE` bør IKKE slås på i
    produksjon ennå — treslag/skogalder-usikkerheten og
    gate-churn-raten er reelle, kvantifiserte, men uløste avvik, ikke bare
@@ -968,3 +994,28 @@ committes, siden det er der ETL-en faktisk kjører.
      manuelt for å teste dette — den plukker opp endringen av seg selv
      ved neste ordinære kjøring, i tråd med normal drift, i stedet for et
      ekstra nasjonalt sveip kun for verifikasjonens skyld.
+
+   **Markfuktighet-dekningshullet LØST samme dag, ikke bare bekreftet**
+   (brukeren ba om regional oppfølging → funnet 77 % dekningshull i Vågå
+   → implementert og verifisert en fiks, alt i samme økt): la til et
+   fall-tilbake-til-live i `fetch_markfuktighet()` selv (kun når lokalt
+   oppslag gir `"ukjent"` — se koden/kommentaren der for full
+   begrunnelse). Kjørt Vågå-sveipet på nytt med fiksen:
+   - `markfuktighet: 246 ok / 190 feil av 436` — de 190 lokale
+     nodata-tilfellene falt korrekt tilbake til live og fikk likevel en
+     reell verdi (ok-tallet dekker ALLE 246 aksepterte punkt, ikke bare
+     de 56 rasteret i utgangspunktet hadde data for).
+   - Punkt-for-punkt mot samme live-baseline: **0/246 fortsatt
+     "ukjent"**, **100 % kategori-match, 100 % (245/246) klasse-match**.
+   - Uventet bonus: **655,6s totalt, RASKERE enn både den rene
+     live-baselinen (727,9s) OG det opprinnelige (utette) lokale forsøket
+     (701,6s)** — selv i denne verst-tenkelige fjellkommunen betaler
+     flertallet av punktene aldri fallback-kostnaden, siden Vågå (som de
+     fleste norske kommuner) fortsatt har en god del lavereliggende areal
+     mellom fjellpartiene.
+   - `FUNGIFINDER_LOCAL_MARKFUKTIGHET` er etter dette i praksis like
+     produksjonsklar som berggrunn/DTM — anbefalingen over ("bør
+     bekreftes på ett utvalg til") er dermed innfridd, med et enda
+     sterkere resultat enn Nannestad-testen alene ga grunnlag for. IKKE
+     slått på i produksjon ennå i denne økten — egen vurdering/godkjenning
+     anbefalt før det gjøres, samme mønster som berggrunn/DTM fulgte.
