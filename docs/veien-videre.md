@@ -779,12 +779,56 @@ committes, siden det er der ETL-en faktisk kjører.
    porteres — de er rasterpunktoppslag via `rasterio` (vindussampling),
    ikke vektor-punkt-i-polygon-søk, så dette punktet er i praksis løst
    for alle fire faktorene, ikke bare berggrunn.
-5. Avgjør AR5-skog-porten separat: bruk live WMS (fungerer allerede, se
-   over) som interim/permanent løsning for selve porten, siden bulk
-   FKB-AR5 er reelt blokkert — dette gir fortsatt store deler av
-   Hitra-funnets gevinst (unngår SR16/markfuktighet/berggrunn-kall for
-   forkastede kandidater), bare ikke det aller siste "null live-kall"-
-   steget for selve skog/ikke-skog-avgjørelsen.
+5. ~~Avgjør AR5-skog-porten separat~~ — **gjort 2026-08-19, samme dag.**
+   Nytt `FUNGIFINDER_AR5_GATE=1` (AV som standard). `fetch_ar5_arealtype()`
+   avgjør nå skog/åpen-mark/avvis i ÉTT kall, i stedet for dagens
+   Kartverk-terreng-sjekk FØRST + et ekstra AR5-kall kun for
+   åpen-mark-kandidater.
+
+   **Målt, ikke antatt — den opprinnelige "langt billigere"-antakelsen
+   holdt IKKE**: AR5 (GetMap+pikselfarge) og Kartverkets høgdeprofil-API
+   har praktisk talt samme responstid per kall (147ms vs 130ms, liten
+   måling). Å bytte portkilde er ALENE altså ikke en stor
+   hastighetsgevinst. Den reelle, smalere gevinsten: (1) fjerner
+   dobbelt-kallet dagens vei allerede gjør for åpen-mark-kandidater
+   (ett i stedet for to for DEN undergruppen), og (2) — viktigst i
+   kombinasjon med `LOCAL_DTM_ENABLED` — fjerner den SISTE gjenværende
+   harde Kartverk-avhengigheten fra pipelinen: med begge flagg på
+   trenger et akseptert skogpunkt INGEN live Kartverk-kall i det hele
+   tatt. Prisen: `stedsnavn` blir da alltid borte (DTM10 har ingen —
+   faller til enrich_point()s eksisterende generiske
+   "Skogpunkt N"/"Åpent punkt N"-fallback).
+
+   **Paritetstestet FØR koding** (samme rekkefølge som resten av Del 3):
+   AR5s "Skog"-klasse mot Kartverkets skog/ikke-skog-svar, n=25
+   landsdekkende tilfeldige punkt — **25/25 enig** på selve skog/
+   ikke-skog-binæret (kategoriene stemte forøvrig påfallende godt også
+   utover selve skog-spørsmålet: havflate↔Hav, åpentområde↔Åpen
+   fastmark, dyrketmark↔Fulldyrka jord). `myr`/`skogbevokst myr` ikke
+   observert i utvalget — reell, ikke undersøkt edge-case.
+
+   **Regresjonstestet mot faktisk `enrich_point()`**: 3 punkt (skog/
+   åpen/skog) ga IDENTISK aksept/avvisning OG identiske
+   `hoydeMoh`/`helningGrader`-verdier med flagget på (uten
+   `LOCAL_DTM_ENABLED`) som med det av. Med `LOCAL_DTM_ENABLED` også på:
+   samme aksept/avvisning, høyde/helning innenfor DTM-portens allerede
+   dokumenterte ~1-2 m/0,5°-avvik. Full kombo (AR5_GATE + alle fire
+   Del 3-faktorer samtidig) produserte en komplett, sunn record med KUN
+   ett live AR5-kall totalt for et akseptert punkt.
+
+   **Verifisert i ekte CI — reell, liten avviksrate funnet, ikke
+   skjult**: [kjøring med flagget PÅ](https://github.com/runelov/fungifinder-db/actions/runs/32258935568) (radius 3 km, samme senter som
+   DTM/SR16/markfuktighet-testene) ga 13 kandidater, `ar5: 13 ok`,
+   `hoyde: 10 ok` (kun de 10 GODKJENTE trengte Kartverk-kallet, akkurat
+   som designet), 10/13 godkjent (76,9 %).
+   [Samme sveip med flagget AV](https://github.com/runelov/fungifinder-db/actions/runs/32259102997): `hoyde: 13 ok` (alle 13, som før), 9/13
+   godkjent (69,2 %) — **1 av 13 kandidater fikk ulik
+   aksept/avvisning-avgjørelse** mellom de to portene. Konsistent med
+   den målte 25/25-enigheten (som er et utvalg, ikke en garanti om 100 %
+   i alle tilfeller) — en reell, liten, forventet uenighetsrate ved
+   marginale punkt, ikke en feil. Verdt å være tydelig på: å bytte port
+   endrer FAKTISK hvilke punkt som havner i databasen for et lite
+   mindretall, ikke bare hvordan de blir scoret.
 6. Kjør en ny Del 4-lignende paritetstest (Spor B/C fra artifaktet, som
    sto åpent nettopp fordi Del 3 ikke var bygget nok til å måle mot) før
    noe av dette rulles ut i produksjon.
