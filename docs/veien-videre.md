@@ -625,6 +625,66 @@ committes, siden det er der ETL-en faktisk kjører.
      → "Cache restored from key" → rett til "indeksert 4637 polygoner",
      INGEN ny bestilling/nedlasting denne gangen. Cache-mekanikken
      fungerer altså som tiltenkt i produksjonsmiljøet, ikke bare lokalt.
+
+   ~~DTM portert~~ — **gjort 2026-08-19, samme dag.** Ny
+   `fetch_elevation_and_slope_local()`, styrt av `FUNGIFINDER_LOCAL_DTM=1`
+   (AV som standard).
+
+   **Viktig arkitekturforskjell fra berggrunn**: selve skog/åpen-mark-
+   PORTEN (`fetch_elevation_point()`s `terreng`- og `stedsnavn`-felt) har
+   INGEN lokal erstatning og forblir alltid live uansett flagg — DTM10 er
+   en ren høydemodell uten arealtype. Flagget bytter derfor kun ut selve
+   høyde-/helnings-/himmelretningsberegningen (`compute_slope_aspect()`s
+   4-nabo-batch-livekall) for kandidater som allerede har bestått porten —
+   en mer beskjeden, men fortsatt reell, gevinst enn berggrunn (som
+   fjernet ETT helt live-kall for HVERT kandidatpunkt; DTM fjerner ett av
+   TO gjenværende kall, kun for de ~15-25 % som består porten). Den fulle
+   "null live-kall for skog/ikke-skog-porten"-gevinsten er fortsatt punkt
+   5 (AR5-gate), en separat, ikke gjort endring.
+
+   **Kartverkets DTM finnes IKKE som én fil eller fylkesscopet fil** slik
+   berggrunn/SR16 gjør — "DTM 10 Terrengmodell (UTM33)" er delt i **254
+   kartblad-fliser** (~50×50 km hver, `nedlasting.geonorge.no`s
+   area-kodeliste for datasettet). `_find_dtm_tile()` avgjør hvilken flis
+   et punkt faller i ved å sjekke allerede kjente flisers cachede
+   dekningsbokser lokalt FØRST — kun ett punkt utenfor alle kjente bokser
+   trigger ett live `GetFeatureInfo`-kall mot Kartverkets dekningslag-WMS
+   (`celler_utm33`), ikke ett per punkt. Nedlasting-på-forespørsel
+   gjenbruker ordre-API-mønsteret fra berggrunn, men på
+   `nedlasting.geonorge.no` (Geonorge selv, IKKE NGU/NIBIO) — merk
+   stiforskjellen: `/api/order`/`/api/codelists/...` UTEN `v2`, ulikt de
+   to andre vertene.
+
+   **Reell bug funnet og omgått underveis**: dekningslag-WMS-en
+   (`celler_utm33`) sitt MapServer-oppsett genererer et ugyldig XML-
+   tagnavn for selve laget (mellomrom i `<celler_utm33_fra
+   _utm32_og_utm35_50m_grid_layer>`, bekreftet i rå GetFeatureInfo-
+   respons) — dette får `ET.fromstring()` (brukt av `parse_gml_feature()`)
+   til å kaste `ParseError`, som fanges og gir stille `None` for ALLE
+   punkt uansett faktisk treff. Byttet til en egen regex-basert uthenting
+   av `bilde_nr` for akkurat dette laget i stedet for å bruke den delte
+   GML-parseren.
+
+   **Paritetstestet**: 12 tilfeldige punkt i én flis (6602-1, dekker deler
+   av Nannestad-området) — rå høyde typisk <1,1 m avvik fra
+   `fetch_elevation_point()`s live svar (én outlier 3,6 m). 10 punkt til
+   gjennom den faktiske `enrich_point()`-logikken (elevasjon+helning+
+   himmelretning sammen): helning typisk <0,8° avvik, himmelretning
+   eksakt likt i 9/10 — det tiende var et grensetilfelle rett ved
+   flathet-terskelen (1,5°), ikke en reell uenighet.
+
+   **Verifisert i ekte CI, samme tre-kjørings-mønster som berggrunn**: ny
+   `localDtm`-input i `fetch-area.yml` + `actions/cache`-steg (nøkkel
+   `dtm10-tiles-v1`) i alle tre workflowene.
+   [Kjøring 1](https://github.com/runelov/fungifinder-db/actions/runs/32255893846): "Cache not found for input keys: dtm10-tiles-v1" →
+   "flis 6602-1 mangler lokalt — bestiller fra Geonorge …" → "lastet ned
+   43.7 MB" → `hoyde: 4 ok / 0 feil av 4 (100%)` → "Cache saved with key:
+   dtm10-tiles-v1".
+   [Kjøring 2](https://github.com/runelov/fungifinder-db/actions/runs/32256037385), identiske parametre: "Cache hit for: dtm10-tiles-v1", INGEN
+   ny nedlasting. Lastet ned dry-run-artifacten og bekreftet at reelle,
+   plausible verdier faktisk skrives helt til slutt (ikke bare at koden
+   kjører uten feil): `hoydeMoh: 434.3`, `helningGrader: 13.4`,
+   `himmelretning: "V"` for det godkjente punktet.
 4. ~~Legg til en romlig indeks~~ (`shapely.STRtree`) — **gjort for
    berggrunn 2026-08-19**, se steg 3 over (bygget inn i selve
    berggrunn-porteringen i stedet for som et eget etterfølgende steg).
