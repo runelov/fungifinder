@@ -458,10 +458,86 @@ committes, siden det er der ETL-en faktisk kjører.
    kjøres på nytt om GDAL-relatert usikkerhet dukker opp igjen senere.
    `scripts/requirements.txt` er bevisst IKKE endret ennå (se punkt 3 —
    avhengighetene legges til når selve bygget faktisk starter).
-2. Test SR16- og markfuktighet-rasterlesing mot ferske nedlastede filer
-   (samme paritetstest-metodikk som artifaktet allerede brukte for
-   berggrunn — sammenlign mot `fetch_sr16()`/`fetch_markfuktighet()` sine
-   LIVE svar for et sett kjente punkter, ikke bare anta parity).
+2. ~~Test SR16- og markfuktighet-rasterlesing mot ferske nedlastede
+   filer~~ — **gjort 2026-08-19.**
+
+   **Nedlastings-API'et måtte reverse-engineeres på nytt** — artifaktets
+   antakelse om at markfuktighet og SR16 deler "samme API" med kun
+   fylkesnivå-forskjell, stemte delvis: begge går via
+   `kart8.nibio.no`s bestillings-API (samme mønster som NGU/berggrunn,
+   `nedlasting.geonorge.no`-standarden), funnet ved å lese
+   `main.*.js`-bunten til `kart8.nibio.no/nedlasting/` (Angular-appen bak
+   nedlastingssiden) for de faktiske endepunktene, IKKE ved å gjette:
+   - `GET /api/v2/dataset/` — datasettliste. **SR16 står IKKE i denne
+     listen** (kun 20 spesialdatasett som Sbase2/DMK/Urban Atlas) — riktig
+     `metadataUuid` måtte hentes fra Geonorges kartkatalog-API
+     (`kartkatalog.geonorge.no/api/search?text=SR16`) i stedet.
+   - `GET /api/capabilities/{uuid}` → lenker til projection-/format-/area-
+     kodelister + selve bestillings-endepunktet.
+   - `GET /api/v2/codelists/area/{uuid}` — **korrigerer artifaktets
+     antakelse**: markfuktighet støtter virkelig kun étt areal, `"0000"
+     Hele landet` — MEN SR16 raster støtter fylkesnivå (`"32" Akershus`
+     osv.), altså ikke samme begrensning som markfuktighet likevel.
+   - `POST /api/v2/order` med `{email, orderLines:[{metadataUuid, areas,
+     projections, formats}]}` → returnerer direkte nedlastbare
+     `downloadUrl`-er synkront (ingen e-postventing, matcher
+     `deliveryNotificationByEmail:false` fra capabilities-svaret).
+
+   **Filstørrelser var større enn ventet** — markfuktighet "hele landet"
+   er én 7,4 GB GeoTIFF; SR16 raster for kun Akershus er en 846 MB zip
+   (23 enkeltlags-TIFF-er, `SRRTRESLAG`/`SRRTREALDER`/m.fl., lagret
+   ukomprimert i zip-en). **Ingen av delene ble lastet ned i sin helhet**
+   — GDALs `/vsicurl/`-lag leser vilkårlige vinduer over HTTP
+   Range-forespørsler direkte fra NIBIOs server, og siden zip-medlemmene
+   er ukomprimert virker `/vsizip//vsicurl/URL/internfil.tif` også
+   direkte inn i zip-en uten lokal nedlasting. Dette er en litt annen — og
+   trolig bedre — arkitektur enn planen opprinnelig så for seg
+   ("last ned én gang, les lokalt etterpå"): punktoppslag kan gjøres
+   direkte mot NIBIOs filserver på forespørsel, uten noen
+   nedlastings-/cache-fase i det hele tatt, så lenge nettverksmiljøet
+   (også GitHub Actions-runneren, ikke bare her) faktisk støtter
+   HTTP Range mot denne serveren i praksis — ikke sjekket ennå, se åpent
+   punkt under.
+
+   **Kodeskjema for `SRRTRESLAG` bekreftet autoritativt**, ikke bare
+   antatt fra artifaktet: `GetLegendGraphic` mot samme WMS-lag
+   (`wms.nibio.no/cgi-bin/sr16?...&layer=SRRTRESLAG`) ga en 3-fargers
+   tegnforklaring — grønn/beige/lys gul, lest av som eksakte RGB-verdier
+   — som kun kan tolkes `1=Gran, 2=Furu, 3=Lauv` i den rekkefølgen.
+   Bekrefter artifaktets antakelse, men nå verifisert, ikke gjettet.
+
+   **Paritetstest, markfuktighet** (n=7, samme punkter innenfor
+   Nannestad-testarealet som DTM-en fra 2026-08-16 dekker):
+   **7/7 eksakt treff** mot `fetch_markfuktighet()`s live klasseindeks —
+   ingen omregning nødvendig, rasterklassen ER indeksen appen allerede
+   bruker.
+
+   **Paritetstest, SR16 treslag** (n=25 tilfeldige punkter i samme
+   område, sammenlignet mot `fetch_sr16()`s live SRVTRESLAG-svar):
+   16 treff, 3 avvik, 3 "ulik dekning" (raster tom der live hadde svar —
+   trolig punkter som falt utenfor Akershus' faktiske fylkesgrense siden
+   testpunktene ble valgt fritt i en bbox uten å sjekke administrativ
+   grense, ikke bekreftet), 3 der begge var tomme. **16/19 = 84 % blant
+   sammenlignbare punkter** — samsvarer godt med "delvis, 80 %"-tallet
+   artifaktet allerede hadde notert 2026-08-16, altså reproduserbart og
+   ikke en tilfeldighet. Avvikene er trolig ekte SR16V/SR16R-uenighet
+   (vektorlaget er en generalisering av rasteret til større, mer homogene
+   bestand — se NIBIOs egen produktbeskrivelse — så pikselnivå-avvik nær
+   bestandsgrenser er forventet, ikke nødvendigvis en feil i noen av
+   kildene). `SRRTREALDER` ble også lest ut for alle 25 punkt og gir
+   plausible rå årstall (0 for nylig hogd/plantet, 139–151 for gamle
+   bestand) — bøtte-grensene for ung/middels/gammel er IKKE
+   punkt-for-punkt verifisert mot dette, kun sjekket at størrelsesordenen
+   stemmer overens.
+
+   **Åpent funn**: fant ingen rasterlags-motstykke til `hogst`
+   (hogstår) blant SR16 raster-zip-ens 23 lag — kun treslag, alder og en
+   rekke volum-/biomasse-mål. Om `enrich_point()`s nye lokale versjon
+   trenger hogstår, må dette feltet trolig enten beholdes som live
+   WMS-kall (kun for kandidater som består portvakten, altså sjelden) eller
+   avledes tilnærmet fra svært lav `SRRTREALDER` — ikke avgjort, tas opp
+   igjen i punkt 3.
+
 3. Bygg `enrich_point()`s nye lokale versjon FAKTOR FOR FAKTOR (berggrunn
    først — mest modent, deretter DTM, så SR16, så markfuktighet), med et
    feature-flag som lar den fortsatt falle tilbake til live-WMS-kall per
