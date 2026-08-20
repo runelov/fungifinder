@@ -1212,11 +1212,13 @@ reell skala/reelle data, ikke ved kode-gjennomlesning):
 **Anbefalte neste steg, i prioritert rekkefølge**:
 1. **Nasjonalt sveip — krever en egen, eksplisitt beslutningssamtale
    FØR oppstart**, ikke noe å gli inn i. Planen er klar (15
-   `--mode fylke`-kjøringer, kjørbare parallelt, trolig 2–3 timers
-   klokketid totalt) og tallgrunnlaget er nå fylkesskala-validert — men
-   selve utførelsen skriver ekte data til produksjons-D1 for HELE
-   landet, en ordre av magnitude større handling enn noe annet gjort i
-   denne økten.
+   `--mode fylke`-kjøringer, ~~kjørbare parallelt, trolig 2–3 timers
+   klokketid totalt~~ se "QA av ETL/datalagring før nasjonalt sveip"
+   under — ren parallell kjøring hadde en reell datatap-bug, nå rettet,
+   men bølge-inndeling ved grensedelende fylker gjenstår som anbefaling)
+   og tallgrunnlaget er nå fylkesskala-validert — men selve utførelsen
+   skriver ekte data til produksjons-D1 for HELE landet, en ordre av
+   magnitude større handling enn noe annet gjort i denne økten.
 2. **Frisk hets-registrering** (bruker sitt spørsmål 3, ikke bygget):
    én linje per datakilde med kjent oppdateringstakt + nåværende
    oppfriskingsmekanisme, pluss en periodisk sjekk mot kildenes egne
@@ -1227,3 +1229,97 @@ reell skala/reelle data, ikke ved kode-gjennomlesning):
 3. SR16/AR5-porten: IKKE en aktiv oppgave — begge er reelt begrenset av
    datagrunnlaget, ikke av implementasjonen. La stå AV til en eventuell
    fremtidig anledning gir grunn til å se på dem igjen.
+
+## QA av ETL/datalagring før nasjonalt sveip (2026-08-20)
+
+Bruker ba eksplisitt om en detaljert QA FØR det nasjonale sveipet
+(punkt 1 over) settes i gang, for å unngå å måtte kjøre det på nytt pga.
+en oppdaget mangel/bug. Gjennomgang av faktisk kode (`fetch_area.py`,
+`etlImport.js`, D1-skjemaet, `fetch-area.yml`), ikke bare denne planen.
+
+**🔴 Kritisk funn, RETTET samme dag (D1-migrasjon 0005)**: `fetched_areas`
+ble skrevet med `mode=replace_all` — `DELETE FROM fetched_areas` + insert
+alt på nytt, basert på en snapshot lest ved HVER kjørings oppstart (se
+`main()`/`refresh_existing_locations()`). Trygt for ÉN kjøring om gangen
+(alt dette var noensinne testet under), men et lost-update-race så snart
+flere kjøringer skriver samtidig: med 15 parallelle `--mode fylke`-jobber
+leser alle 15 samme startsnapshot FØR noen av dem har skrevet, og siste
+jobb som fullfører sin `replace_all` overskriver STILLE alle andre
+jobbers rader. Beregnet konsekvens: i beste fall hadde kun 1 av 15
+fylkers `fetched_areas`-rad overlevd et fullt nasjonalt sveip.
+`terreng_steder` var IKKE rammet (ekte `ON CONFLICT DO UPDATE` på `id`
+allerede), men `refresh-areas.yml` (ukentlig cron) leser `fetched_areas`
+for å vite hvilke områder som finnes og trenger oppfriskning av
+hogstår/artsfunn/OSM-infra — uten disse radene ville 14 av 15 fylker
+blitt usynlige for den ukentlige jobben, permanent og uten noen
+feilmelding. Ironisk nok var dette nøyaktig den klassen "les hele
+tabellen, endre én rad, skriv hele tabellen tilbake"-race
+`D1-MIGRASJON.md` opprinnelig ble skrevet for å fjerne (se dens
+"samtidig-skriving-kollisjon"-hendelse) — denne ene tabellen beholdt den
+ved et uhell, bare uten gitts høylytte push-avvisning.
+
+**Fiks** (migrasjon `0005_fetched_areas_upsert.sql` i
+`fungifinder/worker/api/migrations/`, verifisert lokalt med
+`wrangler d1 migrations apply --local` inkl. en simulert
+duplikat-historikk FØR migreringen og en ekte konflikt-/nyinnsettings-test
+ETTERPÅ — se commit for detaljer):
+- Ny `omrade_nokkel`-kolonne (deterministisk tekstnøkkel av
+  mode+value+lat+lon+radiusKm, beregnet i Python — IKKE en SQL-UNIQUE
+  direkte på de rå kolonnene, siden lat/lon/radiusKm er NULL for
+  fylke/kommune og value er NULL for radius, og SQLite behandler
+  NULL≠NULL i UNIQUE-indekser).
+- Migrasjonen bakoverfyller nøkkelen for eksisterende rader OG
+  dedupliserer (beholder nyeste `fetched_at` per nøkkel) FØR den unike
+  indeksen opprettes.
+- `etlImport.js` sin `fetched_areas`-gren byttet fra
+  `DELETE FROM + INSERT ALL` til `INSERT ... ON CONFLICT(omrade_nokkel)
+  DO UPDATE`, samme mønster `terreng_steder` allerede brukte.
+- `fetch_area.py` pusher nå kun DENNE kjøringens egen(e) rad(er), ikke
+  hele `fetched_areas`-lista, fra begge kallstedene
+  (`main()`/`refresh_existing_locations()`).
+
+**🔴 Kritisk, IKKE rettet — krever en prosessendring, ikke kode**:
+duplikat-/hull-risiko nær fylkesgrenser. `enrich_point()`s dedup
+(`< 150 m fra eksisterende sted`) sjekkes kun mot det `fetch_from_d1()`
+leste ved DENNE kjøringens start — to naboer (f.eks. Østfold/Akershus)
+som kjører samtidig ser aldri hverandres punkter før begge har
+committet. Grid-punktene fra hver fylke sin egen bbox kolliderer sjelden
+på eksakt `id`, men kan lande 50–140 m fra hverandre langs delelinjen —
+nære nok til å være reelle duplikater, usynlige for hverandre på
+hentetidspunktet. Ingen krasj, kun doble/tette markører (og lett skjev
+"kjente funn"-tetthet) langs samtlige fylkesgrenser i Norge.
+**Anbefaling, ikke implementert**: kjør sveipet i 2–3 bølger der ingen
+to samtidig kjørende fylker deler grense (Norges fylkesgraf er lett
+fargeleggbar med 3 farger) — beholder mesteparten av
+parallelliseringsgevinsten uten dette racet.
+
+**🟡 Moderate funn, ikke handlingskrevende ennå**:
+- `artskart-sync-state.json`-git-committen kan kollidere hvis flere
+  fylker synkes for FØRSTE gang samtidig (nye dict-nøkler kan treffe
+  samme tekstlinje) — feiler HØYLYTT (`git push` avvist, jobben
+  `exit 1` etter 5 rebase-forsøk), ikke stille datatap. Koster i verste
+  fall en full re-synk av det fylkets Artskart-cursor neste gang.
+  Selvhelbredende, tatt til etterretning, ikke fikset.
+- 15 samtidige store bbox-spørringer mot samme delte, offentlige
+  `overpass-api.de`-instans er en kjent måte å bli rate-limitet på.
+  Retry/backoff finnes (3 forsøk), men ingen koordinering på tvers av
+  jobber. Ved samtidig rate-limiting for flere fylker: de faller
+  tilbake til "ukjent" vei/parkering/stier/befolkning for hele fylket —
+  nå (etter fiksen over) korrekt synlig for `refresh-areas.yml` å prøve
+  på nytt neste uke, siden `osmInfraRefreshedAt=None` fortsatt skrives
+  riktig til den nye, trygge `fetched_areas`-raden.
+- Ingen `concurrency:`-gruppe er satt i `fetch-area.yml` —
+  GitHub Actions kjører alle 15 dispatchene helt ukoordinert. Ingenting
+  hindrer at grensetilfellet over faktisk inntreffer.
+- Ingenting i Del 3 er testet under FAKTISK parallell/flerprosess-
+  kjøring mot delt D1 — alt (Nannestad/Vågå/Akershus) var sekvensiell,
+  én-prosess-testing. Selve mekanismen sveipet er avhengig av (15
+  samtidige skrivere) var før denne QA-en ren antakelse.
+
+**Anbefalt rekkefølge videre**: kjør en liten, ekte
+to-parallell-jobb-test (to naboer, liten radius eller to små
+kommuner/fylker) og verifiser at BEGGE resultatene faktisk overlever i
+D1 etterpå (`terreng_steder` OG `fetched_areas`) — billig, empirisk
+bekreftelse av selve fiksen under ekte parallellitet, ikke bare i
+teorien — FØR det fulle 15-bølge/15-parallelle sveipet, og bølge-del
+grensedelende fylker som beskrevet over.

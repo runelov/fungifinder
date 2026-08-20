@@ -48,6 +48,12 @@ function dekningTilRad(a) {
   return [
     a.mode, nz(a.value), nz(a.lat), nz(a.lon), nz(a.radiusKm), nz(a.gridKm),
     nz(a.pointsChecked), nz(a.pointsAdded), a.fetchedAt, nz(a.osmInfraRefreshedAt),
+    // omradeNokkel (migrasjon 0005): deterministisk (mode,value,lat,lon,
+    // radiusKm)-nøkkel beregnet av fetch_area.py, se DEKNING_UPSERT under —
+    // erstatter det tidligere mode=replace_all-mønsteret, som ikke var trygt
+    // under parallelle ETL-kjøringer (se docs/veien-videre.md, QA før
+    // nasjonalt sveip 2026-08-20).
+    a.omradeNokkel,
   ];
 }
 
@@ -83,9 +89,24 @@ const ARTSFUNN_UPSERT = `
   ON CONFLICT(id) DO NOTHING
 `;
 
-const DEKNING_INSERT = `
-  INSERT INTO fetched_areas (mode, value, lat, lon, radius_km, grid_km, points_checked, points_added, fetched_at, osm_infra_refreshed_at)
-  VALUES (?,?,?,?,?,?,?,?,?,?)
+// UPSERT på omrade_nokkel (migrasjon 0005) — erstatter den tidligere
+// DEKNING_INSERT+"DELETE FROM fetched_areas"-kombinasjonen (mode=replace_all),
+// som leste hele tabellen, la til én rad, og skrev hele tabellen tilbake —
+// trygt for ÉN kjøring om gangen (det eneste scenarioet dette noensinne var
+// testet under), men et lost-update-race så snart flere ETL-kjøringer skriver
+// samtidig: siste kjøring som fullfører sin replace_all overskriver STILLE
+// alle andre kjøringers rader, siden hver av dem baserte seg på en snapshot
+// lest FØR noen av de andre hadde skrevet. Se docs/veien-videre.md, QA før
+// nasjonalt sveip 2026-08-20.
+const DEKNING_UPSERT = `
+  INSERT INTO fetched_areas (
+    mode, value, lat, lon, radius_km, grid_km, points_checked, points_added,
+    fetched_at, osm_infra_refreshed_at, omrade_nokkel
+  ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+  ON CONFLICT(omrade_nokkel) DO UPDATE SET
+    grid_km=excluded.grid_km, points_checked=excluded.points_checked,
+    points_added=excluded.points_added, fetched_at=excluded.fetched_at,
+    osm_infra_refreshed_at=excluded.osm_infra_refreshed_at
 `;
 
 function harGyldigEtlSecret(request, env) {
@@ -120,10 +141,11 @@ export async function importTerrengdata({ request, env }) {
 
   try {
     if (table === 'fetched_areas') {
-      if (mode !== 'replace_all') return json({ error: 'fetched_areas krever mode=replace_all.' }, 400, cors);
-      const statements = [env.DB.prepare('DELETE FROM fetched_areas')];
-      for (const rad of rows) statements.push(env.DB.prepare(DEKNING_INSERT).bind(...dekningTilRad(rad)));
-      await env.DB.batch(statements);
+      if (mode !== 'upsert') return json({ error: 'fetched_areas krever mode=upsert.' }, 400, cors);
+      if (rows.length > 0) {
+        const statements = rows.map((rad) => env.DB.prepare(DEKNING_UPSERT).bind(...dekningTilRad(rad)));
+        await env.DB.batch(statements);
+      }
     } else if (table === 'terreng_steder') {
       if (mode !== 'upsert') return json({ error: 'terreng_steder krever mode=upsert.' }, 400, cors);
       if (rows.length > 0) {
