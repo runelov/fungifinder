@@ -1,5 +1,24 @@
 # Endringslogg
 
+## 0.29.1 — Fiks admin → Brukere: permanent slettet bruker så ut som vanlig deaktivert
+Bruker (admin) meldte at en permanent slettet bruker ("Mette —
+slettet-4@slettet.invalid") ikke forsvant fra Brukere-fanen. Delvis
+bevisst — Statistikk-fanen viser dem allerede med hensikt (se
+`hentStatistikk()` i `worker/api/admin.js`: scrubbing beholder
+`bruker_data`-raden, så tallene ville vært misvisende lave uten dem) —
+men Brukere-fanen manglet samme markering og viste fortsatt fungerende
+⏸/▶- og ✕-knapper for en rad som backendens egne vakter uansett
+avviser (raden er scrubbet, ikke fjernet, se `slettBrukerPermanent()`).
+`status` er `'deaktivert'` for BÅDE en vanlig pauset bruker og en
+permanent slettet en, så de var visuelt umulige å skille fra hverandre
+uten å lese e-postadressen.
+
+- `renderAdminBrukere()` i `js/app.js` leser nå `slettet_tidspunkt`
+  (var allerede med i API-svaret, bare ubrukt) og viser
+  "· permanent slettet" i stedet for "· deaktivert", og skjuler begge
+  handlingsknappene for slike rader — ingenting igjen å slå av/på eller
+  slette.
+
 ## 0.29.0 — Redesign: landingssekvens, kartutsnitt, demo-tekst og trykkflater
 Implementerer redesignforslaget fra designkritikken 2026-08-21 (godkjent
 samme dag). Fem endringer, alle innenfor eksisterende visuell profil — ingen

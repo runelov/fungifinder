@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.29.0';
+  const APP_VERSION = '0.29.1';
   const APP_BUILD_DATE = '2026-08-21';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -925,12 +925,19 @@
     el.innerHTML = 'Laster …';
     try {
       const brukere = await window.ApiClient.hentBrukere();
+      // RETTET 2026-08-21 (bruker meldte: en permanent slettet bruker så
+      // identisk ut som en vanlig deaktivert — status er 'deaktivert' for
+      // begge, se slettBrukerPermanent() i worker/api/src/routes/admin.js —
+      // og hadde fortsatt fungerende ⏸/▶- og ✕-knapper, selv om et klikk på
+      // dem uansett bare bounser i et 400-svar fra backendens egen vakt
+      // (raden er scrubbet, ikke fjernet — se samme funksjon for hvorfor).
+      // slettet_tidspunkt var allerede med i API-svaret, bare ubrukt her.
       el.innerHTML = brukere.map(b => `
         <div class="sp-mine-row">
-          <span>${escapeHtml(b.kortnavn)} <span style="opacity:.6">— ${escapeHtml(b.epost)} · ${b.rolle}${b.status==='deaktivert' ? ' · deaktivert' : ''}</span></span>
+          <span>${escapeHtml(b.kortnavn)} <span style="opacity:.6">— ${escapeHtml(b.epost)} · ${b.rolle}${b.slettet_tidspunkt ? ' · permanent slettet' : (b.status==='deaktivert' ? ' · deaktivert' : '')}</span></span>
           <span class="sp-mine-row-actions">
-            ${b.rolle !== 'admin' ? `<button class="sp-locate" data-toggle-bruker="${b.id}" data-ny-status="${b.status==='aktiv'?'deaktivert':'aktiv'}" title="${b.status==='aktiv'?'Deaktiver':'Aktiver'}">${b.status==='aktiv'?'⏸':'▶'}</button>` : ''}
-            ${b.rolle !== 'admin' ? `<button class="sp-remove" data-slett-bruker="${b.id}" title="Slett permanent">✕</button>` : ''}
+            ${b.rolle !== 'admin' && !b.slettet_tidspunkt ? `<button class="sp-locate" data-toggle-bruker="${b.id}" data-ny-status="${b.status==='aktiv'?'deaktivert':'aktiv'}" title="${b.status==='aktiv'?'Deaktiver':'Aktiver'}">${b.status==='aktiv'?'⏸':'▶'}</button>` : ''}
+            ${b.rolle !== 'admin' && !b.slettet_tidspunkt ? `<button class="sp-remove" data-slett-bruker="${b.id}" title="Slett permanent">✕</button>` : ''}
           </span>
         </div>`).join('') || '<div class="sp-empty-mine">Ingen brukere ennå.</div>';
       el.querySelectorAll('[data-toggle-bruker]').forEach(btn => btn.addEventListener('click', async () => {
