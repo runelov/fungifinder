@@ -1323,3 +1323,79 @@ D1 etterpå (`terreng_steder` OG `fetched_areas`) — billig, empirisk
 bekreftelse av selve fiksen under ekte parallellitet, ikke bare i
 teorien — FØR det fulle 15-bølge/15-parallelle sveipet, og bølge-del
 grensedelende fylker som beskrevet over.
+
+## Nasjonalt sveip — status og fremdrift (2026-08-20/21)
+
+### Fiksen verifisert i produksjon
+`fetched_areas`-racet over ble rettet (D1-migrasjon
+`0005_fetched_areas_upsert.sql`, `fungifinder@6f6a80b` +
+`fungifinder-db@5398498`) og deretter faktisk bevist under ekte
+parallellitet, ikke bare lokalt: to reelt overlappende
+`--mode radius`-testkjøringer (43 sekunder fra hverandre) mot
+produksjons-D1 — begge `fetched_areas`-radene overlevde intakt.
+Testradene er fjernet igjen etterpå.
+
+### Budsjettbegrensning oppdaget: GitHub Free, 2000 min/mnd
+Bruker har GitHub Free (2000 Actions-minutter/måned). Nøkkelinnsikt:
+**Actions fakturerer totalt kompute-minutter, ikke klokketid** —
+parallellisering (den opprinnelige "15 parallelle kjøringer"-planen)
+sparer INGEN minutter, kun kalendertid. Sekvensiell kjøring er derfor
+riktig valg uansett, og løser samtidig grense-dedup-risikoen over som
+bonus (ingen samtidighet = ingen race). **Taket er dessuten PER KONTO,
+ikke per repo** — deles av `fungifinder-db` og alle andre private
+repoer på samme GitHub-konto (`bondoya-db`, `mycrate-db`, evt. `fpl`).
+
+Sveipet ble derfor delt i 3 sekvensielle fylkesbolker à ~1/3 av
+landarealet (areal er en grov proxy, ikke en autoritativ kilde):
+
+| Bolk | Fylker | Areal (grovt) |
+|---|---|---|
+| **A** | Oslo, Østfold, Akershus, Vestfold, Buskerud, Telemark, Agder, Rogaland, Vestland | ~101 500 km² |
+| **B** | Møre og Romsdal, Trøndelag, Innlandet | ~109 500 km² |
+| **C** | Nordland, Troms, Finnmark | ~112 700 km² |
+
+### Fremdrift
+
+**Troms kjørt som kalibrering FØR bolkene** (ekte, ikke dry-run —
+teller som reell fremgang): [kjøring 32366719396](https://github.com/runelov/fungifinder-db/actions/runs/32366719396),
+18 341 punkter, 25,0 % godkjent → 4 594 nye steder, **0,508 s/punkt**
+(40 % raskere enn Akershus), ~156 min. **Troms er ferdig — utgår fra
+Bolk C.**
+
+**Bolk A, 7 av 9 fylker fullført OK** (sekvensielt, én `gh workflow run`
+om gangen):
+
+| Fylke | Punkter sjekket | s/punkt | Godkjent | Varighet |
+|---|---|---|---|---|
+| Oslo | 210 | 0,290 | 7 (3,3 %) | 61,0 s |
+| Vestfold | 1 788 | 0,525 | 634 (35,5 %) | 938,2 s |
+| Østfold | 2 166 | 0,746 | 1 058 (48,8 %) | 1 616,8 s |
+| Akershus | 2 742 | 0,909 | 1 492 (54,4 %) | 2 492,0 s |
+| Rogaland | 7 347 | 0,576 | 2 530 (34,4 %) | 4 232,1 s |
+| Buskerud | 6 533 | 1,110 | 4 005 (61,3 %) | 7 251,6 s |
+| Telemark | 7 171 | 0,951 | 4 751 (66,3 %) | 6 817,2 s |
+
+Sum enrichment disse 7: ~390 min. Pluss Troms (~156 min) og to små
+kalibrerings-testkjøringer ≈ 550-560 min `fungifinder-db`-eget forbruk
+denne måneden, før Agder/Vestland.
+
+**Agder feilet TO ganger på rad** ([kjøring 32440980117](https://github.com/runelov/fungifinder-db/actions/runs/32440980117),
+inkl. `gh run rerun`) — begge ganger `steps: []`, `runner_id: 0`, jobben
+"fullført" på under 2 sekunder, ALDRI tildelt en runner. Ikke en
+kodefeil (ingen linje i `fetch_area.py` kan kjøre så raskt) —
+**bekreftet av bruker: kontoen nådde faktisk 2000 min/mnd-taket.**
+`Vestland` (siste, dyreste fylken i bolken) ble bevisst ikke forsøkt.
+
+**PAUSET til september (ny faktureringsperiode)**. Gjenstår av Bolk A:
+1. **Agder** — `--mode fylke --value Agder --gridKm 1.5 --dryRun false`
+   (aldri reelt fullført pga. tomt budsjett — trygt å bare kjøre på
+   nytt, ikke en feil i selve Agder-hentingen).
+2. **Vestland** — `--mode fylke --value Vestland --gridKm 1.5 --dryRun false`
+   (aldri forsøkt).
+
+Deretter er Bolk A komplett (9/9). **Før Bolk B vurderes**: mål ekte
+minuttforbruk (GitHub Settings → Billing and plans → Actions), og vent
+minst én uke for å se hva `refresh-areas.yml` (ukentlig cron) faktisk
+koster med Bolk A sine nye, fylkesstore `fetched_areas`-rader — en
+foreløpig helt umålt, vedvarende kostnad. Bolk B/C skal IKKE startes i
+samme budsjettvindu som resten av Bolk A uten først å se an dette.
