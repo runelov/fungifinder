@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.30.0';
+  const APP_VERSION = '0.30.1';
   const APP_BUILD_DATE = '2026-08-21';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -632,7 +632,24 @@
       }
     }
 
-    reloadBtn.addEventListener('click', () => location.reload());
+    // RETTET 2026-08-21 (bruker meldte: trykte "Last inn på nytt", men
+    // varselet kom rett tilbake): location.reload() er fortsatt en VANLIG
+    // navigasjon, underlagt akkurat den samme HTTP-cachen som resten av
+    // denne funksjonen eksisterer for å omgå (GitHub Pages sin ekte
+    // Cache-Control: max-age=600, se kommentaren over checkForNyVersjon) —
+    // innenfor de 10 minuttene kan et reload dermed stille servere nøyaktig
+    // samme gamle side på nytt, uten noen nettverksrunde i det hele tatt.
+    // location.replace() med en fersk, aldri-før-sett query-parameter
+    // tvinger derimot en EKTE nettverkshenting (URL-en er cache-nøkkelen —
+    // en ukjent URL kan aldri være et cache-treff), og replace (ikke
+    // assign/href) unngår å legge igjen et unaturlig historikk-steg.
+    // wireVersionUpdateCheck() sitt eget URL-opprydd ved neste oppstart
+    // (se toppen av init()) fjerner parameteren igjen med det samme.
+    reloadBtn.addEventListener('click', () => {
+      const url = new URL(location.href);
+      url.searchParams.set('tvungen_reload', Date.now());
+      location.replace(url.toString());
+    });
     dismissBtn.addEventListener('click', () => {
       if (banner.dataset.serverVersion) localStorage.setItem(AVVIST_NOKKEL, banner.dataset.serverVersion);
       banner.hidden = true;
@@ -5311,6 +5328,19 @@
     render();
   });
   document.getElementById('sp-score-filter-hint').addEventListener('click', (e) => { e.preventDefault(); showAllPointsOnMap(); });
+
+  // Rydder bort ?tvungen_reload=<tidsstempel> (se wireVersionUpdateCheck()
+  // sin reload-knapp) igjen med det samme, uten en ny navigasjon
+  // (replaceState, ikke en ny location.href) — parameteren har gjort
+  // jobben sin (tvang en ekte nettverkshenting forbi HTTP-cachen) i det
+  // øyeblikket DENNE siden faktisk lastet, og skal ikke bli hengende
+  // synlig i adresselinjen i en vanlig nettleserfane.
+  (function ryddOppTvungenReloadParam(){
+    const url = new URL(location.href);
+    if (!url.searchParams.has('tvungen_reload')) return;
+    url.searchParams.delete('tvungen_reload');
+    history.replaceState(null, '', url.toString());
+  })();
 
   (async function init(){
     wireVersionInfo();

@@ -1,5 +1,27 @@
 # Endringslogg
 
+## 0.30.1 — Fiks: "Last inn på nytt" i ny-versjon-varselet gjorde ingenting
+Bruker meldte at varselet kom rett tilbake etter å trykke "Last inn på
+nytt" — og at å avvise det (✕) heller ikke hjalp. Rotårsak:
+`location.reload()` er fortsatt en VANLIG navigasjon, underlagt akkurat
+den samme ekte `Cache-Control: max-age=600`-headeren fra GitHub Pages
+som selve ny-versjon-sjekken (0.30.0) eksisterer for å omgå — innenfor
+de 10 minuttene kunne et reload dermed servere nøyaktig samme gamle
+side på nytt, uten noen reell nettverksrunde. Appen forble på gammel
+kode, sjekken oppdaget "ny versjon tilgjengelig" på nytt ved neste
+poll, og varselet dukket opp igjen — ✕ virket egentlig helt fint
+(husket avvisningen), det var bare det underliggende problemet (aldri
+faktisk oppdatert) som vedvarte uansett.
+
+- Reload-knappen bruker nå `location.replace()` med en fersk,
+  aldri-før-sett query-parameter (`?tvungen_reload=<tidsstempel>`) i
+  stedet for `location.reload()` — en ukjent URL kan aldri være et
+  cache-treff, så dette tvinger en ekte nettverkshenting uansett
+  cache-alder. Parameteren ryddes bort igjen med det samme via
+  `history.replaceState()` ved neste oppstart, uten en ny navigasjon.
+
+Versjon 0.30.0 → 0.30.1.
+
 ## 0.30.0 — Ny-versjon-varsel (unngår stale PWA etter utrulling)
 Oppfølging av 0.29.2-episoden. Bruker spurte om det finnes en måte å unngå
 å måtte tvang-lukke og gjenåpne den installerte PWA-en for å få en ny
