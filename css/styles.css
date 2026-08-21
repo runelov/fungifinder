@@ -259,6 +259,12 @@
   .sp-demo-banner a { color: var(--russet-deep); font-weight: 600; }
   .sp-demo-banner-note { display: inline-block; margin-top: 4px; font-size: var(--fs-xs); color: var(--ink-soft); }
 
+  /* Synlig feilmelding når loadLocations() mislykkes — se app.js. Bruker
+     samme varselfarge som sp-safety (danger), men som en vanlig boks (ikke
+     pille) siden den kommer og går med data-tilstanden, ikke en tidsriktig
+     nudge. */
+  .sp-terrengdata-feil { background: #F3E3DA; border: 1px solid var(--danger); border-radius: 3px; padding: 8px 12px; font-size: var(--fs-sm); color: var(--danger); margin-bottom: 12px; }
+
   .sp-route-panel { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
   .sp-route-row { display: flex; align-items: center; gap: 10px; font-size: var(--fs-sm); color: var(--ink-soft); flex-wrap: wrap; }
   .sp-route-row input[type=range] { width: 120px; }

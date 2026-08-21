@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.30.1';
+  const APP_VERSION = '0.30.2';
   const APP_BUILD_DATE = '2026-08-21';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -1181,6 +1181,15 @@
   // én gang ved innlogging — locationsRequestSeq forkaster utdaterte svar
   // hvis brukeren rekker å bytte filter igjen før forrige kall er ferdig.
   let locationsRequestSeq = 0;
+  // RETTET 2026-08-21 (bruker meldte: ingen steder listet, "Foreslå
+  // områder" alltid grået ut, kun i standalone-PWA på mobil, vedvarer på
+  // tvers av versjoner/reinstallasjon): catch-blokken under var FØR dette
+  // helt stille (kun console.warn) — en mislykket henting så identisk ut
+  // som "ingen analyserte steder i dette området" for brukeren, uten noen
+  // måte å se HVORFOR uten utviklerverktøy koblet til enheten. Feilteksten
+  // vises nå i UI (se render()/sp-terrengdata-feil), nettopp for å kunne
+  // diagnostisere dette videre.
+  let terrengdataFeil = null;
   async function loadLocations(){
     if (!currentUser) return; // beholder BASE_LOCATIONS-demofallbacken definert øverst i filen
     const seq = ++locationsRequestSeq;
@@ -1192,9 +1201,11 @@
       // forrige filters data. Kun ekte feil (fanget under) beholder gammel
       // BASE_LOCATIONS.
       if (Array.isArray(data)) { BASE_LOCATIONS = data; bumpScoreCache(); }
+      terrengdataFeil = null;
     } catch (e) {
       if (seq !== locationsRequestSeq) return;
       console.warn('Kunne ikke laste terrengdata.', e);
+      terrengdataFeil = (e && e.message) ? e.message : 'Ukjent feil';
     }
   }
 
@@ -4462,6 +4473,17 @@
       } else {
         demoBanner.style.display = 'none';
         if (scoreFilterRow) scoreFilterRow.style.display = '';
+      }
+    }
+    // Se terrengdataFeil/loadLocations() — samme "plassert helt først i
+    // render()"-begrunnelse som demoBanner over, av samme grunn.
+    const terrengdataFeilEl = document.getElementById('sp-terrengdata-feil');
+    if (terrengdataFeilEl) {
+      if (terrengdataFeil) {
+        terrengdataFeilEl.style.display = '';
+        terrengdataFeilEl.textContent = `⚠ Kunne ikke hente terrengdata: ${terrengdataFeil} — listen under kan derfor være ufullstendig eller tom. Prøv å laste siden på nytt.`;
+      } else {
+        terrengdataFeilEl.style.display = 'none';
       }
     }
     renderSpeciesList();

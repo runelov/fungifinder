@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.30.1"/>
+<link rel="stylesheet" href="css/styles.css?v=0.30.2"/>
 </head>
 <body>
 
@@ -319,6 +319,13 @@
                noe forklarte hvorfor, eller hvordan man kommer videre — se
                render() for logikken som fyller/skjuler denne. -->
           <div id="sp-demo-banner" style="display:none;"></div>
+          <!-- RETTET 2026-08-21: loadLocations() sin catch-blokk var stille
+               (kun console.warn) ved en mislykket terrengdata-henting —
+               brukeren fikk bare en tom liste uten forklaring, og feilen var
+               dermed usynlig uten utviklerverktøy tilkoblet enheten. Vises nå
+               her i stedet, med selve feilteksten fra nettleseren
+               (e.message), se terrengdataFeil i app.js. -->
+          <div id="sp-terrengdata-feil" class="sp-terrengdata-feil" style="display:none;"></div>
           <div class="sp-score-filter-row" id="sp-score-filter-row">
             <span>Vis kun score ≥ <b id="sp-score-filter-label">70</b></span>
             <input type="range" id="sp-score-filter-slider" min="0" max="90" step="5" value="70"/>
@@ -392,7 +399,7 @@
      worker/api/README.md). Testnøkkelen (1x00000000000000000000AA) hører
      kun hjemme i worker/api/.dev.vars for lokal utvikling, aldri her. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<script src="js/api-client.js?v=0.30.1"></script>
-<script src="js/app.js?v=0.30.1"></script>
+<script src="js/api-client.js?v=0.30.2"></script>
+<script src="js/app.js?v=0.30.2"></script>
 </body>
 </html>

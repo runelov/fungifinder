@@ -1,5 +1,30 @@
 # Endringslogg
 
+## 0.30.2 — Gjør terrengdata-hentefeil synlig i UI
+Bruker bekreftet på v0.30.1 (etter revertet 0.29.2-mistanke) at
+grunnproblemet fortsatt står: ingen steder listet, "Foreslå områder"
+alltid grått, kun i standalone-PWA, innlogget. Siden 0.29.0-reverten i
+0.29.2 IKKE løste det, var mapFittedOnce/renderMap()-teorien altså feil
+spor — noe ANNET (trolig forut for hele denne økten) gjør at
+`GET /terrengdata` reelt feiler for denne brukeren i akkurat denne
+konteksten, mest sannsynlig et nettverks-/cookie-/CORS-avvik spesifikt
+for installerte PWA-er (samme klasse feil som iOS-PWA-cookiesaken fra
+2026-07-21, se `fungifinder/CLAUDE.md`).
+
+`loadLocations()` sin catch-blokk var helt stille (kun `console.warn`)
+— en mislykket henting så identisk ut som "ingen analyserte steder i
+området" i UI, uten noen måte å se den faktiske feilen uten
+utviklerverktøy koblet til enheten. Kan ikke reprodusere
+standalone-modus i utviklingsmiljøet, så neste steg er å faktisk LESE
+feilteksten fra brukerens egen enhet i stedet for å gjette videre.
+
+- Ny `terrengdataFeil`-tilstand, satt fra `e.message` i
+  `loadLocations()` sin catch. Vist i `render()` som en synlig
+  varselboks (`#sp-terrengdata-feil`, over resultatlisten) når satt,
+  nullstilt ved neste vellykkede henting.
+
+Versjon 0.30.1 → 0.30.2.
+
 ## 0.30.1 — Fiks: "Last inn på nytt" i ny-versjon-varselet gjorde ingenting
 Bruker meldte at varselet kom rett tilbake etter å trykke "Last inn på
 nytt" — og at å avvise det (✕) heller ikke hjalp. Rotårsak:
