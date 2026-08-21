@@ -119,9 +119,11 @@ function radTilDekning(rad) {
   };
 }
 
-// Brukt av routes/omrader.js sin hentDekning() (admin "dekning"-panel) OG
-// av fetch_area.py sin fetch_from_d1() (D1-migrasjon fase 4) — samme
-// kontrakt som data/fetched-areas.json ga tidligere.
+// Brukt av routes/etlImport.js sin eksporterTerrengdata() — fetch_area.py
+// sin fetch_from_d1() (D1-migrasjon fase 4) leser sin egen gjeldende
+// tilstand herfra, samme kontrakt som data/fetched-areas.json ga tidligere.
+// (routes/omrader.js sin hentDekning(), som også brukte denne, ble fjernet
+// 2026-08-21 sammen med admin-dekningspanelet i webappen.)
 export async function hentFetchedAreasFraDb(env) {
   const { results } = await env.DB.prepare('SELECT * FROM fetched_areas').all();
   return results.map(radTilDekning);

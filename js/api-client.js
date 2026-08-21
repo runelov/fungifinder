@@ -125,31 +125,14 @@ async function hentBerikelse(locationId){
   return res.json();
 }
 
-// Admin-only server-side (se worker/api/src/routes/omrader.js) — dekning av
-// allerede hentede områder, for "Hent terrengdata"-panelet.
-async function hentOmraderDekning(){
-  const res = await kall('/omrader/dekning');
-  if (!res.ok) throw new Error(`Kunne ikke hente dekning (${res.status}).`);
-  return res.json();
-}
-
-async function startOmradeHenting(inputs){
-  const res = await kall('/omrader/hent', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(inputs)
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `Kunne ikke starte jobben (${res.status}).`);
-  return data;
-}
-
-async function hentOmradeStatus(sinceIso){
-  const q = sinceIso ? `?siden=${encodeURIComponent(sinceIso)}` : '';
-  const res = await kall(`/omrader/status${q}`);
-  if (!res.ok) throw new Error(`Kunne ikke hente jobbstatus (${res.status}).`);
-  return res.json();
-}
+// hentOmraderDekning/startOmradeHenting/hentOmradeStatus (klienter for
+// /omrader/dekning, /omrader/hent, /omrader/status) fjernet 2026-08-21 —
+// admin-panelet for å trigge nye område-hentinger fra selve webappen er
+// fjernet fra js/app.js/index.html (nasjonalt sveip pågår i faste
+// fylkesbolker via gh workflow run i stedet, se
+// fungifinder/docs/veien-videre.md). Selve worker-endepunktene i
+// worker/api/src/routes/omrader.js er IKKE fjernet — bevisst latt stå,
+// se README/CLAUDE.md-diskusjon om hvorvidt de trengs videre.
 
 // IKKE admin-only — berikelse av ett eget funn-sted er del av å registrere
 // et funn, tilgjengelig for enhver innlogget bruker.
@@ -248,7 +231,6 @@ window.ApiClient = {
   meg, beOmLenke, verifiserKode, loggUt,
   hentMineData, lagreMineData, hentDelteFunn,
   hentTerrengdata, hentArtsfunn, hentBerikelse,
-  hentOmraderDekning, startOmradeHenting, hentOmradeStatus,
   trigBerikelse, hentPunktStatus,
   hentBrukere, settBrukerStatus, slettBrukerPermanent,
   hentInvitasjoner, opprettInvitasjon, slettInvitasjon,

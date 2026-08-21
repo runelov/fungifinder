@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.28.14';
-  const APP_BUILD_DATE = '2026-08-18';
+  const APP_VERSION = '0.28.15';
+  const APP_BUILD_DATE = '2026-08-21';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
   // kommentar der) — de to må holdes i sync manuelt siden repoet bevisst
@@ -372,13 +372,9 @@
   let customLocations = [];
   let delFunn = false; // "del mine funn med andre påloggede brukere" — se persistAll()/loadStorage() og sp-toggle-del-funn
   let delteFunn = []; // ANDRE brukeres delte funn ({art,dato,lat,lon,kortnavn}) — se loadDelteFunn()
-  let fetchedAreas = [];
   let artsfunn = []; // ekte Artsdatabanken-observasjoner — se loadArtsfunn()
-  let gridKm = 1.5;
   let kommuneRegister = []; // {kommunenavn, fylkesnavn} — hentet fra Kartverkets Kommuneinfo-API
   let kommuneNarrowFylke = 'alle';
-  let fetchInProgress = false;
-  let fetchPollTimer = null;
   let bboxAreaCache = {}; // cache av Nominatim bbox-areal per fylke/kommune-navn
   let currentUser = null; // { epost, kortnavn, rolle } fra ApiClient.meg(), eller null hvis ikke innlogget
   // "Om dataene"-teksten sin dynamiske kommuneliste — se renderDataNotice().
@@ -725,8 +721,8 @@
   // å falle tilbake til "ikke innlogget, viser eksempeldata"-modus (som
   // f.eks. et 401/500-svar fra serveren allerede håndteres fint av —
   // kun selve nettverkslaget manglet dekning). Samme
-  // fang-og-fortsett-mønster som loadLocations()/loadFetchedAreas()/
-  // loadArtsfunn() allerede bruker.
+  // fang-og-fortsett-mønster som loadLocations()/loadArtsfunn()
+  // allerede bruker.
   async function initAuth(){
     try {
       currentUser = await window.ApiClient.meg();
@@ -1066,7 +1062,7 @@
 
   // ---------- lokasjonsdata (fra fungifinder-api, med innebygd demo-fallback) ----------
 
-  // Samme mønster som findFetchedAreaMatch()/currentAreaLabel() under —
+  // Samme mønster som currentAreaLabel() under —
   // server-side filtrering (se worker/api sin terrengDb.js) speiler EKSAKT
   // det fylke/kommune-filteret brukeren allerede har valgt, ikke et nytt,
   // eget filter-konsept. 'radius'-modus og "alle" sender ingen parametre
@@ -1114,19 +1110,6 @@
     } catch (e) {
       if (seq !== locationsRequestSeq) return;
       console.warn('Kunne ikke laste terrengdata.', e);
-    }
-  }
-
-  // Admin-only server-side (se worker/api/src/routes/omrader.js) — kun
-  // relevant for "Hent terrengdata"-panelet, som selv er skjult for
-  // ikke-admin (se updateFetchPanel).
-  async function loadFetchedAreas(){
-    if (!isAdmin()) { fetchedAreas = []; return; }
-    try {
-      fetchedAreas = await window.ApiClient.hentOmraderDekning();
-    } catch (e) {
-      console.warn('Kunne ikke laste dekningsdata.', e);
-      fetchedAreas = [];
     }
   }
 
@@ -1235,22 +1218,7 @@
     }
   }
 
-  // ---------- on-demand henting av terrengdata ----------
-
-  function findFetchedAreaMatch(){
-    if (filterMode === 'fylke' && fylkeFilter !== 'alle') {
-      return fetchedAreas.find(a => a.mode === 'fylke' && a.value === fylkeFilter) || null;
-    }
-    if (filterMode === 'kommune' && kommuneFilter !== 'alle') {
-      return fetchedAreas.find(a => a.mode === 'kommune' && a.value === kommuneFilter) || null;
-    }
-    if (filterMode === 'radius' && radiusCenter) {
-      return fetchedAreas.find(a => a.mode === 'radius' && a.lat != null &&
-        haversineKm(a.lat, a.lon, radiusCenter.lat, radiusCenter.lon) < 2 &&
-        a.radiusKm >= radiusKm) || null;
-    }
-    return null;
-  }
+  // ---------- områdeavgrensing (fylke/kommune/radius-filter) ----------
 
   // RETTET 2026-08-16: se isInCurrentScope()-kommentaren — returnerer nå
   // "synlig kartutsnitt" i stedet for null når man har zoomet inn nok uten
@@ -1267,10 +1235,10 @@
   }
 
   // Svarer på "er dette terrenget allerede analysert, helt/delvis, eller
-  // nytt?" FØR brukeren må gjette seg til om "Foreslå områder" eller "Hent
-  // data" er riktig neste steg — count er antall kjente punkter (inkl.
-  // flatehogde) i gjeldende fylke/kommune/radius-filter, samme sett som
-  // suggestAreas() selv bruker (før egen isCut-filtrering der).
+  // nytt?" FØR brukeren prøver "Foreslå områder" — count er antall kjente
+  // punkter (inkl. flatehogde) i gjeldende fylke/kommune/radius-filter,
+  // samme sett som suggestAreas() selv bruker (før egen isCut-filtrering
+  // der).
   function updateCoverageLine(count){
     const line = document.getElementById('sp-coverage-line');
     const suggestBtn = document.getElementById('sp-route-suggest');
@@ -1298,14 +1266,12 @@
     }
     line.style.display = '';
     if (count === 0) {
-      line.innerHTML = `⚠ Ingen kjente punkter i ${escapeHtml(areaLabel)} ennå — <a href="#sp-fetch-panel" id="sp-coverage-fetch-link">hent terrengdata</a> først.`;
+      // Fylkesvis nasjonalt sveip pågår (se docs/veien-videre.md) —
+      // ingen admin-knapp i appen lenger til å hente et spesifikt område
+      // på forespørsel, kun en forklarende tekst om at dekningen utvides
+      // gradvis.
+      line.textContent = `Ingen kjente punkter i ${areaLabel} ennå — dette området er ikke sveipet ennå, dekningen utvides gradvis fylke for fylke.`;
       suggestBtn.disabled = true;
-      const link = document.getElementById('sp-coverage-fetch-link');
-      if (link) link.addEventListener('click', (e) => {
-        e.preventDefault();
-        setMobileView('kart');
-        document.getElementById('sp-fetch-panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      });
     } else if (count < AREA_COVERAGE_THIN_THRESHOLD) {
       line.textContent = `${count} kjent${count===1?'':'e'} punkt${count===1?'':'er'} i ${areaLabel} — tynt datagrunnlag, forslagene kan bli få.`;
       suggestBtn.disabled = false;
@@ -1801,27 +1767,13 @@
     }
   }
 
-  async function estimateAreaKm2(){
-    if (filterMode === 'radius') return Math.PI * radiusKm * radiusKm;
-    // Best-effort disambiguering (se resolveKommuneNavn) — faller tilbake
-    // til det rå, ev. tvetydige navnet hvis uløst, siden dette bare er et
-    // areal-ESTIMAT, ikke noe som trigger en faktisk kostbar jobb.
-    const name = filterMode === 'fylke' ? fylkeFilter : (resolveKommuneNavn(kommuneFilter) || kommuneFilter);
-    const bb = await fetchAreaBbox(filterMode, name);
-    if (!bb) return null;
-    const latKm = (bb[1] - bb[0]) * 111.32;
-    const midLat = (bb[0] + bb[1]) / 2;
-    const lonKm = (bb[3] - bb[2]) * 111.32 * Math.cos(midLat * Math.PI/180);
-    return Math.abs(latKm * lonKm);
-  }
-
   // Zoomer kartet til valgt fylke/kommune sin bounding box. Radius-modus har
   // allerede sitt eget senter/zoom-flow (klikk i kartet), så den rører vi ikke.
   async function zoomToAreaSelection(){
     if (!leafletMap || filterMode === 'radius') return;
-    // Best-effort disambiguering, samme begrunnelse som estimateAreaKm2() —
-    // rent kosmetisk kart-zoom, ikke en jobb-trigger, så et uløst tvetydig
-    // navn faller trygt tilbake til det rå navnet i stedet for å blokkere.
+    // Best-effort disambiguering — rent kosmetisk kart-zoom, ikke en
+    // jobb-trigger, så et uløst tvetydig navn faller trygt tilbake til det
+    // rå navnet i stedet for å blokkere.
     const name = filterMode === 'fylke' ? fylkeFilter : (resolveKommuneNavn(kommuneFilter) || kommuneFilter);
     if (!name || name === 'alle') return;
     const bb = await fetchAreaBbox(filterMode, name);
@@ -1854,235 +1806,11 @@
     leafletMap.fitBounds(bounds, { padding: [20, 20] });
   }
 
-  function describeRunStatus(run){
-    if (!run) return 'Ukjent status';
-    if (run.status === 'queued') return '⏳ I kø hos GitHub (venter på ledig kapasitet — dette er normalt og kan ta litt tid)';
-    if (run.status === 'in_progress') return '⚙ Kjører nå hos GitHub …';
-    if (run.status === 'completed') {
-      return run.conclusion === 'success' ? '✓ Fullført' : `⚠ Feilet (${run.conclusion})`;
-    }
-    return `Status: ${run.status}`;
-  }
-
-  async function checkForActiveRun(){
-    if (!isAdmin()) return null;
-    try {
-      const run = await window.ApiClient.hentOmradeStatus();
-      if (run && (run.status === 'queued' || run.status === 'in_progress')) return run;
-    } catch (e) { /* stille feil her — dette er kun en høflig sjekk */ }
-    return null;
-  }
-
-  async function updateFetchPanel(coverageCount){
-    const panel = document.getElementById('sp-fetch-panel');
-    // Å sette i gang områdeanalyser er nå admin-only (server-side håndhevet,
-    // se worker/api/src/routes/omrader.js) — panelet er helt usynlig for
-    // inviterte brukere, ikke bare deaktivert, og vi hopper over det ekte
-    // kartoppslaget (estimateAreaKm2 -> fetchAreaBbox) for dem.
-    if (!isAdmin()) { panel.style.display = 'none'; return; }
-    if (fetchInProgress) { panel.style.display = ''; return; } // behold synlig under pågående henting
-
-    const label = currentAreaLabel();
-    if (!label) { panel.style.display = 'none'; return; }
-
-    const match = findFetchedAreaMatch();
-    if (match) { panel.style.display = 'none'; return; }
-
-    panel.style.display = '';
-
-    // Sjekk om en jobb allerede kjører (f.eks. fra før siden ble lastet på nytt),
-    // slik at vi ikke inviterer til å starte en ny henting oppå en pågående.
-    const activeRun = await checkForActiveRun();
-    if (activeRun) {
-      document.getElementById('sp-fetch-info').textContent = `Ingen ferdig terrengdata for ${label} ennå — men det ser ut som en henting allerede pågår.`;
-      document.getElementById('sp-fetch-start').disabled = true;
-      document.getElementById('sp-fetch-start').textContent = 'Henting pågår …';
-      const progress = document.getElementById('sp-fetch-progress');
-      progress.style.display = '';
-      progress.textContent = describeRunStatus(activeRun);
-      fetchInProgress = true;
-      pollFetchStatus(progress);
-      return;
-    }
-
-    document.getElementById('sp-fetch-start').disabled = false;
-    document.getElementById('sp-fetch-start').textContent = 'Hent data';
-    // findFetchedAreaMatch() krever et EKSAKT treff (samme fylke/kommune-navn,
-    // eller radiussenter+radius) — den vet ikke at en tidligere RADIUS-henting
-    // kan dekke det meste av akkurat DENNE kommunen/fylket. Uten dette ga
-    // panelet et rett-frem misvisende "ingen data ennå" ved siden av en
-    // dekningslinje over "Foreslå områder" som samtidig (korrekt) viste at det
-    // fantes mange kjente punkter her — se konteksten som avdekket dette.
-    document.getElementById('sp-fetch-info').textContent = coverageCount > 0
-      ? `Ingen egen henting registrert for nøyaktig ${label} (trolig dekket delvis av en tidligere henting med annet filter, f.eks. radius) — men ${coverageCount} kjent${coverageCount===1?'':'e'} punkt${coverageCount===1?'':'er'} finnes her allerede. Hent likevel for å fylle ut resten av området.`
-      : `Ingen terrengdata hentet for ${label} ennå.`;
-    // Rydd bort ev. statustekst fra en TIDLIGERE fullført/feilet henting (f.eks.
-    // "Oppdaterer visningen …") — den ble stående synlig under "Hent data" for
-    // et helt NYTT område ellers, og ga inntrykk av at noe fortsatt pågikk.
-    const progress = document.getElementById('sp-fetch-progress');
-    progress.style.display = 'none';
-    progress.textContent = '';
-    await updateFetchEstimate();
-  }
-
-  async function updateFetchEstimate(){
-    const est = document.getElementById('sp-fetch-estimate');
-    est.textContent = 'Beregner estimat …';
-    const areaKm2 = await estimateAreaKm2();
-    if (!areaKm2) { est.textContent = 'Kunne ikke beregne arealestimat — henting fungerer likevel.'; return; }
-    const pointCount = Math.round(areaKm2 / (gridKm * gridKm));
-    const minEstimate = Math.max(1, Math.round(pointCount * 1.0 / 60));
-    const maxEstimate = Math.max(minEstimate, Math.round(pointCount * 2.0 / 60));
-    est.textContent = `Areal ≈ ${Math.round(areaKm2)} km² → opptil ca. ${pointCount} kandidatpunkter å sjekke, anslått ${minEstimate}-${maxEstimate} minutter.`;
-  }
-
-  function wireFetchPanel(){
-    const slider = document.getElementById('sp-grid-slider');
-    slider.addEventListener('input', (e) => {
-      gridKm = parseFloat(e.target.value);
-      document.getElementById('sp-grid-label').textContent = gridKm + ' km';
-      updateFetchEstimate();
-    });
-    document.getElementById('sp-fetch-start').addEventListener('click', startFetch);
-  }
-
-  async function startFetch(){
-    if (!isAdmin()) {
-      document.getElementById('sp-fetch-info').textContent = 'Kun admin kan hente terrengdata for nye områder.';
-      return;
-    }
-
-    // Dobbeltsjekk rett før trigging — unngår at to jobber startes samtidig
-    // hvis brukeren rekker å klikke to ganger eller har en fane åpen fra før.
-    const progress = document.getElementById('sp-fetch-progress');
-    progress.style.display = '';
-    progress.textContent = 'Sjekker om en jobb allerede kjører …';
-    const already = await checkForActiveRun();
-    if (already) {
-      progress.textContent = 'En henting kjører allerede — kobler til den i stedet for å starte en ny. ' + describeRunStatus(already);
-      fetchInProgress = true;
-      document.getElementById('sp-fetch-start').disabled = true;
-      document.getElementById('sp-fetch-start').textContent = 'Henting pågår …';
-      pollFetchStatus(progress);
-      return;
-    }
-
-    const inputs = { gridKm: String(gridKm) };
-    if (filterMode === 'fylke') { inputs.mode = 'fylke'; inputs.value = fylkeFilter; }
-    else if (filterMode === 'kommune') {
-      // RETTET 2026-08-12: sendte tidligere kun det rå kommunenavnet, ALDRI
-      // disambiguert med fylke — feilet derfor 100% av tiden for de fåtallige
-      // tvetydige kommunenavnene (Våler, Bø, Os, …), UANSETT om brukeren
-      // hadde valgt fylke i "snevre inn"-menyen, siden det valget aldri ble
-      // lest her. Se resolveKommuneNavn() for selve oppslaget. Denne jobben
-      // er kostbar (ekte GitHub Actions-kjøring) — blokkerer heller HER med
-      // en tydelig beskjed enn å la den feile eksternt etter at brukeren
-      // trodde den var i gang.
-      const disambiguert = resolveKommuneNavn(kommuneFilter);
-      if (disambiguert === null) {
-        const fylker = kommunerMedNavn(kommuneFilter).map(k => k.fylkesnavn).join(' og ');
-        progress.textContent = `⚠ "${kommuneFilter}" finnes i flere fylker (${fylker}) — velg riktig fylke i "Snevre inn til ett fylke"-menyen ved siden av kommunefeltet først, så prøv igjen.`;
-        fetchInProgress = false;
-        document.getElementById('sp-fetch-start').disabled = false;
-        document.getElementById('sp-fetch-start').textContent = 'Hent data';
-        return;
-      }
-      inputs.mode = 'kommune'; inputs.value = disambiguert;
-    }
-    else if (filterMode === 'radius') {
-      inputs.mode = 'radius'; inputs.lat = String(radiusCenter.lat); inputs.lon = String(radiusCenter.lon); inputs.radiusKm = String(radiusKm);
-    } else return;
-
-    fetchInProgress = true;
-    document.getElementById('sp-fetch-start').disabled = true;
-    document.getElementById('sp-fetch-start').textContent = 'Henting pågår …';
-    progress.textContent = 'Starter jobb …';
-
-    // Viktig: registrer tidspunktet FØR vi trigger jobben, slik at polling kan
-    // filtrere bort eventuelle eldre, allerede fullførte kjøringer.
-    const dispatchedAt = new Date(Date.now() - 5000).toISOString(); // liten margin for klokke-avvik
-
-    try {
-      await window.ApiClient.startOmradeHenting(inputs);
-      progress.textContent = '⏳ Jobb bedt om å starte — venter på at GitHub Actions registrerer den nye kjøringen (kan ta 10-30 sekunder) …';
-      pollFetchStatus(progress, dispatchedAt);
-    } catch (e) {
-      console.error(e);
-      progress.textContent = '⚠ Kunne ikke starte jobben: ' + e.message;
-      fetchInProgress = false;
-      document.getElementById('sp-fetch-start').disabled = false;
-      document.getElementById('sp-fetch-start').textContent = 'Hent data';
-    }
-  }
-
-  function pollFetchStatus(progress, sinceIso){
-    let attempts = 0;
-    const maxAttempts = 60; // ~15 min ved 15 sek mellomrom
-    clearTimeout(fetchPollTimer);
-    const poll = async () => {
-      attempts++;
-      try {
-        const run = await window.ApiClient.hentOmradeStatus(sinceIso);
-        if (run) {
-          if (run.status === 'completed') {
-            if (run.conclusion === 'success') {
-              progress.textContent = 'GitHub-jobben er ferdig kjørt hos GitHub. Henter oppdatert data til nettleseren din …';
-              await loadLocations();
-              await loadFetchedAreas();
-              let match = findFetchedAreaMatch();
-              // GitHubs Contents API kan i sjeldne tilfeller ha en kort forsinkelse
-              // (eventual consistency) før den reflekterer en commit som akkurat
-              // landet — det ga tidligere en forvirrende "ingen terrengdata hentet"
-              // rett etter en faktisk vellykket jobb, uten at brukeren gjorde noe
-              // galt (f.eks. bare byttet art). Prøv på nytt et par ganger med kort
-              // mellomrom før vi gir opp og viser "ingen terrengdata".
-              for (let retry = 0; retry < 4 && !match; retry++) {
-                await new Promise(r => setTimeout(r, 1500));
-                await loadFetchedAreas();
-                match = findFetchedAreaMatch();
-              }
-              const detail = match ? ` ${match.pointsAdded} nye steder lagt til (av ${match.pointsChecked} punkter sjekket).` : '';
-              progress.textContent = `✓ Ferdig!${detail} Oppdaterer visningen …`;
-              fetchInProgress = false;
-              document.getElementById('sp-fetch-start').disabled = false;
-              document.getElementById('sp-fetch-start').textContent = 'Hent data';
-              // Liten pause slik at du faktisk rekker å lese sluttmeldingen før
-              // panelet eventuelt skjules (fordi området nå har data).
-              setTimeout(() => render(), 2200);
-              return;
-            } else {
-              progress.textContent = `⚠ Jobben feilet (${run.conclusion}). Sjekk Actions-fanen på GitHub → siste kjøring → logg, for detaljer om hvilken datakilde som eventuelt svikter.`;
-              fetchInProgress = false;
-              document.getElementById('sp-fetch-start').disabled = false;
-              document.getElementById('sp-fetch-start').textContent = 'Hent data';
-              return;
-            }
-          } else {
-            progress.textContent = `${describeRunStatus(run)} (sjekket ${attempts} gang${attempts>1?'er':''} — oppdateres automatisk, du trenger ikke gjøre noe)`;
-          }
-        } else {
-          progress.textContent = `Fant ingen kjøring ennå hos GitHub — venter litt til (forsøk ${attempts}/${maxAttempts}) …`;
-        }
-      } catch (e) {
-        console.warn('Feil under polling', e);
-      }
-      if (attempts < maxAttempts) {
-        fetchPollTimer = setTimeout(poll, 15000);
-      } else {
-        progress.textContent = 'Bruker lenger tid enn ventet (over 15 min) — sjekk Actions-fanen på GitHub manuelt. Data lastes automatisk neste gang du åpner siden, uansett.';
-        fetchInProgress = false;
-        document.getElementById('sp-fetch-start').disabled = false;
-        document.getElementById('sp-fetch-start').textContent = 'Hent data';
-      }
-    };
-    poll();
-  }
-
   // ---------- weather ----------
   // ~0.1° ≈ 11 km (nord-sør) / 5 km (øst-vest ved 63°N) — matcher grovt
   // oppløsningen til værmodellen Open-Meteo selv bruker for disse variablene
   // (typisk 9-11 km), så avrunding taper ingen reell presisjon: mange
-  // punkter fra et tett "Hent data"-rutenett (ned til 0.5 km) faller uansett
+  // punkter fra et tett ETL-rutenett (ned til 0.5 km) faller uansett
   // innenfor SAMME underliggende modellcelle og ville fått identisk svar.
   const WEATHER_GRID_DEG = 0.1;
   const WEATHER_CACHE_KEY = 'fungifinder-weather-grid-cache';
@@ -3271,10 +2999,11 @@
   // fungifinder-db sin CHANGELOG v23). "Snevre inn til ett fylke"-velgeren
   // (kommuneNarrowFylke) fantes allerede i UI-et og filtrerte forslagslisten
   // riktig, MEN ble aldri faktisk brukt til å disambiguere — verken i
-  // Nominatim-kallet (zoomToAreaSelection/estimateAreaKm2) eller i verdien
-  // sendt til /omrader/hent (startFetch), som begge sendte det rå,
-  // potensielt tvetydige kommunenavnet direkte. Dette var ROTÅRSAKEN til
-  // feilen, ikke bare et visningsproblem.
+  // Nominatim-kallet (zoomToAreaSelection) eller i verdien sendt til det
+  // daværende admin-panelet for områdehenting (fjernet 2026-08-21, se
+  // docs/veien-videre.md), som begge sendte det rå, potensielt tvetydige
+  // kommunenavnet direkte. Dette var ROTÅRSAKEN til feilen, ikke bare et
+  // visningsproblem.
   //
   // kommunerMedNavn(): alle kommuneRegister-oppføringer med akkurat dette
   // navnet (0, 1, eller — for de fåtallige tvetydige navnene — 2).
@@ -4144,8 +3873,7 @@
       const zoomHint = viewportImpliesScope()
         ? ' Prøv å zoome ut i kartet, eller velg et fylke/kommune/radius.'
         : '';
-      summary.innerHTML = 'Ingen steder å foreslå områder fra i valgt område.' + zoomHint + fetchNudgeHtml(0);
-      wireFetchNudgeLink();
+      summary.innerHTML = 'Ingen steder å foreslå områder fra i valgt område.' + zoomHint;
       return;
     }
 
@@ -4191,30 +3919,8 @@
       ${overskrift} i valgt område (stiplede sirkler i kartet, farget etter score — klikk en sirkel eller 🅿️-markøren for detaljer).<br/>
       ${areas.map((a, i) => `<div class="sp-route-area-item">Område ${i+1}: <b>${escapeHtml(a.anchor.loc.name)}</b> (${escapeHtml(a.anchor.loc.kommune || 'ukjent kommune')}) — beste score ${a.anchor.res.total}, ${a.members.length} kjent${a.members.length===1?'':'e'} punkt${a.members.length===1?'':'er'} i området. ${a.parking ? `🅿️ ca ${a.parking.distM} m unna.` : '🅿️ ingen kjent parkering funnet.'}</div>`).join('')}
       <span style="font-size:var(--fs-xs);opacity:0.8;">Sirklene markerer OMRÅDER med gode odds, ikke eksakte punkter eller en gåtur mellom dem — bruk det topografiske kartlaget til å utforske selv innenfor sirkelen. Parkeringsmarkører er hentet fra kartdata og kan avvike fra virkeligheten — bekreft alltid på stedet.</span>
-      ${fetchNudgeHtml(scoped.length)}
     `;
-    wireFetchNudgeLink();
     document.getElementById('sp-route-clear').style.display = '';
-  }
-
-  // Oppfordring om å hente mer terrengdata, vist i resultat-sammendraget når
-  // "Foreslå områder" endte opp med tynt datagrunnlag — svarer på samme
-  // spørsmål som dekningslinjen over knappen (se updateCoverageLine), bare
-  // ETTER at brukeren faktisk har prøvd, i stedet for i forkant. Vises kun
-  // hvis hent-panelet faktisk er tilgjengelig (ikke skjult pga. et allerede
-  // registrert treff for nøyaktig dette området).
-  function fetchNudgeHtml(count){
-    if (count >= AREA_COVERAGE_THIN_THRESHOLD) return '';
-    const fetchPanel = document.getElementById('sp-fetch-panel');
-    if (!fetchPanel || fetchPanel.style.display === 'none') return '';
-    return `<div class="sp-route-nudge" style="margin-top:8px;font-size:var(--fs-sm);color:var(--ink-soft);">Tynt datagrunnlag her (${count} punkt${count===1?'':'er'}) — <a href="#sp-fetch-panel" id="sp-route-nudge-link">hent mer terrengdata</a> for bedre forslag.</div>`;
-  }
-  function wireFetchNudgeLink(){
-    const link = document.getElementById('sp-route-nudge-link');
-    if (link) link.addEventListener('click', (e) => {
-      e.preventDefault();
-      document.getElementById('sp-fetch-panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
-    });
   }
 
   // ---------- render ----------
@@ -4542,15 +4248,14 @@
 
   // RETTET 2026-08-13 (bruker ba om at "Om dataene"-teksten viser HVILKE
   // kommuner som faktisk har god dekning, i stedet for en generisk "hentes
-  // on-demand"-formulering — misvisende for en vanlig bruker, som ikke selv
-  // kan trigge nye hentinger, kun admin kan det, se requireAdmin i
-  // worker/api/src/routes/omrader.js). Listen er bevisst IKKE hardkodet i
-  // HTML-en — datasettet vokser etter hvert som admin analyserer flere
-  // kommuner (se D1-MIGRASJON.md), og en statisk liste ville blitt stille
-  // utdatert. Beregnes i stedet her, fra samme terreng_steder-datasett som
-  // allerede er lastet inn for ENHVER innlogget bruker (admin ELLER
-  // bruker, se hentTerrengdata() — i motsetning til /omrader/dekning, som
-  // er admin-only server-side og derfor IKKE kunne brukes som kilde her).
+  // on-demand"-formulering — nasjonalt sveip kjøres nå fylkesvis, ikke
+  // lenger on-demand fra appen (se docs/veien-videre.md, 2026-08-21: både
+  // admin-panelet og de tilhørende /omrader/dekning|hent|status-endepunktene
+  // er fjernet). Listen er bevisst IKKE hardkodet i HTML-en — datasettet
+  // vokser etter hvert som flere fylker sveipes, og en statisk liste ville
+  // blitt stille utdatert. Beregnes i stedet her, fra samme
+  // terreng_steder-datasett som allerede er lastet inn for ENHVER
+  // innlogget bruker (admin ELLER bruker, se hentTerrengdata()).
   //
   // Teller kun BASE_LOCATIONS (server-hentet grid-data), ikke
   // customLocations (egne, manuelt lagt-til steder) — en bruker med mange
@@ -4736,8 +4441,6 @@
       return b.res.total - a.res.total;
     });
 
-    updateFetchPanel(scoped.length);
-
     // kommuneFilter kommer fra et fritekstfelt (autocomplete, ikke en låst
     // <select>), så den må escapes før den havner i innerHTML nedenfor —
     // ellers kan noen skrive HTML/script rett inn i "0 steder vist"-meldingen.
@@ -4771,13 +4474,7 @@
           : filterMode === 'kommune'
             ? 'Velg en annen kommune, eller se hvilke kommuner som er dekket under «Om dataene».'
             : 'Prøv et annet senterpunkt eller en større radius.';
-      // fetchNudgeHtml() er allerede admin-only i praksis (sjekker om
-      // #sp-fetch-panel faktisk er synlig — updateFetchPanel() skjuler det
-      // helt for ikke-admin, se der) — gjenbruker samme lenke/mønster som
-      // dekningslinjen over "Foreslå områder" og sammendraget etter et
-      // "Foreslå områder"-forsøk, i stedet for en tredje, særegen formulering.
-      container.innerHTML = `<div class="sp-empty">Ingen analyserte steder${areaLabel} ennå. ${forslag}${fetchNudgeHtml(scoped.length)}</div>`;
-      wireFetchNudgeLink();
+      container.innerHTML = `<div class="sp-empty">Ingen analyserte steder${areaLabel} ennå. ${forslag}</div>`;
       return;
     }
 
@@ -4934,9 +4631,9 @@
     }
   }
 
-  // Enkel, uavhengig poll-løkke (egen lukking per kall, ikke en delt
-  // global timer som fetchPollTimer) — flere funn kan trigge berikelse av
-  // ulike steder samtidig uten å kollidere med hverandre.
+  // Enkel, uavhengig poll-løkke (egen lukking per kall, ikke én delt
+  // global timer-variabel) — flere funn kan trigge berikelse av ulike
+  // steder samtidig uten å kollidere med hverandre.
   function pollEnrichStatus(locationId, dispatchedAt, attempts){
     attempts = attempts || 0;
     const maxAttempts = 30; // ~15 min ved 30 sek mellomrom
@@ -5483,7 +5180,6 @@
     wireKodeForm();
     wireLogout();
     wireAdminPanel();
-    wireFetchPanel();
     initMap();
     // RETTET 2026-08-12 (bruker meldte lang ventetid før kommune-fanen var
     // brukbar første gang): loadKommuneRegister() sto tidligere HELT SIST i
@@ -5513,11 +5209,11 @@
     await checkUrlInvitasjon();
     // RETTET (lastetid): disse fire var tidligere sekvensielle await-kall
     // uten noen reell avhengighet mellom dem — hver skriver til sin egen,
-    // usammenhengende globale tilstand (BASE_LOCATIONS/fetchedAreas/
-    // artsfunn/userFinds osv.) og svelger allerede sine egne feil internt
+    // usammenhengende globale tilstand (BASE_LOCATIONS/artsfunn/
+    // userFinds osv.) og svelger allerede sine egne feil internt
     // (så en Promise.all her avviser aldri). Kjørt parallelt kutter
     // ventetiden fra summen av alle fire til den TREGESTE av dem.
-    await Promise.all([loadLocations(), loadFetchedAreas(), loadArtsfunn(), loadStorage(), loadDelteFunn()]);
+    await Promise.all([loadLocations(), loadArtsfunn(), loadStorage(), loadDelteFunn()]);
     // render() under trigger nå selv den første loadWeather()/
     // loadSeasonWeather()-kjøringen via maybeRefreshWeatherForScope() (se
     // den funksjonen) — ikke lenger et eget par kall her, se RETTET

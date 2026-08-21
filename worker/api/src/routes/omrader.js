@@ -1,69 +1,17 @@
 import { json } from '../lib/json.js';
 import { corsHeaders } from '../lib/cors.js';
-import { requireAdmin, requireSession } from '../lib/session.js';
+import { requireSession } from '../lib/session.js';
 import { triggerWorkflow, getLatestRun } from '../lib/github.js';
-import { hentFetchedAreasFraDb } from '../lib/terrengDb.js';
 
-// Admin-only: dette er nettopp "sette i gang analyse av nye områder", som
-// inviterte brukere eksplisitt IKKE skal ha tilgang til.
-//
-// RETTET (D1-migrasjon fase 4, se D1-MIGRASJON.md): leste tidligere
-// data/fetched-areas.json fra GitHub — glemt i fase 2/3 sin ellers
-// komplette migrering av terrengdata-lesesiden. fetch_area.py slutter å
-// skrive denne filen til GitHub i fase 4, så denne ruten ville stått
-// PERMANENT FASTFROSSET på gammel data uten denne fiksen.
-export async function hentDekning({ request, env }) {
-  const cors = corsHeaders(env);
-  const admin = await requireAdmin(request, env);
-  if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
-
-  const data = await hentFetchedAreasFraDb(env);
-  return json(data, 200, cors);
-}
-
-export async function startOmradeHenting({ request, env }) {
-  const cors = corsHeaders(env);
-  const admin = await requireAdmin(request, env);
-  if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
-
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return json({ error: 'Ugyldig forespørsel.' }, 400, cors);
-  }
-
-  const { mode, value, lat, lon, radiusKm, gridKm } = body || {};
-  if (!mode) return json({ error: 'Mangler mode.' }, 400, cors);
-
-  try {
-    await triggerWorkflow('fetch-area.yml', {
-      mode: String(mode),
-      value: value != null ? String(value) : '',
-      lat: lat != null ? String(lat) : '',
-      lon: lon != null ? String(lon) : '',
-      radiusKm: radiusKm != null ? String(radiusKm) : '15',
-      gridKm: gridKm != null ? String(gridKm) : '1.5',
-    }, env);
-  } catch (e) {
-    return json({ error: e.message }, 502, cors);
-  }
-  return json({ ok: true }, 200, cors);
-}
-
-export async function omradeStatus({ request, env, url }) {
-  const cors = corsHeaders(env);
-  const admin = await requireAdmin(request, env);
-  if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
-
-  const sinceIso = url.searchParams.get('siden') || undefined;
-  try {
-    const run = await getLatestRun('fetch-area.yml', sinceIso, env);
-    return json(run, 200, cors);
-  } catch (e) {
-    return json({ error: e.message }, 502, cors);
-  }
-}
+// hentDekning()/startOmradeHenting()/omradeStatus() (GET /omrader/dekning,
+// POST /omrader/hent, GET /omrader/status — admin-only trigger/polling for
+// on-demand fetch-area.yml-kjøringer) fjernet 2026-08-21. Admin-panelet i
+// webappen som kalte disse ble fjernet samme dag (js/app.js/index.html) —
+// nasjonalt sveip kjøres nå i faste fylkesbolker via `gh workflow run`
+// direkte, se fungifinder/docs/veien-videre.md. hentFetchedAreasFraDb()
+// (worker/api/src/lib/terrengDb.js) er IKKE fjernet — fortsatt i bruk av
+// routes/etlImport.js sin eksporterTerrengdata() (fetch_area.py sin
+// fetch_from_d1(), aktivt brukt av selve ETL-en).
 
 // IKKE admin-only: berikelse av ett eget funn-sted er en del av "registrer
 // funn", tilgjengelig for enhver innlogget bruker — se routes/terreng.js

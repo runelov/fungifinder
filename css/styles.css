@@ -218,10 +218,9 @@
     .sp-panel-funn { order: 5; }
     .sp-panel-vaer { order: 6; }
   }
-  /* Fullskjerm skal maksimere selve kartet — skjul underpanelene som ellers
-     følger under (turforslag, hente-data) mens man er i denne visningen. */
-  .sp-map-panel.sp-map-fullscreen .sp-route-panel,
-  .sp-map-panel.sp-map-fullscreen #sp-fetch-panel {
+  /* Fullskjerm skal maksimere selve kartet — skjul underpanelet som ellers
+     følger under (turforslag) mens man er i denne visningen. */
+  .sp-map-panel.sp-map-fullscreen .sp-route-panel {
     display: none;
   }
   body.sp-map-fullscreen-active { overflow: hidden; }

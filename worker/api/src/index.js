@@ -6,7 +6,7 @@ import { beOmLenke, verifiser, verifiserKode, loggUt } from './routes/auth.js';
 import { meg } from './routes/meg.js';
 import { hentMineData, lagreMineData, hentDelteFunn } from './routes/data.js';
 import { hentTerrengdata, hentArtsfunn, hentBerikelse } from './routes/terreng.js';
-import { hentDekning, startOmradeHenting, omradeStatus, berikPunkt, punktStatus } from './routes/omrader.js';
+import { berikPunkt, punktStatus } from './routes/omrader.js';
 import {
   listBrukere, oppdaterBrukerStatus, slettBrukerPermanent,
   listInvitasjoner, opprettInvitasjon, slettInvitasjon,
@@ -27,9 +27,6 @@ router.get('/delte/funn', hentDelteFunn);
 router.get('/terrengdata', hentTerrengdata);
 router.get('/terrengdata/artsfunn', hentArtsfunn);
 router.get('/terrengdata/berikelse/:locationId', hentBerikelse);
-router.get('/omrader/dekning', hentDekning);
-router.post('/omrader/hent', startOmradeHenting);
-router.get('/omrader/status', omradeStatus);
 router.post('/punkt/:id/berik', berikPunkt);
 router.get('/punkt/status', punktStatus);
 router.get('/admin/brukere', listBrukere);

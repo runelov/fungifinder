@@ -1,5 +1,45 @@
 # Endringslogg
 
+## 0.28.15 — Fjern admin-panelet for on-demand områdehenting
+Nasjonalt sveip pågår nå i faste fylkesbolker via `gh workflow run`
+direkte mot GitHub Actions (se `fungifinder-db/docs/veien-videre.md`) —
+admin trenger ikke lenger trigge kommune/radius/fylke-hentinger fra selve
+webappen, og forespurte at funksjonaliteten fjernes for å forenkle appen.
+
+- Fjernet `#sp-fetch-panel` (rutenett-tetthet-glidebryter, arealestimat,
+  "Hent data"-knapp, fremdriftspolling) fra `index.html`, og all
+  tilhørende logikk fra `js/app.js` — `startFetch()`, `pollFetchStatus()`,
+  `updateFetchPanel()`, `updateFetchEstimate()`, `checkForActiveRun()`,
+  `describeRunStatus()`, `wireFetchPanel()`, `findFetchedAreaMatch()`,
+  `loadFetchedAreas()`, `estimateAreaKm2()`, `fetchNudgeHtml()`/
+  `wireFetchNudgeLink()` og tilhørende global tilstand
+  (`fetchedAreas`/`gridKm`/`fetchInProgress`/`fetchPollTimer`).
+- Fjernet klient-metodene `hentOmraderDekning()`/`startOmradeHenting()`/
+  `hentOmradeStatus()` fra `js/api-client.js` (kalte kun det fjernede
+  panelet), OG selve Worker-endepunktene (`GET /omrader/dekning`,
+  `POST /omrader/hent`, `GET /omrader/status` — `hentDekning()`/
+  `startOmradeHenting()`/`omradeStatus()` i
+  `worker/api/src/routes/omrader.js`, med tilhørende ruter i
+  `worker/api/src/index.js`). `berikPunkt()`/`punktStatus()` i samme fil
+  (IKKE admin-only — del av "registrer eget funn") er UENDRET.
+  `hentFetchedAreasFraDb()` (`worker/api/src/lib/terrengDb.js`) er også
+  UENDRET — fortsatt aktivt brukt av `routes/etlImport.js` sin
+  `eksporterTerrengdata()` (leses av `fetch_area.py` sin `fetch_from_d1()`).
+- **Uendret, bevisst IKKE fjernet**: fylke/kommune/radius-VELGEREN over
+  kartet (`#sp-mode-seg`) og "Foreslå områder"-panelet (`#sp-route-panel`)
+  — begge er generelle, ikke-admin-only funksjoner for å filtrere/utforske
+  allerede hentet data, et helt annet formål enn den fjernede
+  admin-trigger-knappen. `updateCoverageLine()` (dekningslinjen over
+  "Foreslå områder") er beholdt, men "0 kjente punkter"-meldingen
+  linker ikke lenger til det fjernede panelet — sier i stedet at
+  dekningen utvides gradvis fylke for fylke.
+- **"Om dataene"-teksten oppdatert**: "hentes per kommune av
+  administrator" → "hentes fylkesvis og dekker etter hvert hele Norge",
+  siden nasjonalt sveip nå kjøres fylkesvis, ikke lenger on-demand per
+  kommune. Den dynamiske "godt analyserte kommuner"-lista er uendret
+  (bygget fra reell `terreng_steder`-data, ikke fra det fjernede
+  admin-panelets dekningssporing).
+
 ## 0.28.14 — Gjeninnfør parasollsopp og sjampinjong (åpen-mark-data på plass)
 Fjernet i v0.28.7 (2026-08-18, samme dag) fordi treslag/skogalder-
 scoringsmodellen ikke kunne produsere `'apen'`-verdien disse to saprotrofe
