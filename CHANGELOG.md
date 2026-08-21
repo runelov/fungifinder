@@ -1,5 +1,28 @@
 # Endringslogg
 
+## 0.30.0 — Ny-versjon-varsel (unngår stale PWA etter utrulling)
+Oppfølging av 0.29.2-episoden. Bruker spurte om det finnes en måte å unngå
+å måtte tvang-lukke og gjenåpne den installerte PWA-en for å få en ny
+utrulling — rotårsaken der var ikke bare selve regresjonen, men at
+`index.html` sin `<meta http-equiv="Cache-Control">` er kosmetisk (GitHub
+Pages ignorerer den og sender en ekte `Cache-Control: max-age=600` på ALT,
+inkl. index.html selv), og at "å åpne" en allerede kjørende installert PWA
+fra hjemskjermen ofte bare gjenopptar samme side i stedet for å navigere på
+nytt — `?v=`-cachebustingen hjelper ingenting hvis index.html aldri hentes
+på nytt i utgangspunktet.
+
+- Ny `wireVersionUpdateCheck()` i `js/app.js`: henter `index.html` med
+  `cache: 'no-store'` (omgår HTTP-cachen helt) når appen kommer i
+  forgrunnen igjen (`visibilitychange`) og hvert 5. minutt mens den står
+  åpen (pauset når skjult), og sammenligner `app.js?v=`-parameteren mot
+  `APP_VERSION`. Ved avvik vises en ny pille (`#sp-update-banner`, samme
+  visuelle familie som sp-a2hs/sp-safety) med en EKSPLISITT
+  "Last inn på nytt"-knapp — aldri automatisk reload. Avvisning huskes kun
+  for akkurat den versjonen (localStorage), så en enda nyere utrulling
+  senere varsler på nytt i stedet for å forbli stille for alltid.
+- Ingen service worker innført — bevisst holdt til dette enkle, lavrisiko
+  polling-mønsteret i stedet for en ny, mer komplisert cache-lag-arkitektur.
+
 ## 0.29.2 — Hurtigfiks: reverter render()/mapFittedOnce-endring fra 0.29.0
 Bruker (admin, logget inn) meldte at INGEN steder lenger ble listet — hverken
 default, ved zoom i kart, eller ved kommune-valg — og at "Foreslå områder"

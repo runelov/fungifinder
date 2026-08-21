@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.29.2';
+  const APP_VERSION = '0.30.0';
   const APP_BUILD_DATE = '2026-08-21';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -587,6 +587,67 @@
   function wireVersionInfo(){
     document.getElementById('sp-version').textContent = 'v' + APP_VERSION;
     document.getElementById('sp-config-version').textContent = `FungiFinder v${APP_VERSION} (${APP_BUILD_DATE})`;
+  }
+
+  // ---------- ny-versjon-varsel ----------
+  // RETTET 2026-08-21 (bruker meldte at en installert PWA på iOS ble
+  // stående på en gammel, buggy versjon i lang tid etter en utrulling —
+  // måtte tvinge appen helt igjen for å faktisk laste den nye): index.html
+  // sin <meta http-equiv="Cache-Control"> er kosmetisk, GitHub Pages
+  // ignorerer den og sender en ekte `Cache-Control: max-age=600`-header på
+  // ALT, inkl. selve index.html — og "å åpne" en allerede kjørende
+  // installert PWA på nytt fra hjemskjermen trigger ofte ingen navigasjon
+  // (og dermed ingen ny hent) i det hele tatt, den gjenopptar bare samme
+  // side. `?v=`-cachebustingen hjelper ingenting hvis index.html selv aldri
+  // hentes på nytt. Denne funksjonen henter index.html med `cache:
+  // 'no-store'` (omgår HTTP-cachen helt, i motsetning til en vanlig
+  // navigasjon) når appen kommer i forgrunnen igjen, og med jevne mellomrom
+  // mens den står åpen — og viser et lite varsel med en EKPLISITT
+  // reload-knapp (aldri automatisk, skal ikke rykke siden vekk midt i noe).
+  function wireVersionUpdateCheck(){
+    const banner = document.getElementById('sp-update-banner');
+    if (!banner) return;
+    const reloadBtn = document.getElementById('sp-update-reload');
+    const dismissBtn = document.getElementById('sp-update-dismiss');
+    const AVVIST_NOKKEL = 'fungifinder-oppdatering-avvist-for';
+    let sjekkerNa = false;
+    let intervallId = null;
+
+    async function sjekkForNyVersjon(){
+      if (sjekkerNa || !banner.hidden) return;
+      sjekkerNa = true;
+      try {
+        const res = await fetch(location.origin + '/index.html?sjekk=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) return;
+        const html = await res.text();
+        const m = html.match(/js\/app\.js\?v=([\d.]+)/);
+        if (!m || m[1] === APP_VERSION) return;
+        if (localStorage.getItem(AVVIST_NOKKEL) === m[1]) return; // brukeren har allerede avvist NETTOPP denne versjonen
+        banner.dataset.serverVersion = m[1];
+        banner.hidden = false;
+      } catch (e) {
+        // Stille — en nettverksfeil her skal ikke plage brukeren, prøver igjen ved neste sjekk.
+      } finally {
+        sjekkerNa = false;
+      }
+    }
+
+    reloadBtn.addEventListener('click', () => location.reload());
+    dismissBtn.addEventListener('click', () => {
+      if (banner.dataset.serverVersion) localStorage.setItem(AVVIST_NOKKEL, banner.dataset.serverVersion);
+      banner.hidden = true;
+    });
+
+    // Poller kun mens appen faktisk er synlig — ingen vits i å bruke
+    // nettverk/batteri på en bakgrunnsfane/-PWA, og visibilitychange-
+    // lytteren under fanger uansett opp øyeblikket den kommer tilbake.
+    function startPolling(){ if (!intervallId) intervallId = setInterval(sjekkForNyVersjon, 5 * 60 * 1000); }
+    function stopPolling(){ if (intervallId) { clearInterval(intervallId); intervallId = null; } }
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') { sjekkForNyVersjon(); startPolling(); }
+      else stopPolling();
+    });
+    if (document.visibilityState === 'visible') startPolling();
   }
 
   function wireTabs(){
@@ -5253,6 +5314,7 @@
 
   (async function init(){
     wireVersionInfo();
+    wireVersionUpdateCheck();
     wireTabs();
     wireCollapsibles();
     wireA2HS();

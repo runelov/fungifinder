@@ -470,6 +470,15 @@
   .sp-collapsible.sp-a2hs .sp-collapsible-body p { margin: 0 0 8px; font-size: var(--fs-sm); color: var(--ink-soft); }
   .sp-collapsible.sp-a2hs .sp-collapsible-body .sp-btn { margin-right: 8px; }
 
+  /* Ny-versjon-varsel (se wireVersionUpdateCheck() i app.js) — samme
+     pilleform som sp-a2hs/sp-safety (nudge, ikke referanseboks), men egen
+     salvie/pine-tone (samme par som sp-notice) siden dette verken er en
+     anbefaling (a2hs) eller en advarsel (safety), bare en systemmelding. */
+  .sp-update-banner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; background: #DCE3CB; border: 1px solid rgba(52,67,44,0.35); border-radius: 999px; padding: 10px 10px 10px 18px; margin-bottom: 14px; font-size: var(--fs-sm); color: var(--pine-deep); font-weight: 600; }
+  .sp-update-actions { display: flex; align-items: center; gap: 6px; }
+  .sp-update-dismiss { background: none; border: none; color: var(--ink-soft); font-size: 14px; cursor: pointer; padding: 4px 6px; line-height: 1; }
+  .sp-update-dismiss:hover { color: var(--ink); }
+
   .sp-collapsible.sp-safety { background: #F3E3DA; border: 1.5px solid var(--danger); }
   .sp-collapsible.sp-safety summary { color: var(--danger); font-family: 'Fraunces', serif; font-size: 14.5px; }
   .sp-collapsible.sp-safety .sp-collapsible-body p { margin: 0 0 8px; font-size: var(--fs-md); color: var(--ink); }

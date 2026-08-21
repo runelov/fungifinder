@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.29.2"/>
+<link rel="stylesheet" href="css/styles.css?v=0.30.0"/>
 </head>
 <body>
 
@@ -33,6 +33,23 @@
         <div class="sp-title">Fungi<em>Finder</em></div>
         <div class="sp-sub">Kombinerer artsprofiler, terrengdata, adkomst, værdata og din egen funnhistorikk for å foreslå hvor du bør lete — og hvorfor.</div>
       </div>
+    </div>
+
+    <!-- Ny-versjon-varsel — se wireVersionUpdateCheck() i app.js. Ingen
+         service worker i dette repoet (bevisst, se README), så en allerede
+         åpen fane/PWA merker ellers ALDRI en ny utrulling av seg selv —
+         spesielt en installert PWA på iOS, der "å åpne appen igjen" ofte
+         bare gjenopptar en allerede kjørende side i stedet for å laste den
+         på nytt. Skjult by default; vist når en fersk (no-store) hent av
+         index.html refererer en annen app.js-versjon enn den som faktisk
+         kjører. Reload er alltid brukerstyrt (knapp), aldri automatisk —
+         skal ikke rykke siden vekk midt i noe brukeren holder på med. -->
+    <div class="sp-update-banner" id="sp-update-banner" hidden>
+      <span>🔄 Ny versjon av FungiFinder er tilgjengelig.</span>
+      <span class="sp-update-actions">
+        <button type="button" class="sp-btn sp-primary" id="sp-update-reload">Last inn på nytt</button>
+        <button type="button" class="sp-update-dismiss" id="sp-update-dismiss" aria-label="Lukk">✕</button>
+      </span>
     </div>
 
     <!-- "Legg til på hjemskjermen" — nå en sammenleggbar pille (samme mønster
@@ -375,7 +392,7 @@
      worker/api/README.md). Testnøkkelen (1x00000000000000000000AA) hører
      kun hjemme i worker/api/.dev.vars for lokal utvikling, aldri her. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<script src="js/api-client.js?v=0.29.2"></script>
-<script src="js/app.js?v=0.29.2"></script>
+<script src="js/api-client.js?v=0.30.0"></script>
+<script src="js/app.js?v=0.30.0"></script>
 </body>
 </html>
