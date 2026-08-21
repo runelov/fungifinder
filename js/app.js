@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.30.2';
+  const APP_VERSION = '0.30.3';
   const APP_BUILD_DATE = '2026-08-21';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -598,12 +598,45 @@
   // ALT, inkl. selve index.html — og "å åpne" en allerede kjørende
   // installert PWA på nytt fra hjemskjermen trigger ofte ingen navigasjon
   // (og dermed ingen ny hent) i det hele tatt, den gjenopptar bare samme
-  // side. `?v=`-cachebustingen hjelper ingenting hvis index.html selv aldri
-  // hentes på nytt. Denne funksjonen henter index.html med `cache:
-  // 'no-store'` (omgår HTTP-cachen helt, i motsetning til en vanlig
-  // navigasjon) når appen kommer i forgrunnen igjen, og med jevne mellomrom
-  // mens den står åpen — og viser et lite varsel med en EKPLISITT
-  // reload-knapp (aldri automatisk, skal ikke rykke siden vekk midt i noe).
+  // side.
+  //
+  // RETTET 2026-08-21, runde 2 (bruker meldte at VARSELET selv var
+  // problemet — verken "Last inn på nytt" eller ✕ fikk det til å forsvinne):
+  // et første forsøk brukte en fersk query-parameter
+  // (?tvungen_reload=<tidsstempel>) for å tvinge frem en nettverkshenting
+  // forbi cachen. Verifisert (curl mot fungifinder.no) at dette IKKE virker
+  // — GitHub Pages ligger bak Fastly, som cacher /index.html PÅ TVERS AV
+  // ULIKE QUERY-STRINGS (to identiske kall med forskjellig ?sjekk=-verdi ga
+  // "x-cache: MISS" første gang, "x-cache: HIT" andre gang, selv med en
+  // eksplisitt `Cache-Control: no-store`-forespørselsheader). Query-
+  // parameteren var dermed virkningsløs mot selve CDN-laget (kun nyttig mot
+  // NETTLESERENS egen cache, som IKKE var flaskehalsen her) — fjernet igjen
+  // sammen med opprydds-koden for den (se historikk i git for tidligere
+  // forsøk). Reell konsekvens: en fersk utrulling kan i verste fall ta opp
+  // til Fastly sin egen cache-levetid (samme 600 sek) FØR den faktisk
+  // fanges opp — noe klientkode ikke kan tvinge frem raskere. Sjekken under
+  // er derfor nå primært en INFORMATIV varsling ("noe nytt er på vei"),
+  // ikke en garanti om at ett trykk på reload henter det med det samme.
+  //
+  // Samtidig rettet en reell logikk-feil som forverret akkurat dette:
+  // sjekken sammenlignet tidligere KUN på ulikhet (`m[1] !== APP_VERSION`)
+  // — hvis Fastly i en overgangsperiode serverte en ELDRE (eller bare
+  // ulik, f.eks. delvis purget) versjon enn den som faktisk kjørte, viste
+  // varselet "ny versjon" for noe som IKKE var nyere, og et reload kunne
+  // dermed aldri få det til å stemme (samme eller eldre kode, sammenlignet
+  // på nytt, fortsatt "ulik" mot den ferske purgingen et annet sted i
+  // Fastly-nettverket). Sammenligner nå med ekte semver-STØRRE-ENN
+  // (versjonErNyere()), ikke bare ulikhet.
+  function versjonErNyere(server, kjorende){
+    const a = server.split('.').map(Number);
+    const b = kjorende.split('.').map(Number);
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+      const av = a[i] || 0, bv = b[i] || 0;
+      if (av !== bv) return av > bv;
+    }
+    return false;
+  }
+
   function wireVersionUpdateCheck(){
     const banner = document.getElementById('sp-update-banner');
     if (!banner) return;
@@ -617,11 +650,13 @@
       if (sjekkerNa || !banner.hidden) return;
       sjekkerNa = true;
       try {
-        const res = await fetch(location.origin + '/index.html?sjekk=' + Date.now(), { cache: 'no-store' });
+        // no-store omgår NETTLESERENS egen cache (reelt nyttig) — se
+        // kommentaren over for hvorfor dette IKKE også omgår Fastly.
+        const res = await fetch(location.origin + '/index.html', { cache: 'no-store' });
         if (!res.ok) return;
         const html = await res.text();
         const m = html.match(/js\/app\.js\?v=([\d.]+)/);
-        if (!m || m[1] === APP_VERSION) return;
+        if (!m || !versjonErNyere(m[1], APP_VERSION)) return;
         if (localStorage.getItem(AVVIST_NOKKEL) === m[1]) return; // brukeren har allerede avvist NETTOPP denne versjonen
         banner.dataset.serverVersion = m[1];
         banner.hidden = false;
@@ -632,24 +667,7 @@
       }
     }
 
-    // RETTET 2026-08-21 (bruker meldte: trykte "Last inn på nytt", men
-    // varselet kom rett tilbake): location.reload() er fortsatt en VANLIG
-    // navigasjon, underlagt akkurat den samme HTTP-cachen som resten av
-    // denne funksjonen eksisterer for å omgå (GitHub Pages sin ekte
-    // Cache-Control: max-age=600, se kommentaren over checkForNyVersjon) —
-    // innenfor de 10 minuttene kan et reload dermed stille servere nøyaktig
-    // samme gamle side på nytt, uten noen nettverksrunde i det hele tatt.
-    // location.replace() med en fersk, aldri-før-sett query-parameter
-    // tvinger derimot en EKTE nettverkshenting (URL-en er cache-nøkkelen —
-    // en ukjent URL kan aldri være et cache-treff), og replace (ikke
-    // assign/href) unngår å legge igjen et unaturlig historikk-steg.
-    // wireVersionUpdateCheck() sitt eget URL-opprydd ved neste oppstart
-    // (se toppen av init()) fjerner parameteren igjen med det samme.
-    reloadBtn.addEventListener('click', () => {
-      const url = new URL(location.href);
-      url.searchParams.set('tvungen_reload', Date.now());
-      location.replace(url.toString());
-    });
+    reloadBtn.addEventListener('click', () => location.reload());
     dismissBtn.addEventListener('click', () => {
       if (banner.dataset.serverVersion) localStorage.setItem(AVVIST_NOKKEL, banner.dataset.serverVersion);
       banner.hidden = true;
@@ -5350,19 +5368,6 @@
     render();
   });
   document.getElementById('sp-score-filter-hint').addEventListener('click', (e) => { e.preventDefault(); showAllPointsOnMap(); });
-
-  // Rydder bort ?tvungen_reload=<tidsstempel> (se wireVersionUpdateCheck()
-  // sin reload-knapp) igjen med det samme, uten en ny navigasjon
-  // (replaceState, ikke en ny location.href) — parameteren har gjort
-  // jobben sin (tvang en ekte nettverkshenting forbi HTTP-cachen) i det
-  // øyeblikket DENNE siden faktisk lastet, og skal ikke bli hengende
-  // synlig i adresselinjen i en vanlig nettleserfane.
-  (function ryddOppTvungenReloadParam(){
-    const url = new URL(location.href);
-    if (!url.searchParams.has('tvungen_reload')) return;
-    url.searchParams.delete('tvungen_reload');
-    history.replaceState(null, '', url.toString());
-  })();
 
   (async function init(){
     wireVersionInfo();

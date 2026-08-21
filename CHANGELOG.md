@@ -1,5 +1,41 @@
 # Endringslogg
 
+## 0.30.3 — Fiks ny-versjon-varselet for godt: Fastly ignorerer query-strings
+Bruker presiserte: det er selve "Ny versjon tilgjengelig"-varselet som er
+problemet — verken "Last inn på nytt" eller ✕ fikk det til å forsvinne, selv
+på 0.30.1.
+
+Rotårsak funnet og verifisert med `curl` direkte mot fungifinder.no: GitHub
+Pages ligger bak Fastly, som cacher `/index.html` **på tvers av ulike
+query-strings** — to identiske kall med forskjellig `?sjekk=<verdi>` ga
+`x-cache: MISS` første gang, `x-cache: HIT` andre gang, selv med en
+eksplisitt `Cache-Control: no-store`-forespørselsheader. 0.30.1 sin
+`?tvungen_reload=<tidsstempel>`-cachebusting (både for reload-knappen og
+selve sjekken) var dermed virkningsløs mot CDN-laget — den omgikk kun
+NETTLESERENS egen cache, som aldri var hele problemet.
+
+Samtidig lå det en reell logikkfeil i sammenligningen: sjekken viste
+varselet ved ENHVER ulikhet (`m[1] !== APP_VERSION`), ikke bare når
+serveren faktisk var nyere. Hvis Fastly i en overgangsperiode serverte en
+ELDRE eller delvis purget versjon enn den som faktisk kjørte, viste
+varselet "ny versjon" for noe som ikke var nyere — og et reload kunne da
+aldri få det til å stemme, siden neste sjekk (mot en annen Fastly-node)
+kunne gi samme "ulike, men ikke nyere"-resultat på nytt.
+
+- Fjernet all query-string-cachebusting (virkningsløs mot Fastly, kun
+  cosmetisk støy i URL-en) — både reload-knappen (tilbake til vanlig
+  `location.reload()`) og selve sjekken (`fetch('/index.html', {cache:
+  'no-store'})`, uten `?sjekk=`).
+- Ny `versjonErNyere()` — ekte semver-større-enn-sammenligning (numerisk
+  per segment, ikke streng-ulikhet) — varselet vises nå kun når serveren
+  faktisk har en NYERE versjon.
+- Realistisk forventning fremover: en fersk utrulling kan i verste fall
+  ta opp til Fastly sin egen cache-levetid (samme 600 sek som
+  Cache-Control-headeren) før den blir synlig for sjekken — dette er en
+  ren CDN-begrensning klientkode ikke kan tvinge forbi.
+
+Versjon 0.30.2 → 0.30.3.
+
 ## 0.30.2 — Gjør terrengdata-hentefeil synlig i UI
 Bruker bekreftet på v0.30.1 (etter revertet 0.29.2-mistanke) at
 grunnproblemet fortsatt står: ingen steder listet, "Foreslå områder"
