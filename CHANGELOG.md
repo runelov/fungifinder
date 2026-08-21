@@ -1,5 +1,55 @@
 # Endringslogg
 
+## 0.29.0 — Redesign: landingssekvens, kartutsnitt, demo-tekst og trykkflater
+Implementerer redesignforslaget fra designkritikken 2026-08-21 (godkjent
+samme dag). Fem endringer, alle innenfor eksisterende visuell profil — ingen
+nye farger/skrifter.
+
+- **Kortere landingssekvens**: sikkerhetsvarselet (`sp-safety`) er nå lukket
+  by default (var alltid utfoldet) — sammendragslinjen bærer nå selve
+  budskapet ("⚠ Appen bestemmer ikke arter — les før du spiser") i stedet
+  for en generisk tittel, så innholdet leses uten å måtte utvide. "Legg til
+  på hjemskjermen" er konvertert fra et alltid-synlig kort til samme
+  sammenleggbare mønster (`<details>`). "Om dataene" er flyttet fra toppen
+  av siden til bunnen (etter resultatlisten) — den er referansestoff, ikke
+  en forutsetning for å komme i gang. Artsvelgeren er dermed synlig langt
+  tidligere på mobil.
+- **Kartets standardutsnitt**: `initMap()` brukte et fast `setView(senter,
+  zoom)` tuftet på et bredt skjermformat — viste for det meste tomt/grått
+  på en smal, høy mobil-kartcontainer. Byttet til `fitBounds()` mot en ny
+  `NORGE_STARTVISNING`-konstant. Fant samtidig en dypere rotårsak for
+  hvorfor det faktiske utsnittet kunne bli varig feil: kartpanelet er
+  `display:none` på mobil (default "Liste"-visning) til brukeren trykker
+  "Kart", og et `fitBounds()`-kall mot en 0×0-container regner ut et
+  meningsløst utsnitt som blir stående — kun tile-plasseringen rettes opp av
+  `invalidateSize()`, ikke selve zoom/senter. `renderMap()` sin
+  "fit-til-faktiske-punkter-første-gang"-logikk (`mapFittedOnce`) kunne
+  dermed låse seg til et feil utsnitt før containeren noensinne ble synlig.
+  Lagt til en synlighets-vakt (`leafletMap.getSize()`) som lar
+  `mapFittedOnce` forbli `false` til containeren faktisk har en reell
+  størrelse, og `setMobileView('kart')` kjører nå `render()` på nytt idet
+  panelet blir synlig for første gang, slik at et korrekt utsnitt faktisk
+  blir beregnet da.
+- **Konsistente tall i demo-visning**: `minScoreFilter` (standard 70) kunne
+  filtrere bort begge demo-stedene fra listen samtidig som demo-banneret
+  rett over sa "Du ser 2 demo-steder" — to motstridende tellinger av samme
+  punkter. Terskelen er nå slått av for ikke-innloggede (`effectiveMinScore
+  = currentUser ? minScoreFilter : 0`), selve terskel-kontrollen
+  (`sp-score-filter-row`) skjules i demo-visning, og banderteksten er
+  omskrevet til én sammenhengende melding.
+- **Trykkflater ≥44px**: økt padding på `.sp-slider-row` (preferanse-brytere,
+  reell klikkflate var allerede hele raden — kun høyden manglet), `.sp-seg
+  button` (Fylke/Kommune/Radius, Liste/Kart, Én art/Mine favoritter),
+  `.sp-select` (matchet til samme høyde i samme filterrad) og `.sp-mini-btn`
+  (Min posisjon/Fullskjerm/Vis alle/Nullstill senter). Leaflets egne
+  zoom-knapper overstyrt til 44×44px.
+- **Visuelt skille varsel vs. faktaboks**: `sp-safety`/`sp-a2hs` (tidsriktige
+  varsler/tilbud) har nå en avrundet pilleform når lukket (`border-radius:
+  999px`), tydelig forskjellig fra de firkantede referanse-/
+  innstillingsboksene (`sp-notice`/`sp-preferences`, 3-4px). Gjentatt
+  "(klikk for å skjule/vise)"-tekst fjernet fra alle fire — chevronen alene
+  gir samme affordance.
+
 ## 0.28.17 — Fiks "Om dataene": ekskluder gamle kommune/radius-punkter fra fylkestellingen
 Oppfølging av 0.28.16, samme dag. Bruker spurte om gamle kommune-/
 radius-kjøringer fortsatt ligger lagret ved siden av de nye

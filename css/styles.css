@@ -44,25 +44,9 @@
   .sp-notice { background: #DCE3CB; border: 1px solid rgba(52,67,44,0.25); border-radius: 3px; padding: 10px 14px; font-size: var(--fs-sm); color: var(--pine-deep); margin-bottom: 14px; }
   .sp-notice b { color: var(--russet-deep); }
 
-  /* "Legg til på hjemskjermen"-banner, se index.html/wireA2HS() i app.js.
-     Egen, litt varmere farge (gold-tint) enn .sp-notice ved siden av — skal
-     lese som en anbefaling/handling, ikke som endnu en informasjonsboks. */
-  .sp-a2hs { position: relative; display: flex; align-items: flex-start; gap: 12px; background: #F1E4C4; border: 1px solid rgba(200,151,74,0.55); border-radius: 3px; padding: 12px 40px 12px 14px; margin-bottom: 14px; }
-  .sp-a2hs-icon { font-size: 22px; line-height: 1; }
-  .sp-a2hs-body { flex: 1; min-width: 0; }
-  .sp-a2hs-body b { color: var(--russet-deep); font-size: var(--fs-md); }
-  .sp-a2hs-body p { margin: 3px 0 8px; font-size: var(--fs-sm); color: var(--ink-soft); }
-  .sp-a2hs-close { position: absolute; top: 8px; right: 10px; background: none; border: none; color: var(--ink-soft); font-size: 14px; cursor: pointer; padding: 2px 4px; line-height: 1; }
-  .sp-a2hs-close:hover { color: var(--ink); }
-  .sp-a2hs-instructions { font-size: var(--fs-sm); color: var(--ink-soft); background: rgba(255,255,255,0.5); border-radius: 3px; padding: 8px 10px; margin-top: 4px; }
-  .sp-a2hs-instructions code { background: rgba(38,48,31,0.08); padding: 1px 5px; border-radius: 3px; }
-
-  .sp-safety { background: #F3E3DA; border: 1.5px solid var(--danger); border-radius: 4px; padding: 14px 16px; margin-bottom: 22px; }
-  .sp-safety h4 { margin: 0 0 6px; font-family: 'Fraunces', serif; color: var(--danger); font-size: 15px; }
-  .sp-safety p { margin: 0 0 8px; font-size: var(--fs-md); color: var(--ink); }
-  .sp-safety .sp-safety-links { display: flex; flex-wrap: wrap; gap: 14px; font-size: var(--fs-sm); }
-  .sp-safety .sp-safety-links a { font-weight: 600; }
-  .sp-safety .sp-safety-emergency { font-size: var(--fs-sm); color: var(--danger); margin-top: 8px; font-family: 'JetBrains Mono', monospace; }
+  /* sp-a2hs/sp-safety sin egen "pille vs. boks"-form flyttet ned til
+     .sp-collapsible-blokken (de er begge <details> nå, se der) —
+     "Redesignforslag 2026-08-21", endring 1/5. */
 
   .sp-layout { display: grid; grid-template-columns: 260px 1fr; gap: 26px; align-items: start; }
   /* Grid-celler har implisitt min-width:auto, som lar innhold med "nowrap"
@@ -120,7 +104,11 @@
     .sp-species-btn { flex: 0 0 auto; width: auto; padding: 7px 12px; }
   }
 
-  .sp-slider-row { display: flex; align-items: center; justify-content: space-between; font-size: var(--fs-md); margin-bottom: 8px; gap: 10px; cursor: pointer; }
+  /* padding: 9px 0 løfter radens EGEN høyde til ~44px (26px bryter + 2×9px),
+     ikke bare bredden — raden var allerede det reelle klikkmålet (se
+     event-lytteren i app.js), men kun ~26px høy. Se
+     "Redesignforslag 2026-08-21", endring 4. */
+  .sp-slider-row { display: flex; align-items: center; justify-content: space-between; font-size: var(--fs-md); margin-bottom: 8px; padding: 9px 0; gap: 10px; cursor: pointer; }
   /* UX-gjennomgang 2026-08-14: bryteren var 38×21px — under WCAG 2.2 sitt
      minimum på 24×24px for touch-mål (2.5.8), og langt under de anbefalte
      44×44px for utendørsbruk (kalde fingre/hansker/sollys). Økt til 46×26px
@@ -162,14 +150,27 @@
   .sp-map-topline { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
   .sp-map-topline h3 { margin: 0; }
   .sp-filter-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .sp-select { font-family: 'Source Sans 3', sans-serif; font-size: var(--fs-sm); padding: 6px 9px; border-radius: 3px; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+  /* Padding økt sammen med .sp-seg button rett under, slik at nedtrekkslister
+     og segmenterte knapper i samme filterrad (.sp-filter-controls) holder
+     samme høyde igjen (~44px) i stedet for å skjeve ut mot hverandre. */
+  .sp-select { font-family: 'Source Sans 3', sans-serif; font-size: var(--fs-sm); padding: 13px 9px; border-radius: 3px; border: 1px solid var(--line); background: #fff; color: var(--ink); }
   .sp-seg { display: flex; border: 1px solid var(--pine); border-radius: 3px; overflow: hidden; }
-  .sp-seg button { border: none; background: #fff; color: var(--pine-deep); font-size: var(--fs-sm); padding: 5px 10px; cursor: pointer; font-family: 'Source Sans 3', sans-serif; }
+  /* padding økt (var 5px 10px, ~28px høy) til ~44px trykkflate — dekker
+     Fylke/Kommune/Radius, Liste/Kart (mobil) og Én art/Mine favoritter, som
+     alle deler denne klassen. Se "Redesignforslag 2026-08-21", endring 4. */
+  .sp-seg button { border: none; background: #fff; color: var(--pine-deep); font-size: var(--fs-sm); padding: 13px 10px; cursor: pointer; font-family: 'Source Sans 3', sans-serif; }
   .sp-seg button.active { background: var(--pine); color: #fff; }
   .sp-radius-controls { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--ink-soft); }
   .sp-radius-controls input[type=range] { width: 110px; }
-  .sp-mini-btn { background: none; border: 1px solid var(--line); border-radius: 3px; font-size: var(--fs-xs); padding: 4px 8px; cursor: pointer; color: var(--ink-soft); }
+  /* padding økt (var 4px 8px, ~24px høy) til ~44px trykkflate — dekker Min
+     posisjon/Fullskjerm/Vis alle/Nullstill senter. Se
+     "Redesignforslag 2026-08-21", endring 4. */
+  .sp-mini-btn { background: none; border: 1px solid var(--line); border-radius: 3px; font-size: var(--fs-xs); padding: 14px 8px; cursor: pointer; color: var(--ink-soft); }
   .sp-leaflet-map { height: 360px; border: 1px solid var(--line); border-radius: 3px; }
+  /* Leaflets egne zoom-knapper er 26×26px by default — under 44px-målet
+     resten av trykkflatene på siden nå følger. Se
+     "Redesignforslag 2026-08-21", endring 4. */
+  .sp-leaflet-map .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; font-size: 20px; }
   .sp-leaflet-map .leaflet-popup-content-wrapper { font-family: 'Source Sans 3', sans-serif; font-size: var(--fs-sm); border-radius: 4px; }
   .sp-leaflet-map .leaflet-popup-content b { font-family: 'Fraunces', serif; }
   .sp-map-hint { font-size: var(--fs-xs); color: var(--ink-soft); margin-top: 6px; }
@@ -256,6 +257,7 @@
      ny fargehistorie. */
   .sp-demo-banner { background: #DCE3CB; border: 1px solid rgba(52,67,44,0.25); border-radius: 3px; padding: 8px 12px; font-size: var(--fs-sm); color: var(--pine-deep); margin-bottom: 12px; }
   .sp-demo-banner a { color: var(--russet-deep); font-weight: 600; }
+  .sp-demo-banner-note { display: inline-block; margin-top: 4px; font-size: var(--fs-xs); color: var(--ink-soft); }
 
   .sp-route-panel { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
   .sp-route-row { display: flex; align-items: center; gap: 10px; font-size: var(--fs-sm); color: var(--ink-soft); flex-wrap: wrap; }
@@ -436,14 +438,9 @@
   .sp-collapsible summary::-webkit-details-marker { display: none; }
   .sp-collapsible summary::before { content: '▸'; font-size: var(--fs-xs); color: var(--ink-soft); transition: transform 0.15s; margin-right: 2px; }
   .sp-collapsible[open] summary::before { transform: rotate(90deg); }
-  /* UX-gjennomgang 2026-08-14: hadde opacity:0.6 oppå en ellers
-     AA-kompatibel var(--ink-soft) — målt reelt renderet kontrastforhold
-     mot .sp-collapsible-bakgrunnen var kun ~2.4:1 (WCAG AA krever 4.5:1
-     for normal tekst). Denne teksten forklarer nettopp AT boksene er
-     klikkbare, så den bør ikke være den vanskeligste å lese. Fjernet
-     opacity — var(--ink-soft) alene består fint (~5:1) og er fortsatt
-     tydelig underordnet resten av teksten via størrelse alene (10.5px). */
-  .sp-collapse-hint { font-size: var(--fs-xs); color: var(--ink-soft); font-weight: 400; }
+  /* Gjentatt "(klikk for å skjule/vise)"-tekst ved siden av hver summary er
+     fjernet (2026-08-21) — chevronen over gir samme affordance uten å måtte
+     lese den samme frasen fire ganger på siden. */
   .sp-collapsible-body { margin-top: 8px; }
   /* UX-gjennomgang 2026-08-14: sp-notice/sp-safety hadde ulik border-radius
      (3px/4px) og padding (10px 14px/14px 16px) selv om de visuelt er ment
@@ -451,8 +448,35 @@
      alvorlighetsfarge). Samkjørt på sp-safety sine litt større verdier. */
   .sp-collapsible.sp-notice { background: #DCE3CB; border: 1px solid rgba(52,67,44,0.25); border-radius: 4px; padding: 14px 16px; font-size: var(--fs-sm); color: var(--pine-deep); }
   .sp-collapsible.sp-notice summary { font-size: var(--fs-sm); }
-  .sp-collapsible.sp-safety { background: #F3E3DA; border: 1.5px solid var(--danger); border-radius: 4px; padding: 14px 16px; }
-  .sp-collapsible.sp-safety summary h4 { color: var(--danger); font-family: 'Fraunces', serif; font-size: 15px; }
+
+  /* sp-safety og sp-a2hs er "nudge"-striper (tidsriktig varsel/tilbud), ikke
+     referanse-/innstillingsbokser som sp-notice/sp-preferences — nå gitt en
+     egen, avrundet pilleform når lukket (border-radius: 999px) som skiller
+     dem visuelt fra boks-familiens 3-4px hjørner, selv om alle fire deler
+     samme .sp-collapsible-mekanikk. Åpne blir de en mykere boks (10px) —
+     fortsatt tydelig rundere enn boks-familien. Se
+     "Redesignforslag 2026-08-21", endring 5. */
+  .sp-collapsible.sp-a2hs, .sp-collapsible.sp-safety {
+    border-radius: 999px; padding: 10px 18px; transition: border-radius 0.15s, padding 0.15s;
+  }
+  .sp-collapsible.sp-a2hs[open], .sp-collapsible.sp-safety[open] {
+    border-radius: 10px; padding: 14px 18px;
+  }
+  .sp-collapsible.sp-a2hs summary, .sp-collapsible.sp-safety summary { font-weight: 600; }
+
+  .sp-collapsible.sp-a2hs { background: #F1E4C4; border: 1px solid rgba(200,151,74,0.55); }
+  .sp-collapsible.sp-a2hs summary { color: var(--russet-deep); }
+  .sp-collapsible.sp-a2hs .sp-a2hs-icon { font-size: 15px; }
+  .sp-collapsible.sp-a2hs .sp-collapsible-body p { margin: 0 0 8px; font-size: var(--fs-sm); color: var(--ink-soft); }
+  .sp-collapsible.sp-a2hs .sp-collapsible-body .sp-btn { margin-right: 8px; }
+
+  .sp-collapsible.sp-safety { background: #F3E3DA; border: 1.5px solid var(--danger); }
+  .sp-collapsible.sp-safety summary { color: var(--danger); font-family: 'Fraunces', serif; font-size: 14.5px; }
+  .sp-collapsible.sp-safety .sp-collapsible-body p { margin: 0 0 8px; font-size: var(--fs-md); color: var(--ink); }
+  .sp-collapsible.sp-safety .sp-safety-links { display: flex; flex-wrap: wrap; gap: 14px; font-size: var(--fs-sm); }
+  .sp-collapsible.sp-safety .sp-safety-links a { font-weight: 600; }
+  .sp-collapsible.sp-safety .sp-safety-emergency { font-size: var(--fs-sm); color: var(--danger); margin-top: 8px; font-family: 'JetBrains Mono', monospace; }
+
   /* Preferanser/Konto flyttet ut av den alltid-synlige venstrekolonnen og inn
      hit — inspirert av MyCrate sin sammenleggbare "Setup & Sync"-plassering i
      toppen i stedet for en fast sidepanel-fane (se samtalen 2026-07-11). */

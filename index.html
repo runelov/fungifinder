@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.28.17"/>
+<link rel="stylesheet" href="css/styles.css?v=0.29.0"/>
 </head>
 <body>
 
@@ -35,37 +35,35 @@
       </div>
     </div>
 
-    <!-- "Legg til på hjemskjermen"-banner. Skjult by default (hidden-attributt) —
-         wireA2HS() i app.js avgjør synlighet ved oppstart: aldri vist hvis appen
-         allerede kjører standalone (display-mode: standalone / navigator.standalone),
-         og aldri vist igjen samme enhet etter at brukeren har lukket den (localStorage).
-         Innhold (tekst/knapp) fylles inn av samme funksjon, plattformavhengig — se
-         der for iOS (statisk anvisning, ingen programmatisk install-API finnes) vs.
-         Android/Chrome (ekte beforeinstallprompt()-knapp) vs. andre nettlesere. -->
-    <div class="sp-a2hs" id="sp-a2hs" hidden>
-      <button type="button" class="sp-a2hs-close" id="sp-a2hs-close" aria-label="Lukk">✕</button>
-      <div class="sp-a2hs-icon">📲</div>
-      <div class="sp-a2hs-body">
-        <b>Legg FungiFinder på hjemskjermen</b>
+    <!-- "Legg til på hjemskjermen" — nå en sammenleggbar pille (samme mønster
+         som sp-safety/sp-notice) i stedet for et alltid-utfoldet kort, se
+         "Redesignforslag 2026-08-21", endring 1. Skjult by default
+         (hidden-attributt) — wireA2HS() i app.js avgjør synlighet ved
+         oppstart: aldri vist hvis appen allerede kjører standalone
+         (display-mode: standalone / navigator.standalone), og aldri vist
+         igjen samme enhet etter at brukeren har lukket den (localStorage).
+         Innhold (tekst/knapp) fylles inn av samme funksjon, plattformavhengig
+         — se der for iOS (statisk anvisning, ingen programmatisk
+         install-API finnes) vs. Android/Chrome (ekte
+         beforeinstallprompt()-knapp) vs. andre nettlesere. -->
+    <details class="sp-collapsible sp-a2hs" id="sp-a2hs" hidden>
+      <summary><span class="sp-a2hs-icon">📲</span> <b>Legg FungiFinder på hjemskjermen</b></summary>
+      <div class="sp-collapsible-body">
         <p id="sp-a2hs-text">Rask tilgang som en app — og du slipper å logge inn i nettleseren på nytt hver gang.</p>
         <button type="button" class="sp-btn sp-primary" id="sp-a2hs-action" hidden>Installer app</button>
-      </div>
-    </div>
-
-    <details class="sp-collapsible sp-notice" id="sp-notice">
-      <summary><b>Om dataene</b> <span class="sp-collapse-hint">(klikk for å skjule/vise)</span></summary>
-      <div class="sp-collapsible-body">
-      Terreng- og adkomstdata (treslag, fuktighet, vei/parkering/stier) hentes fylkesvis og dekker etter hvert hele Norge.
-      Per nå er følgende fylker analysert: <span id="sp-analyserte-fylker">henter oversikt …</span>.
-      De blå prikkene i kartet er ekte, verifiserte artsobservasjoner fra Artsdatabanken sin Artskart-database
-      — dine egne funn vises med en annen farge. Artsobservasjoner vises først når du har valgt et mindre
-      kartutsnitt. Værdata hentes <b>live</b>. Dine personlige data (funn, hogst-merker, egne steder) lagres
-      på din innloggede konto — logg inn under ⚙ Preferanser &amp; Konto → Konto.
+        <button type="button" class="sp-btn" id="sp-a2hs-close">Ikke nå</button>
       </div>
     </details>
 
-    <details class="sp-collapsible sp-safety" open id="sp-safety">
-      <summary><h4 style="display:inline;margin:0;">⚠ Viktig om artsbestemmelse</h4> <span class="sp-collapse-hint">(klikk for å skjule/vise)</span></summary>
+    <!-- Sikkerhetsvarselet er nå lukket by default (ingen open-attributt —
+         wireCollapsibles() i app.js husker brukerens eget valg fra forrige
+         besøk via localStorage, og overstyrer default under). Selve
+         sammendragslinjen (summary) bærer nå BUDSKAPET, ikke bare en
+         generisk tittel, slik at det leses uten å måtte utvide —
+         detaljene (forvekslingsfare, lenker, nødnummer) er samme innhold som
+         før, ett tapp unna. Se "Redesignforslag 2026-08-21", endring 1/5. -->
+    <details class="sp-collapsible sp-safety" id="sp-safety">
+      <summary>⚠ Appen bestemmer ikke arter — les før du spiser</summary>
       <div class="sp-collapsible-body">
       <p>FungiFinder foreslår <b>terreng</b> — appen bestemmer ikke arter og er ikke en erstatning for kunnskap eller kontroll.
       Spis aldri sopp du ikke er 100 % sikker på. Flere av de "trygge" artene under har giftige forvekslingsarter — les
@@ -79,7 +77,7 @@
     </details>
 
     <details class="sp-collapsible sp-preferences sp-tabbed-panel" id="sp-preferences">
-      <summary><b>⚙ Preferanser &amp; Konto</b> <span class="sp-collapse-hint">(klikk for å skjule/vise)</span></summary>
+      <summary><b>⚙ Preferanser &amp; Konto</b></summary>
       <div class="sp-collapsible-body">
         <div class="sp-tab-bar" id="sp-tab-bar">
           <button class="sp-tab-btn active" data-tab="preferences">Preferanser</button>
@@ -154,7 +152,7 @@
     </details>
 
     <details class="sp-collapsible sp-tabbed-panel" id="sp-admin-panel" hidden>
-      <summary><b>🛡️ Admin</b> <span class="sp-collapse-hint">(klikk for å skjule/vise)</span></summary>
+      <summary><b>🛡️ Admin</b></summary>
       <div class="sp-collapsible-body">
         <div class="sp-tab-bar" id="sp-admin-tab-bar">
           <button class="sp-tab-btn active" data-tab="brukere">Brukere</button>
@@ -304,7 +302,7 @@
                noe forklarte hvorfor, eller hvordan man kommer videre — se
                render() for logikken som fyller/skjuler denne. -->
           <div id="sp-demo-banner" style="display:none;"></div>
-          <div class="sp-score-filter-row">
+          <div class="sp-score-filter-row" id="sp-score-filter-row">
             <span>Vis kun score ≥ <b id="sp-score-filter-label">70</b></span>
             <input type="range" id="sp-score-filter-slider" min="0" max="90" step="5" value="70"/>
             <a href="#" class="sp-score-filter-hint" id="sp-score-filter-hint">Vis alle steder i området på kartet →</a>
@@ -313,6 +311,22 @@
         </div>
       </div>
     </div>
+
+    <!-- "Om dataene" flyttet hit fra toppen av siden (var før artsvelgeren,
+         mellom installer-banneret og sikkerhetsvarselet) — den er
+         referansestoff, ikke en forutsetning for å komme i gang. Se
+         "Redesignforslag 2026-08-21", endring 1. -->
+    <details class="sp-collapsible sp-notice" id="sp-notice">
+      <summary><b>Om dataene</b></summary>
+      <div class="sp-collapsible-body">
+      Terreng- og adkomstdata (treslag, fuktighet, vei/parkering/stier) hentes fylkesvis og dekker etter hvert hele Norge.
+      Per nå er følgende fylker analysert: <span id="sp-analyserte-fylker">henter oversikt …</span>.
+      De blå prikkene i kartet er ekte, verifiserte artsobservasjoner fra Artsdatabanken sin Artskart-database
+      — dine egne funn vises med en annen farge. Artsobservasjoner vises først når du har valgt et mindre
+      kartutsnitt. Værdata hentes <b>live</b>. Dine personlige data (funn, hogst-merker, egne steder) lagres
+      på din innloggede konto — logg inn under ⚙ Preferanser &amp; Konto → Konto.
+      </div>
+    </details>
   </div>
 
   <div id="sp-modal-slot"></div>
@@ -361,7 +375,7 @@
      worker/api/README.md). Testnøkkelen (1x00000000000000000000AA) hører
      kun hjemme i worker/api/.dev.vars for lokal utvikling, aldri her. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<script src="js/api-client.js?v=0.28.17"></script>
-<script src="js/app.js?v=0.28.17"></script>
+<script src="js/api-client.js?v=0.29.0"></script>
+<script src="js/app.js?v=0.29.0"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.28.17';
+  const APP_VERSION = '0.29.0';
   const APP_BUILD_DATE = '2026-08-21';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -606,7 +606,7 @@
   }
 
   function wireCollapsibles(){
-    ['sp-notice', 'sp-safety', 'sp-preferences'].forEach(id => {
+    ['sp-notice', 'sp-safety', 'sp-preferences', 'sp-a2hs'].forEach(id => {
       const el = document.getElementById(id);
       const key = 'fungifinder-collapse-' + id;
       const saved = localStorage.getItem(key);
@@ -3156,7 +3156,17 @@
     layout.classList.toggle('sp-mobile-view-liste', view === 'liste');
     layout.classList.toggle('sp-mobile-view-kart', view === 'kart');
     toggle.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mobileview === view));
-    if (view === 'kart' && leafletMap) setTimeout(() => leafletMap.invalidateSize(), 60);
+    if (view === 'kart' && leafletMap) {
+      setTimeout(() => {
+        leafletMap.invalidateSize();
+        // Startutsnittet kan ha blitt hoppet over mens panelet var skjult
+        // (se mapFittedOnce-vakten i renderMap()) — nå som containeren har
+        // en reell størrelse, kjør render() på nytt slik at fitBounds() får
+        // riktige pikselmål å regne ut fra. render() er billig å kalle om
+        // igjen (samme mønster som toggle-lytterne under bruker allerede).
+        if (!mapFittedOnce) render();
+      }, 60);
+    }
   }
 
   // ---------- min posisjon (GPS, engangs) ----------
@@ -3304,6 +3314,11 @@
   // ikke polarområdene, så det viser seg som tomt, grått felt uten noe kart.
   const MAP_BOUNDS = L.latLngBounds([53, -10], [82, 45]);
 
+  // Fastlands-Norge (ingen Svalbard — appens fylkevelger tilbyr ikke
+  // Svalbard, se sp-fylke-filter i index.html), brukt som startutsnitt før
+  // ekte data er lastet. Se "Redesignforslag 2026-08-21", endring 2.
+  const NORGE_STARTVISNING = L.latLngBounds([57.8, 4.0], [71.3, 31.5]);
+
   // Ved rask påfølgende panorering/zooming (f.eks. fitBounds rett etter mange
   // steder lastes, eller flere raske klikk på zoom-knappen) avbryter
   // nettleseren fliser som er under lasting. Leaflet prøver IKKE disse på
@@ -3327,7 +3342,24 @@
       maxBounds: MAP_BOUNDS,
       maxBoundsViscosity: 1.0,
       minZoom: 4
-    }).setView([60.5, 10.7], 6);
+    });
+    // fitBounds() (fremfor et fast senter/zoom-nivå) lar startutsnittet
+    // faktisk fylle containeren uansett fasong — et fast zoom-nivå tuftet på
+    // et bredt skjermformat viste for det meste tomt hav på en smal, høy
+    // mobil-kartcontainer. mapFittedOnce settes IKKE her: dette er kun et
+    // kosmetisk startbilde før ekte data er lastet — renderMap() sin egen
+    // fitBounds-til-faktiske-punkter (se mapFittedOnce der) skal fortsatt få
+    // ta over med et mer presist utsnitt så snart det er klart. Containeren
+    // er skjult (display:none) på mobil til brukeren trykker "Kart" (se
+    // .sp-mobile-view-liste) — fitBounds mot en 0×0-container gir et
+    // meningsløst utsnitt, så vi faller tilbake til det gamle,
+    // størrelsesuavhengige setView() der; riktig utsnitt hentes uansett inn
+    // via samme vakt i renderMap()/setMobileView() når panelet blir synlig.
+    if (document.getElementById('sp-leaflet-map').offsetParent !== null) {
+      leafletMap.fitBounds(NORGE_STARTVISNING, { padding: [16, 16] });
+    } else {
+      leafletMap.setView([60.5, 10.7], 6);
+    }
 
     // Standard OSM-gatekart viser ikke høydekoter, bekker eller stier — for
     // å faktisk kunne lese terrenget (poenget med appen) trengs et ordentlig
@@ -3541,7 +3573,15 @@
       }).addTo(radiusLayer);
     }
 
-    if (!mapFittedOnce && scoredAll.length) {
+    // Kjør IKKE fitBounds (og lås ikke mapFittedOnce) mens containeren er
+    // skjult (display:none, mobil "Liste"-visning før "Kart" er trykket) —
+    // Leaflet regner da mot en 0×0-container og setter et meningsløst
+    // utsnitt som blir stående (kun tile-plasseringen rettes opp av
+    // invalidateSize(), ikke selve zoom/senter). setMobileView() kaller
+    // render() på nytt idet panelet faktisk blir synlig, slik at dette
+    // fanger opp riktig utsnitt da i stedet. Se "Redesignforslag 2026-08-21",
+    // endring 2.
+    if (!mapFittedOnce && scoredAll.length && leafletMap.getSize().x > 0 && leafletMap.getSize().y > 0) {
       const bounds = L.latLngBounds(scoredAll.map(({loc}) => [loc.lat, loc.lon]));
       leafletMap.fitBounds(bounds.pad(0.15));
       mapFittedOnce = true;
@@ -4322,16 +4362,26 @@
     // først i render() (før eventuelle tidlige return i selve
     // resultatlisten under) slik at varselet alltid vises/skjules korrekt
     // uavhengig av hvilken gren resten av funksjonen tar.
+    // RETTET 2026-08-21 (Redesignforslag, endring 3): denne meldingen og
+    // "X av Y steder vist — Z skjult under score …" under (se activeOnes/
+    // hiddenByScore) leste tidligere som to MOTSTRIDENDE tellinger av de
+    // samme demo-punktene — "0 av 2 vist" rett over "Du ser 2 demo-steder".
+    // Terskelen (minScoreFilter) er nå slått av i demo-modus (se
+    // effectiveMinScore under), så demo-punktene alltid teller som "vist"
+    // her også — én sammenhengende melding i stedet for to.
     const demoBanner = document.getElementById('sp-demo-banner');
+    const scoreFilterRow = document.getElementById('sp-score-filter-row');
     if (demoBanner) {
       if (!currentUser) {
         const n = allLocations().length;
         demoBanner.style.display = '';
-        demoBanner.innerHTML = `👋 Du ser <b>${n} demo-steder</b> — ikke ekte, analyserte skogpunkter. <a href="#" id="sp-demo-login-link">Logg inn</a> for å se tusenvis av ekte steder i hele Norge.`;
+        demoBanner.innerHTML = `👋 Demo: viser ${n} av ${n} eksempelsteder — ikke ekte, analyserte skogpunkter. <a href="#" id="sp-demo-login-link">Logg inn</a> for tusenvis av ekte steder i hele Norge.<br/><span class="sp-demo-banner-note">Terskelen under er slått av i demo-visning, så du får se eksemplene.</span>`;
         const link = document.getElementById('sp-demo-login-link');
         if (link) link.addEventListener('click', (e) => { e.preventDefault(); openLoginPanel(); });
+        if (scoreFilterRow) scoreFilterRow.style.display = 'none';
       } else {
         demoBanner.style.display = 'none';
+        if (scoreFilterRow) scoreFilterRow.style.display = '';
       }
     }
     renderSpeciesList();
@@ -4503,14 +4553,20 @@
     // minScoreFilter tynner kun ut LISTEN (og kun blant anbefalte, ikke
     // flatehogde) — kartet over viser alltid alle steder i området, uansett
     // score, slik at man kan oppdage og klikke seg til dem der i stedet.
-    const activeOnes = scoped.filter(s => !s.res.isCut && s.res.total >= minScoreFilter);
-    const hiddenByScore = scoped.filter(s => !s.res.isCut && s.res.total < minScoreFilter).length;
+    // I demo-modus (ikke innlogget) er terskelen slått av (effectiveMinScore
+    // 0) — se demoBanner-blokken over. Uten dette kunne demo-punktene score
+    // under standardterskelen (70) og bli filtrert bort, som ga "0 av 2
+    // steder vist" rett ved siden av demo-banneret sin "du ser 2
+    // demo-steder". Se "Redesignforslag 2026-08-21", endring 3.
+    const effectiveMinScore = currentUser ? minScoreFilter : 0;
+    const activeOnes = scoped.filter(s => !s.res.isCut && s.res.total >= effectiveMinScore);
+    const hiddenByScore = scoped.filter(s => !s.res.isCut && s.res.total < effectiveMinScore).length;
     const cutOnes = scoped.filter(s => s.res.isCut);
 
     if (!activeOnes.length && !cutOnes.length) {
       document.getElementById('sp-count').textContent = `0 av ${scoped.length} steder vist${areaLabel}`
-        + (hiddenByScore ? ` — ${hiddenByScore} skjult under score ${minScoreFilter}` : '');
-      container.innerHTML = `<div class="sp-empty">Ingen steder over valgt minimumsscore (${minScoreFilter})${areaLabel} — senk terskelen over, eller se kartet for alle ${scoped.length} steder i området.</div>`;
+        + (hiddenByScore ? ` — ${hiddenByScore} skjult under score ${effectiveMinScore}` : '');
+      container.innerHTML = `<div class="sp-empty">Ingen steder over valgt minimumsscore (${effectiveMinScore})${areaLabel} — senk terskelen over, eller se kartet for alle ${scoped.length} steder i området.</div>`;
       return;
     }
 
@@ -4537,7 +4593,7 @@
     const visteKort = aktiveViste.length + cutViste.length;
 
     document.getElementById('sp-count').textContent = `${visteKort} av ${totalKort} steder vist${areaLabel}`
-      + (hiddenByScore ? ` — ${hiddenByScore} skjult under score ${minScoreFilter}` : '');
+      + (hiddenByScore ? ` — ${hiddenByScore} skjult under score ${effectiveMinScore}` : '');
 
     const renderCard = viewMode === 'favorites'
       ? (s) => cardHtmlFavorites(s.loc, s.favResults)
