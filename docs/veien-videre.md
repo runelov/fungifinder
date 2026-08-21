@@ -1435,3 +1435,30 @@ A-seksjonen over) er nå DEN ENESTE veien til å hente nye områder —
 ikke lenger et alternativ blant flere. Ingen `--mode kommune`/`--mode
 radius`-bruk er planlagt fremover; alt gjenstående (Bolk A-resten,
 B, C) er `--mode fylke`.
+
+### Rutenett-tetthet i fylkeskjøringene — avklart 2026-08-21
+
+Bolk A + Troms ble kjørt med `gridKm=1.5` (samme som `fetch_area.py`
+sin egen default) — betydelig grovere enn `sp-grid-slider`s tidligere
+laveste valgbare verdi (0,5 km/500 m), som bruker konsekvent brukte for
+sine egne kommune-kjøringer. Dette var et ureflektert valg (default
+brukt uten å sjekke etablert praksis), ikke en bevisst instruks.
+
+**Kvantifisert**: 500 m er 3× finere lineært → 9× flere kandidatpunkter
+per arealenhet. Et fullt nasjonalt sveip på 500 m er beregnet til
+**~20 900 minutter (~348 timer/~14,5 dager)** — bunn-opp fra de 8
+fylkene faktisk kjørt i denne økten (46 298 punkter/~553 min ved 1,5 km,
+skalert til nasjonalt nivå via arealforhold, deretter ×9). Med GitHub
+Actions sin 2026-pris ($0,006/min, Linux-runner) tilsvarer det
+**~$63–125** avhengig av tempo/spending limit — ikke en uoverkommelig
+sum i seg selv, men uansett betalingsvilje tar det ~1–11 måneder pga.
+2000 min/mnd-taket (med mindre et spending limit heves).
+
+**Beslutning: AVVENTER 500 m nasjonalt inntil videre.** Bruker har
+allerede finkornet (500 m) dekning for kommunene av primær interesse
+via de gamle kommune-kjøringene (se `terreng_steder`-seksjonen i
+"Admin-panelet fjernet"-notatet over — 12 720 punkter, fortsatt
+aktivt vedlikeholdt av `refresh-areas.yml`). Fylkessveipet (1,5 km)
+gir landsdekkende grunndekning ved siden av, ikke en erstatning for
+disse. Ingen endring i `gridKm` for gjenstående Bolk A/B/C-kjøringer —
+fortsetter på 1,5 km.
