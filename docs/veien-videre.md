@@ -1399,3 +1399,39 @@ minst én uke for å se hva `refresh-areas.yml` (ukentlig cron) faktisk
 koster med Bolk A sine nye, fylkesstore `fetched_areas`-rader — en
 foreløpig helt umålt, vedvarende kostnad. Bolk B/C skal IKKE startes i
 samme budsjettvindu som resten av Bolk A uten først å se an dette.
+
+### Admin-panelet for on-demand områdehenting fjernet fra appen (2026-08-21)
+
+Bruker påpekte at admin, etter overgangen til fylkesvise sveip via
+`gh workflow run`, verken trenger å trigge kommune/radius-hentinger
+lenger, eller å gjøre det per fylke fra selve webappen — ba om at
+funksjonaliteten fjernes fra appen for å forenkle den, samt at
+"Om dataene"-teksten oppdateres til å reflektere fylkesvis henting.
+
+**Shippet, v0.28.15** (`fungifinder@1f455d3`), live i produksjon
+(frontend på `fungifinder.no` + Worker på `api.fungifinder.no`,
+begge verifisert etter deploy):
+- Fjernet `#sp-fetch-panel` (rutenett-slider, arealestimat, "Hent
+  data"-knapp, fremdriftspolling) fra `index.html`/`js/app.js`, og de
+  tilhørende klient-metodene i `js/api-client.js`.
+- Fjernet selve Worker-endepunktene `GET /omrader/dekning`,
+  `POST /omrader/hent`, `GET /omrader/status`
+  (`worker/api/src/routes/omrader.js` + `index.js`) — verifisert trygt
+  først: `berikPunkt()`/`punktStatus()` (ikke-admin, del av "registrer
+  eget funn") deler fil men er en separat feature, UENDRET.
+  `hentFetchedAreasFraDb()` (`lib/terrengDb.js`) er UENDRET — fortsatt
+  aktivt brukt av `routes/etlImport.js` sin `eksporterTerrengdata()`,
+  som `fetch_area.py` sin `fetch_from_d1()` leser fra ved HVER
+  ETL-kjøring (inkl. hele Bolk A over).
+- Uendret, bevisst IKKE fjernet: fylke/kommune/radius-**velgeren** over
+  kartet og "Foreslå områder"-panelet — generelle, ikke-admin-only
+  funksjoner for å utforske allerede hentet data, ikke det samme som
+  den fjernede admin-trigger-knappen.
+- "Om dataene" oppdatert: "hentes per kommune av administrator" →
+  "hentes fylkesvis og dekker etter hvert hele Norge".
+
+**Praktisk konsekvens**: `gh workflow run` (se kommandoene i Bolk
+A-seksjonen over) er nå DEN ENESTE veien til å hente nye områder —
+ikke lenger et alternativ blant flere. Ingen `--mode kommune`/`--mode
+radius`-bruk er planlagt fremover; alt gjenstående (Bolk A-resten,
+B, C) er `--mode fylke`.
