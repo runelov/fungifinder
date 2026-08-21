@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.29.1';
+  const APP_VERSION = '0.29.2';
   const APP_BUILD_DATE = '2026-08-21';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -3163,17 +3163,11 @@
     layout.classList.toggle('sp-mobile-view-liste', view === 'liste');
     layout.classList.toggle('sp-mobile-view-kart', view === 'kart');
     toggle.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mobileview === view));
-    if (view === 'kart' && leafletMap) {
-      setTimeout(() => {
-        leafletMap.invalidateSize();
-        // Startutsnittet kan ha blitt hoppet over mens panelet var skjult
-        // (se mapFittedOnce-vakten i renderMap()) — nå som containeren har
-        // en reell størrelse, kjør render() på nytt slik at fitBounds() får
-        // riktige pikselmål å regne ut fra. render() er billig å kalle om
-        // igjen (samme mønster som toggle-lytterne under bruker allerede).
-        if (!mapFittedOnce) render();
-      }, 60);
-    }
+    // RETTET 2026-08-21: den ekstra render()-retriggeren herfra (lagt til
+    // samme dag) er reversert igjen sammen med getSize()-vakten i
+    // renderMap() — se kommentaren der for begrunnelsen (mistenkt
+    // regresjonskilde, standalone-PWA-spesifikk, ikke rotårsak-bekreftet).
+    if (view === 'kart' && leafletMap) setTimeout(() => leafletMap.invalidateSize(), 60);
   }
 
   // ---------- min posisjon (GPS, engangs) ----------
@@ -3580,15 +3574,16 @@
       }).addTo(radiusLayer);
     }
 
-    // Kjør IKKE fitBounds (og lås ikke mapFittedOnce) mens containeren er
-    // skjult (display:none, mobil "Liste"-visning før "Kart" er trykket) —
-    // Leaflet regner da mot en 0×0-container og setter et meningsløst
-    // utsnitt som blir stående (kun tile-plasseringen rettes opp av
-    // invalidateSize(), ikke selve zoom/senter). setMobileView() kaller
-    // render() på nytt idet panelet faktisk blir synlig, slik at dette
-    // fanger opp riktig utsnitt da i stedet. Se "Redesignforslag 2026-08-21",
-    // endring 2.
-    if (!mapFittedOnce && scoredAll.length && leafletMap.getSize().x > 0 && leafletMap.getSize().y > 0) {
+    // RETTET 2026-08-21 (bruker meldte at INGEN steder lenger ble listet —
+    // verken default, ved zoom eller ved kommune-valg — og at "Foreslå
+    // områder" alltid var grået ut, kun i standalone-PWA på mobil, ikke i
+    // nettleser): denne getSize()-vakten (lagt til samme dag, se
+    // "Redesignforslag 2026-08-21" endring 2) er reversert igjen — mistenkt
+    // årsak til regresjonen, ikke bekreftet ned til eksakt linje (kunne ikke
+    // reprodusere standalone-modus i dette miljøet), men brukeren var sikker
+    // på at det virket før den ble innført. initMap() sin fitBounds-vs-
+    // setView-fallback (uendret, se der) er lavere risiko og beholdt.
+    if (!mapFittedOnce && scoredAll.length) {
       const bounds = L.latLngBounds(scoredAll.map(({loc}) => [loc.lat, loc.lon]));
       leafletMap.fitBounds(bounds.pad(0.15));
       mapFittedOnce = true;

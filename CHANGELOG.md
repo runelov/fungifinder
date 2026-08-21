@@ -1,5 +1,33 @@
 # Endringslogg
 
+## 0.29.2 — Hurtigfiks: reverter render()/mapFittedOnce-endring fra 0.29.0
+Bruker (admin, logget inn) meldte at INGEN steder lenger ble listet — hverken
+default, ved zoom i kart, eller ved kommune-valg — og at "Foreslå områder"
+alltid var grået ut. Kun i standalone-PWA på mobil (hjemskjerm-installert),
+ikke i nettleser (heller ikke mobilnettleser) — og vedvarte etter å slette og
+legge til PWA-en på nytt (utelukker gammel/feil localStorage som årsak).
+Brukeren var sikker på at dette virket før 0.29.0 sin
+getSize()-vakt/render()-retrigger (se CHANGELOG 0.29.0, "Kartets
+standardutsnitt").
+
+Kunne ikke reprodusere standalone-modus i utviklingsmiljøet (ingen
+tilgjengelig iOS-simulator), og rotårsaken er derfor IKKE bekreftet ned til
+eksakt linje. Reverterer likevel de to nyeste, minst utprøvde bitene av
+0.29.0-kartfiksen som en rask, lav-risiko utbedring, i påvente av videre
+feilsøking (Safari Web Inspector-konsoll fra faktisk enhet ville gitt et
+konkret svar):
+
+- `renderMap()` sin `mapFittedOnce`-vakt er tilbake til det ubetingede
+  `if (!mapFittedOnce && scoredAll.length)` fra før 0.29.0 — fjernet
+  `leafletMap.getSize().x > 0 && leafletMap.getSize().y > 0`-sjekken.
+- `setMobileView('kart')` sin ekstra `render()`-retrigger (kalt fra samme
+  `setTimeout` som `invalidateSize()`) er fjernet.
+
+`initMap()` sin `fitBounds(NORGE_STARTVISNING)`-vs-`setView()`-fallback
+(uendret siden 0.29.0) er IKKE reversert — den rører ikke `mapFittedOnce`
+eller `render()`, og er uavhengig verifisert å virke for både demo- og
+innlogget visning i dette miljøet.
+
 ## 0.29.1 — Fiks admin → Brukere: permanent slettet bruker så ut som vanlig deaktivert
 Bruker (admin) meldte at en permanent slettet bruker ("Mette —
 slettet-4@slettet.invalid") ikke forsvant fra Brukere-fanen. Delvis
