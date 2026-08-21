@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.28.15';
+  const APP_VERSION = '0.28.16';
   const APP_BUILD_DATE = '2026-08-21';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -377,12 +377,12 @@
   let kommuneNarrowFylke = 'alle';
   let bboxAreaCache = {}; // cache av Nominatim bbox-areal per fylke/kommune-navn
   let currentUser = null; // { epost, kortnavn, rolle } fra ApiClient.meg(), eller null hvis ikke innlogget
-  // "Om dataene"-teksten sin dynamiske kommuneliste — se renderDataNotice().
+  // "Om dataene"-teksten sin dynamiske fylkesliste — se renderDataNotice().
   // Huskes fra siste gang HELE datasettet var lastet (fylkeFilter==='alle'),
   // slik at teksten fortsatt viser riktig NASJONAL oversikt selv etter at
   // brukeren filtrerer til ett fylke/én kommune (BASE_LOCATIONS blir da kun
   // DEN filtrerte undermengden, se loadLocations()). null = ikke beregnet ennå.
-  let analyserteKommunerCache = null;
+  let analyserteFylkerCache = null;
 
   // RETTET 2026-08-13 (bruker meldte at bytte "Én art" → "Mine favoritter"
   // tar noen sekunder): scoreLocation(art, sted) er en ren funksjon av
@@ -4246,47 +4246,54 @@
   let _currentSpecies = null;
   function species_for_card(){ return _currentSpecies; }
 
-  // RETTET 2026-08-13 (bruker ba om at "Om dataene"-teksten viser HVILKE
-  // kommuner som faktisk har god dekning, i stedet for en generisk "hentes
-  // on-demand"-formulering — nasjonalt sveip kjøres nå fylkesvis, ikke
-  // lenger on-demand fra appen (se docs/veien-videre.md, 2026-08-21: både
-  // admin-panelet og de tilhørende /omrader/dekning|hent|status-endepunktene
-  // er fjernet). Listen er bevisst IKKE hardkodet i HTML-en — datasettet
-  // vokser etter hvert som flere fylker sveipes, og en statisk liste ville
-  // blitt stille utdatert. Beregnes i stedet her, fra samme
-  // terreng_steder-datasett som allerede er lastet inn for ENHVER
-  // innlogget bruker (admin ELLER bruker, se hentTerrengdata()).
+  // RETTET 2026-08-21 (bruker påpekte at listen fortsatt grupperte på
+  // KOMMUNE, og derfor kun viste et fåtall enkeltkommuner fra Østfold/
+  // Oslo/Akershus — rester fra individuelle kommune-testhentinger FØR
+  // fylkesvis sveip. Reell bug, ikke bare et visningsvalg: `--mode
+  // fylke`-kjøringer i fetch_area.py setter ALDRI `kommune`-feltet per
+  // punkt (kun `fylke`, se main()) — hele Bolk A-sveipet (Oslo/Vestfold/
+  // Østfold/Akershus/Rogaland/Buskerud/Telemark) og Troms var derfor
+  // usynlige for denne opptellingen uansett terskel, ikke bare
+  // underrepresentert. Grupperer nå på `fylke` i stedet, som ER satt for
+  // alle modus (fylke/kommune/radius, se main()/reverse_geocode()) — se
+  // docs/veien-videre.md for selve sveipestatusen.
   //
-  // Teller kun BASE_LOCATIONS (server-hentet grid-data), ikke
-  // customLocations (egne, manuelt lagt-til steder) — en bruker med mange
-  // personlige steder i en kommune admin aldri har analysert skal ikke
-  // gjøre den kommunen se "godt analysert" ut.
-  // RETTET 2026-08-13: hevet 20 → 100 (bruker meldte at 20 var for lavt —
-  // admin velger gjennomgående minste gridstørrelse ved analyse, som gir
-  // langt tettere punktdekning per kommune enn 20 antydet).
-  const KOMMUNE_GOD_DEKNING_MIN = 100; // terskel for "godt analysert" — justerbar, ingen fasit finnes ennå
+  // Opprinnelig kommentar (2026-08-13, delvis fortsatt gyldig resonnement):
+  // listen er bevisst IKKE hardkodet i HTML-en — datasettet vokser etter
+  // hvert som flere fylker sveipes, og en statisk liste ville blitt
+  // stille utdatert. Beregnes i stedet her, fra samme terreng_steder-
+  // datasett som allerede er lastet inn for ENHVER innlogget bruker (se
+  // hentTerrengdata()). Teller kun BASE_LOCATIONS (server-hentet
+  // grid-data), ikke customLocations (egne, manuelt lagt-til steder).
+  //
+  // Terskel senket kraftig fra den gamle kommune-terskelen (100): et
+  // `--mode fylke`-sveip sjekker HELE fylkets rutenett i én kjøring, så
+  // ethvert reelt antall punkter (også et lite, som Oslo sine 7 — en
+  // liten, tett urban fylke med lite skog) betyr et FULLFØRT sveip, ikke
+  // delvis/tynn dekning slik et lavt kommune-tall kunne bety før.
+  const FYLKE_ANALYSERT_MIN = 1; // terskel for "analysert" — ethvert reelt punkt teller, se begrunnelse over
   function renderDataNotice(){
-    const el = document.getElementById('sp-analyserte-kommuner');
+    const el = document.getElementById('sp-analyserte-fylker');
     if (!el) return;
     if (!currentUser) { el.textContent = 'logg inn for å se full oversikt'; return; }
     // Kun beregnet på nytt når HELE datasettet faktisk er lastet (uendret
     // filter) — ellers gjenbrukes forrige nasjonale snapshot uendret (se
-    // analyserteKommunerCache sin deklarasjon).
+    // analyserteFylkerCache sin deklarasjon).
     if (filterMode === 'fylke' && fylkeFilter === 'alle') {
       const counts = {};
       for (const loc of BASE_LOCATIONS) {
-        if (!loc.kommune) continue;
-        counts[loc.kommune] = (counts[loc.kommune] || 0) + 1;
+        if (!loc.fylke) continue;
+        counts[loc.fylke] = (counts[loc.fylke] || 0) + 1;
       }
-      analyserteKommunerCache = Object.keys(counts)
-        .filter(k => counts[k] >= KOMMUNE_GOD_DEKNING_MIN)
+      analyserteFylkerCache = Object.keys(counts)
+        .filter(k => counts[k] >= FYLKE_ANALYSERT_MIN)
         .sort((a, b) => a.localeCompare(b, 'no'));
     }
-    if (analyserteKommunerCache === null) { el.textContent = 'henter oversikt …'; return; }
-    if (!analyserteKommunerCache.length) { el.textContent = 'ingen ennå'; return; }
-    el.textContent = analyserteKommunerCache.length === 1
-      ? analyserteKommunerCache[0]
-      : analyserteKommunerCache.slice(0, -1).join(', ') + ' og ' + analyserteKommunerCache[analyserteKommunerCache.length - 1];
+    if (analyserteFylkerCache === null) { el.textContent = 'henter oversikt …'; return; }
+    if (!analyserteFylkerCache.length) { el.textContent = 'ingen ennå'; return; }
+    el.textContent = analyserteFylkerCache.length === 1
+      ? analyserteFylkerCache[0]
+      : analyserteFylkerCache.slice(0, -1).join(', ') + ' og ' + analyserteFylkerCache[analyserteFylkerCache.length - 1];
   }
 
   function render(){

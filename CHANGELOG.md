@@ -1,5 +1,28 @@
 # Endringslogg
 
+## 0.28.16 — Fiks "Om dataene": viser fylker i stedet for kommuner
+Bruker påpekte at "godt analysert"-listen kun viste et fåtall
+enkeltkommuner fra Østfold/Oslo/Akershus. Reell bug, ikke bare et
+visningsvalg: `--mode fylke`-kjøringer i `fetch_area.py` setter ALDRI
+`kommune`-feltet per punkt (kun `fylke`, se `main()`) — hele Bolk
+A-sveipet (Oslo/Vestfold/Østfold/Akershus/Rogaland/Buskerud/Telemark)
+og Troms var derfor usynlige for den gamle kommune-baserte
+opptellingen i `renderDataNotice()` uansett terskel, ikke bare
+underrepresentert.
+
+- `renderDataNotice()` grupperer nå på `loc.fylke` i stedet for
+  `loc.kommune` — `fylke` settes for ALLE moduser (fylke/kommune/
+  radius), i motsetning til `kommune` som kun settes for
+  kommune/radius-modus.
+- Terskelen ("godt analysert") senket kraftig, fra 100 til 1: et
+  `--mode fylke`-sveip sjekker HELE fylkets rutenett i én kjøring, så
+  ethvert reelt antall punkter (også et lite, som Oslo sine 7 — en
+  liten, tett urban fylke med lite skog) betyr et FULLFØRT sveip, ikke
+  delvis/tynn dekning slik et lavt kommune-tall kunne bety før.
+  Element-id-en byttet fra `sp-analyserte-kommuner` til
+  `sp-analyserte-fylker`, teksten fra "kommuner godt analysert" til
+  "fylker analysert".
+
 ## 0.28.15 — Fjern admin-panelet for on-demand områdehenting
 Nasjonalt sveip pågår nå i faste fylkesbolker via `gh workflow run`
 direkte mot GitHub Actions (se `fungifinder-db/docs/veien-videre.md`) —

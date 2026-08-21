@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.28.15"/>
+<link rel="stylesheet" href="css/styles.css?v=0.28.16"/>
 </head>
 <body>
 
@@ -56,7 +56,7 @@
       <summary><b>Om dataene</b> <span class="sp-collapse-hint">(klikk for å skjule/vise)</span></summary>
       <div class="sp-collapsible-body">
       Terreng- og adkomstdata (treslag, fuktighet, vei/parkering/stier) hentes fylkesvis og dekker etter hvert hele Norge.
-      Per nå er følgende kommuner godt analysert: <span id="sp-analyserte-kommuner">henter oversikt …</span>.
+      Per nå er følgende fylker analysert: <span id="sp-analyserte-fylker">henter oversikt …</span>.
       De blå prikkene i kartet er ekte, verifiserte artsobservasjoner fra Artsdatabanken sin Artskart-database
       — dine egne funn vises med en annen farge. Artsobservasjoner vises først når du har valgt et mindre
       kartutsnitt. Værdata hentes <b>live</b>. Dine personlige data (funn, hogst-merker, egne steder) lagres
@@ -361,7 +361,7 @@
      worker/api/README.md). Testnøkkelen (1x00000000000000000000AA) hører
      kun hjemme i worker/api/.dev.vars for lokal utvikling, aldri her. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<script src="js/api-client.js?v=0.28.15"></script>
-<script src="js/app.js?v=0.28.15"></script>
+<script src="js/api-client.js?v=0.28.16"></script>
+<script src="js/app.js?v=0.28.16"></script>
 </body>
 </html>
