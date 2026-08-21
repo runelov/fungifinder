@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.28.16';
+  const APP_VERSION = '0.28.17';
   const APP_BUILD_DATE = '2026-08-21';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -4272,6 +4272,21 @@
   // liten, tett urban fylke med lite skog) betyr et FULLFØRT sveip, ikke
   // delvis/tynn dekning slik et lavt kommune-tall kunne bety før.
   const FYLKE_ANALYSERT_MIN = 1; // terskel for "analysert" — ethvert reelt punkt teller, se begrunnelse over
+
+  // RETTET 2026-08-21, samme dag (bruker spurte om gamle kommune-/
+  // radius-kjøringer fortsatt ligger lagret ved siden av fylke-punktene
+  // — de gjør det, dedup-sjekken i enrich_point() overskriver aldri,
+  // bare fyller ut nye punkter rundt). Det avslørte en reell svakhet i
+  // fiksen over: å telle ALLE punkter i fylket (uansett kilde) mot
+  // fylke-navnet fikk fylker med KUN gammel enkelt-kommune-testdata
+  // (f.eks. Trøndelag — 1244 punkter fra en gammel Trondheim-henting,
+  // ikke fra noe fylke-sveip ennå, se docs/veien-videre.md) til å vises
+  // som "analysert", selv om resten av fylket aldri er sjekket. Filtrerer
+  // nå EKSPLISITT til `!loc.kommune` (samme signal som bekrefter et
+  // `--mode fylke`-opphav — kun den modusen lar kommune stå usatt, se
+  // main() i fetch_area.py) FØR opptelling, slik at gamle kommune-/
+  // radius-punkter (som ALLTID har kommune satt) ikke lenger kan gjøre
+  // et reelt useveipet fylke synlig som ferdig.
   function renderDataNotice(){
     const el = document.getElementById('sp-analyserte-fylker');
     if (!el) return;
@@ -4282,7 +4297,7 @@
     if (filterMode === 'fylke' && fylkeFilter === 'alle') {
       const counts = {};
       for (const loc of BASE_LOCATIONS) {
-        if (!loc.fylke) continue;
+        if (!loc.fylke || loc.kommune) continue; // kun ekte fylke-sveip-punkter, se begrunnelse over
         counts[loc.fylke] = (counts[loc.fylke] || 0) + 1;
       }
       analyserteFylkerCache = Object.keys(counts)

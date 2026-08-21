@@ -1,5 +1,22 @@
 # Endringslogg
 
+## 0.28.17 — Fiks "Om dataene": ekskluder gamle kommune/radius-punkter fra fylkestellingen
+Oppfølging av 0.28.16, samme dag. Bruker spurte om gamle kommune-/
+radius-kjøringer fortsatt ligger lagret ved siden av de nye
+fylke-sveip-punktene — bekreftet direkte mot produksjons-D1 at de gjør
+det (12 720 gamle punkter, 19 071 fra fylke-sveip, disjunkte mengder,
+ingenting overskrevet). Det avslørte en reell svakhet i 0.28.16-fiksen:
+å telle ALLE punkter i fylket uansett kilde fikk fylker med KUN gammel
+enkelt-kommune-testdata (Trøndelag: 1244 punkter, alle fra en gammel
+Trondheim-henting, ikke fra noe fylke-sveip) til feilaktig å vises som
+"analysert".
+
+- `renderDataNotice()` filtrerer nå eksplisitt til `!loc.kommune` (kun
+  `--mode fylke`-opphav — den eneste modusen som lar `kommune` stå
+  usatt, se `main()` i `fetch_area.py`) FØR opptelling mot fylke-navnet.
+  Gamle kommune-/radius-punkter (som ALLTID har `kommune` satt) kan
+  ikke lenger gjøre et reelt useveipet fylke synlig som ferdig.
+
 ## 0.28.16 — Fiks "Om dataene": viser fylker i stedet for kommuner
 Bruker påpekte at "godt analysert"-listen kun viste et fåtall
 enkeltkommuner fra Østfold/Oslo/Akershus. Reell bug, ikke bare et
