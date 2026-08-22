@@ -1,5 +1,50 @@
 # Endringslogg
 
+## 0.31.1 — Kart-lagfiks: enkeltpunkt-visning og synlige områder (fase 2+3)
+Del 2+3 av designgjennomgangen (2026-08-22, se v0.31.0). Dekker to av tre
+punkter fra brukerens opprinnelige kritikk: "vanskelig å se ett punkt uten å
+slå på hele prikketeppet" og "foreslåtte områder er umulige å se når
+artsobservasjoner vises". Det tredje punktet (begrense hele "Målepunkter"-
+laget til kartutsnitt når et fylke er eksplisitt valgt) er bevisst IKKE
+gjort her — se avsluttende avsnitt.
+
+**Enkeltpunkt-visning:**
+- `locateOnMap()` ("📍 Vis i kart" på et kort) slo tidligere på HELE
+  `markerLayer` (potensielt tusenvis av punkter) bare for å vise ett punkt.
+  Viser nå kun det ene punktet, i et nytt eget `singlePointLayer`, hvis
+  "Målepunkter" ikke allerede er skrudd på — ellers gjenbrukes den ekte
+  markøren derfra som før.
+- Ny `buildLocationMarker(loc, res)` skilt ut fra `renderMap()` slik at
+  enkeltpunktet og bulk-laget garantert ser identiske ut.
+
+**Foreslåtte områder, synlige uansett hva som ligger oppå:**
+- Områdesirkelen var en tynn stiplet linje med `fillOpacity: 0.07`, og
+  `routeLayer` ble lagt til kartet FØR `artskartLayer`/`delteFunnLayer` i
+  `initMap()` — artsfunn-prikker (default PÅ) ble derfor alltid tegnet
+  oppå områdesirkelen (default PÅ). `routeLayer` flyttet til etter dem i
+  lagrekkefølgen, og selve sirkelen er nå heldekket og tykkere
+  (`weight: 3.5`, `fillOpacity: 0.13`, ingen dashArray).
+- Nytt nummerert merke i sentrum av hver sirkel (samme "Område {i+1}" som
+  allerede fantes i popup-en).
+- `a.members` — de faktiske scorede punktene i området, allerede beregnet i
+  `suggestAreas()` men aldri tegnet — vises nå som punkter inni sirkelen
+  (typisk 1–3 stk, siden `AREA_RADIUS_KM` er mindre enn rutenettavstanden).
+- Rettet to tekster som beskrev den gamle, stiplede/punktløse sirkelen
+  (kartforklaringen i `index.html`, og oppsummeringsteksten i
+  `suggestAreas()` som eksplisitt sa "ikke eksakte punkter" — stemmer ikke
+  lenger).
+
+**Ikke gjort i denne omgangen:** å begrense hele "Målepunkter"-laget til
+gjeldende kartutsnitt NÅR et fylke er eksplisitt valgt (i dag vises alle
+punkter i hele fylket — kan fortsatt bli mange). Uten eksplisitt filter
+faller `isInCurrentScope()` allerede tilbake til kartutsnittet
+(`viewportImpliesScope()`, se RETTET 2026-08-16 der), så dette gjelder kun
+"eksplisitt fylke valgt + Målepunkter skrudd på"-kombinasjonen — usikkert om
+det skal oppføre seg likt (bevisst "vis meg alt i fylket" er kanskje riktig
+når man ber om nettopp det). Avventer avklaring før dette eventuelt endres.
+
+Versjon 0.31.0 → 0.31.1.
+
 ## 0.31.0 — Kort-redesign: fjern tredobbel gjentakelse på stedkortet
 Fase 1 av en designgjennomgang (2026-08-22, se mockup til godkjenning før
 implementasjon) av stedkortet og kart-lagene. Dette er kun kortet — kart-

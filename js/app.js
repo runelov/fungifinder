@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.31.0';
+  const APP_VERSION = '0.31.1';
   const APP_BUILD_DATE = '2026-08-22';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -3223,6 +3223,11 @@
   let artskartLayer = null;
   let delteFunnLayer = null; // andre brukeres delte funn — se loadDelteFunn()/renderDelteFunnLayer()
   let voksestedslagLayer = null; // fargelag per art/score — se renderVoksestedslag()
+  // RETTET 2026-08-22 (kart-lagfiks, fase 2) — eget, alltid-på infrastruktur-
+  // lag (ikke i lag-kontrollen, akkurat som radiusLayer/routeLayer) for å
+  // vise ETT enkelt punkt uten å måtte slå på hele markerLayer. Se
+  // locateOnMap().
+  let singlePointLayer = null;
   let layersControl = null; // L.control.layers-instansen — se updateVoksestedslagAvailability()
   let artskartMoveDebounce = null; // se moveend-lytteren i initMap()
   let findMarkersById = {};
@@ -3530,12 +3535,24 @@
     // laget uansett på/av-tilstand, slik at det er ferdig tegnet i det
     // øyeblikket avkrysningen skrus på.
     voksestedslagLayer = L.layerGroup();
+    // RETTET 2026-08-22 (kart-lagfiks, fase 3) — Leaflet stabler lag i
+    // overlayPane etter DEN REKKEFØLGEN de legges til kartet, ikke etter
+    // noen egen z-index. routeLayer ("Foreslåtte områder") lå tidligere FØR
+    // artskartLayer/delteFunnLayer her, så artsfunn-prikker (default PÅ)
+    // ble alltid tegnet OVENPÅ områdesirklene (default PÅ) — se
+    // designgjennomgangen 2026-08-22. routeLayer flyttet til etter dem,
+    // slik at områdegrensen alltid vinner. (markerLayer/voksestedslagLayer
+    // starter av og legges til dynamisk når brukeren skrur dem på —
+    // de havner uansett øverst av alle i det øyeblikket, siden Leaflet
+    // legger et lag til på slutten av paneet ved addLayer(); det er en
+    // separat, akseptert avveining, ikke noe denne rettelsen dekker.)
     radiusLayer = L.layerGroup().addTo(leafletMap);
-    routeLayer = L.layerGroup().addTo(leafletMap);
     hogstLayer = L.layerGroup().addTo(leafletMap);
     findsLayer = L.layerGroup().addTo(leafletMap);
     artskartLayer = L.layerGroup().addTo(leafletMap);
     delteFunnLayer = L.layerGroup().addTo(leafletMap);
+    routeLayer = L.layerGroup().addTo(leafletMap);
+    singlePointLayer = L.layerGroup().addTo(leafletMap);
 
     // Lag-kontroll: bytt bakgrunnskart (radioknapper) og skru målepunkter/
     // rundtur/hogstfelt/funn av/på (avkrysning) — praktisk når man vil se
@@ -3657,45 +3674,68 @@
     document.getElementById('sp-leaflet-map').scrollIntoView({ behavior:'smooth', block:'center' });
   }
 
-  // Motsatt vei av handleMapMarkerClick: klikk på "Vis i kart" på et kort i
-  // listen panorerer/zoomer kartet til akkurat det stedet og åpner popup-en,
-  // slik at du kan analysere naboterrenget uten å måtte lete deg fram manuelt.
+  // Skilt ut fra renderMap() (kart-lagfiks, fase 2) slik at locateOnMap()
+  // under kan tegne ETT enkelt punkt med nøyaktig samme utseende/popup/
+  // tooltip som bulk-laget, uten å måtte bygge hele markerLayer for det.
+  function buildLocationMarker(loc, res){
+    const color = res.isCut ? '#A23E2E' : scoreColor(res.total);
+    const marker = L.circleMarker([loc.lat, loc.lon], {
+      radius: 8,
+      color: loc.custom ? '#8C4A20' : '#232D1D',
+      weight: 1.5,
+      fillColor: color,
+      fillOpacity: 0.85,
+      dashArray: loc.custom ? '3,3' : null
+    });
+    marker.bindPopup(`<b>${escapeHtml(loc.name)}</b><br/>${escapeHtml(loc.kommune)}, ${escapeHtml(loc.fylke)}<br/>Score: ${res.total}${res.isCut ? ' — flatehogd' : ''}`, POPUP_OPTS);
+    // Eksakt score synlig ved HOVER, ikke bare ved klikk (se vurderingen
+    // av fargekodingens grovkornethet) — tooltip er lettvekts sammenlignet
+    // med popup-en (åpnes ikke ved klikk, kolliderer ikke med
+    // handleMapMarkerClick).
+    marker.bindTooltip(String(res.total), { direction: 'top', offset: [0, -6] });
+    return marker;
+  }
+
+  // RETTET 2026-08-22 (designgjennomgang, kart-lagfiks fase 2) — viste
+  // tidligere HELE markerLayer (potensielt tusenvis av punkter, se
+  // "Målepunkter-laget starter AV" lenger ned) bare for å vise ETT punkt fra
+  // listen. Hvis "Målepunkter" allerede er skrudd på, gjenbruk den ekte
+  // markøren derfra som før. Hvis ikke, tegn KUN dette ene punktet i det
+  // separate singlePointLayer-et i stedet for å slå på hele bunken — samme
+  // visuelle stil (buildLocationMarker()), scoret akkurat som resultatlisten
+  // (scoreForRoute() — favoritt-modus bruker beste favoritt, ellers valgt art).
   function locateOnMap(locId){
     const loc = allLocations().find(l => l.id === locId);
-    const marker = markersById[locId];
     if (!loc || !leafletMap) return;
-    // Markøren finnes i markerLayer uansett, men er usynlig (og openPopup()
-    // virker ikke) hvis laget er skrudd av via "Målepunkter"-avkrysningen —
-    // skru det på igjen, ellers skjer det tilsynelatende ingenting.
-    if (markerLayer && !leafletMap.hasLayer(markerLayer)) leafletMap.addLayer(markerLayer);
     setMobileView('kart');
     document.getElementById('sp-leaflet-map').scrollIntoView({ behavior:'smooth', block:'center' });
     leafletMap.setView([loc.lat, loc.lon], Math.max(leafletMap.getZoom(), 13));
-    if (marker) setTimeout(() => marker.openPopup(), 350);
+
+    if (markerLayer && leafletMap.hasLayer(markerLayer)) {
+      const marker = markersById[locId];
+      if (marker) setTimeout(() => marker.openPopup(), 350);
+      return;
+    }
+    singlePointLayer.clearLayers();
+    const { res } = scoreForRoute(loc);
+    const marker = buildLocationMarker(loc, res);
+    marker.addTo(singlePointLayer);
+    setTimeout(() => marker.openPopup(), 350);
   }
 
   function renderMap(scoredAll){
     if (!leafletMap) return;
     markerLayer.clearLayers();
     radiusLayer.clearLayers();
+    // Punktet i singlePointLayer (om noe) tilhører forrige render — det
+    // ekte punktet fins uansett igjen i det ferske markerLayer under, og en
+    // gjenbrukt gammel enkeltmarkør kan ellers henge igjen usynkronisert
+    // (feil score/farge) etter et art-/filterbytte.
+    if (singlePointLayer) singlePointLayer.clearLayers();
     markersById = {};
 
     scoredAll.forEach(({ loc, res }) => {
-      const color = res.isCut ? '#A23E2E' : scoreColor(res.total);
-      const marker = L.circleMarker([loc.lat, loc.lon], {
-        radius: 8,
-        color: loc.custom ? '#8C4A20' : '#232D1D',
-        weight: 1.5,
-        fillColor: color,
-        fillOpacity: 0.85,
-        dashArray: loc.custom ? '3,3' : null
-      });
-      marker.bindPopup(`<b>${escapeHtml(loc.name)}</b><br/>${escapeHtml(loc.kommune)}, ${escapeHtml(loc.fylke)}<br/>Score: ${res.total}${res.isCut ? ' — flatehogd' : ''}`, POPUP_OPTS);
-      // Eksakt score synlig ved HOVER, ikke bare ved klikk (se vurderingen
-      // av fargekodingens grovkornethet) — tooltip er lettvekts sammenlignet
-      // med popup-en (åpnes ikke ved klikk, kolliderer ikke med
-      // handleMapMarkerClick under).
-      marker.bindTooltip(String(res.total), { direction: 'top', offset: [0, -6] });
+      const marker = buildLocationMarker(loc, res);
       marker.on('click', () => handleMapMarkerClick(loc));
       marker.addTo(markerLayer);
       markersById[loc.id] = marker;
@@ -3977,6 +4017,21 @@
   // det er mulig å parkere — RETTET 2026-08-16: hentet nå fra
   // bestParkingForArea() (forhåndshentede per-punkt-felt fra ETL-en, se
   // fetch_area.py v36), ikke lenger et eget live Overpass-oppslag.
+  // RETTET 2026-08-22 (designgjennomgang, kart-lagfiks fase 2+3) — et
+  // "Foreslått område" var en tynn stiplet linje med nesten usynlig fyll
+  // (0.07), og druknet i praksis under artsfunn-prikker tegnet oppå (se
+  // lagrekkefølgen i initMap() — routeLayer legges nå til ETTER
+  // artskartLayer/delteFunnLayer, slik at kanten alltid tegnes øverst av
+  // dem). Tre endringer i denne funksjonen:
+  //  1. Heldekket, tykkere kant i stedet for stiplet — leselig uansett hva
+  //     som ligger under.
+  //  2. Nummerert merke i sentrum (samme "Område {i+1}" som allerede fantes
+  //     i popup-en, nå synlig direkte på kartet uten klikk).
+  //  3. a.members (de faktiske scorede punktene i området, allerede
+  //     beregnet i suggestAreas()) tegnes nå som punkter — de fantes i
+  //     dataene hele tiden, men ble aldri vist. Typisk 1-3 stk siden
+  //     AREA_RADIUS_KM (0,5 km) er mindre enn rutenettavstanden, så dette
+  //     blir illustrerende, ikke et nytt prikketeppe.
   function renderAreasOnMap(){
     if (!routeLayer || !suggestedRoute) return;
     routeLayer.clearLayers();
@@ -3987,10 +4042,22 @@
       const parkeringTekst = a.parking
         ? `🅿️ ${escapeHtml(a.parking.notat) || `Nærmeste kjente parkeringsplass, ca ${a.parking.distM} m unna`}`
         : '🅿️ Ingen kjent parkeringsplass blant de kjente punktene i området';
+      const popupHtml = `<b>Område ${i+1}: ${escapeHtml(a.anchor.loc.name)}</b><br/>Beste score i området: ${score}<br/>${parkeringTekst}<br/>${describeRouteTerrain(a.members)}`;
+
       L.circle([a.anchor.loc.lat, a.anchor.loc.lon], {
-        radius: a.radiusM, color, weight: 2.5, dashArray: '8,8', fillColor: color, fillOpacity: 0.07
-      }).bindPopup(`<b>Område ${i+1}: ${escapeHtml(a.anchor.loc.name)}</b><br/>Beste score i området: ${score}<br/>${parkeringTekst}<br/>${describeRouteTerrain(a.members)}`, POPUP_OPTS)
-        .addTo(routeLayer);
+        radius: a.radiusM, color, weight: 3.5, fillColor: color, fillOpacity: 0.13
+      }).bindPopup(popupHtml, POPUP_OPTS).addTo(routeLayer);
+
+      L.marker([a.anchor.loc.lat, a.anchor.loc.lon], {
+        icon: L.divIcon({ className: 'sp-area-badge', html: String(i + 1), iconSize: [26, 26] }),
+        zIndexOffset: 500
+      }).bindPopup(popupHtml, POPUP_OPTS).addTo(routeLayer);
+
+      a.members.forEach(m => {
+        const marker = buildLocationMarker(m.loc, m.res);
+        marker.on('click', () => handleMapMarkerClick(m.loc));
+        marker.addTo(routeLayer);
+      });
 
       if (a.parking) {
         L.marker([a.parking.lat, a.parking.lon], {
@@ -4105,11 +4172,15 @@
     suggestedRoute = { areas };
     renderAreasOnMap();
 
+    // RETTET 2026-08-22 (kart-lagfiks, fase 2+3): teksten under beskrev
+    // tidligere "stiplede sirkler" (nå heldekkede, nummererte, se
+    // renderAreasOnMap()) og sa eksplisitt at INGEN eksakte punkter vises i
+    // sirkelen — det stemmer ikke lenger nå som a.members faktisk tegnes.
     const overskrift = areas.length === 1 ? '<b>1 godt område</b> foreslått' : `<b>${areas.length} gode områder</b> foreslått`;
     summary.innerHTML = `
-      ${overskrift} i valgt område (stiplede sirkler i kartet, farget etter score — klikk en sirkel eller 🅿️-markøren for detaljer).<br/>
+      ${overskrift} i valgt område (nummererte sirkler i kartet, farget etter score — klikk en sirkel, et punkt inni den, eller 🅿️-markøren for detaljer).<br/>
       ${areas.map((a, i) => `<div class="sp-route-area-item">Område ${i+1}: <b>${escapeHtml(a.anchor.loc.name)}</b> (${escapeHtml(a.anchor.loc.kommune || 'ukjent kommune')}) — beste score ${a.anchor.res.total}, ${a.members.length} kjent${a.members.length===1?'':'e'} punkt${a.members.length===1?'':'er'} i området. ${a.parking ? `🅿️ ca ${a.parking.distM} m unna.` : '🅿️ ingen kjent parkering funnet.'}</div>`).join('')}
-      <span style="font-size:var(--fs-xs);opacity:0.8;">Sirklene markerer OMRÅDER med gode odds, ikke eksakte punkter eller en gåtur mellom dem — bruk det topografiske kartlaget til å utforske selv innenfor sirkelen. Parkeringsmarkører er hentet fra kartdata og kan avvike fra virkeligheten — bekreft alltid på stedet.</span>
+      <span style="font-size:var(--fs-xs);opacity:0.8;">Sirkelen markerer et OMRÅDE med gode odds — de kjente punktene inni den er allerede tegnet, men det finnes trolig gode voksesteder mellom dem også, ikke bare akkurat der prikkene ligger. Parkeringsmarkører er hentet fra kartdata og kan avvike fra virkeligheten — bekreft alltid på stedet.</span>
     `;
     document.getElementById('sp-route-clear').style.display = '';
   }
