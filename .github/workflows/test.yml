@@ -1,0 +1,32 @@
+name: Enhetstester
+
+# Kjøres på hver PR mot main OG på push til main (siste som en dobbel-
+# sjekk, f.eks. etter en admin-merge som omgikk statussjekken). Selve
+# håndhevingen ("merge feiler hvis testene feiler") skjer via branch
+# protection på main (krever denne jobben, se repo-innstillinger), ikke
+# noe denne workflow-filen alene kan garantere.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # Ingen npm-avhengigheter i testene selv (kun Node sin innebygde
+      # node:test/node:sqlite) — worker/api/node_modules (wrangler) trengs
+      # ikke for å kjøre testene, så det installeres bevisst ikke her.
+      #
+      # `npm test` fra repo-roten dekker BÅDE test/repo-consistency.test.js
+      # OG worker/api/test/lib/*.test.js — Node sin `node --test` uten
+      # eksplisitt sti søker rekursivt under cwd (ekskl. node_modules), se
+      # README.md "Enhetstester" for detaljer.
+      - run: npm test
