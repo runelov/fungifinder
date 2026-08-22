@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.31.1';
+  const APP_VERSION = '0.31.2';
   const APP_BUILD_DATE = '2026-08-22';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -3564,9 +3564,17 @@
     // aldri fått med laget, selv for en faktisk admin. Legges i stedet til
     // dynamisk via layersControl.addOverlay()/removeOverlay(), se
     // updateVoksestedslagAvailability() (kalt fra reflectAccountUi()).
+    // RETTET 2026-08-22 (designgjennomgang: "Målepunkter" som eget valgbart
+    // lag fjernet inntil videre — brukeren opplevde det som for massivt
+    // uansett når det først slås på, og mener det holder at punkter vises i
+    // KONTEKST av et foreslått område (a.members i renderAreasOnMap(), se
+    // kart-lagfiks fase 2). Bevisst SKJULT, ikke slettet: markerLayer/
+    // renderMap()/buildLocationMarker()/markersById/locateOnMap()/
+    // showAllPointsOnMap() er alle urørt og fullt fungerende — å tilby laget
+    // igjen er kun å legge 'Målepunkter': markerLayer tilbake i lista under.
     layersControl = L.control.layers(
       { 'Topografisk (Kartverket)': topoLayer, 'Standard': standardLayer, 'Satellitt': satelliteLayer },
-      { 'Målepunkter': markerLayer, 'Foreslåtte områder': routeLayer, 'Mine hogstfelt': hogstLayer, 'Mine funn': findsLayer, 'Artsdatabanken-funn': artskartLayer, 'Delte funn (andre brukere)': delteFunnLayer },
+      { 'Foreslåtte områder': routeLayer, 'Mine hogstfelt': hogstLayer, 'Mine funn': findsLayer, 'Artsdatabanken-funn': artskartLayer, 'Delte funn (andre brukere)': delteFunnLayer },
       { collapsed: true }
     ).addTo(leafletMap);
 

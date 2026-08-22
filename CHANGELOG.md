@@ -1,5 +1,23 @@
 # Endringslogg
 
+## 0.31.2 — Skjul "Målepunkter" som eget kartlag inntil videre
+Bruker: laget oppleves for massivt uansett når det slås på, og det holder
+at punkter vises i KONTEKST av et foreslått område (a.members i
+renderAreasOnMap(), se v0.31.1). Skjult, ikke slettet:
+
+- `'Målepunkter': markerLayer` fjernet fra `layersControl` sin
+  overlay-liste i `initMap()` — å tilby laget igjen er kun å legge linjen
+  tilbake. `markerLayer`/`renderMap()`/`buildLocationMarker()`/
+  `markersById`/`locateOnMap()`/`showAllPointsOnMap()` er alle urørt og
+  fullt fungerende under.
+- "Vis alle steder i området på kartet →"-lenken (score-filter-hintet i
+  resultatlisten) skjult av samme grunn — den kalte samme
+  `showAllPointsOnMap()`/`markerLayer`, og uten avkrysningen igjen i
+  lag-kontrollen ville et klikk der floodet kartet med et lag brukeren
+  ikke lenger har noen UI-vei til å skru av igjen.
+
+Versjon 0.31.1 → 0.31.2.
+
 ## 0.31.1 — Kart-lagfiks: enkeltpunkt-visning og synlige områder (fase 2+3)
 Del 2+3 av designgjennomgangen (2026-08-22, se v0.31.0). Dekker to av tre
 punkter fra brukerens opprinnelige kritikk: "vanskelig å se ett punkt uten å
