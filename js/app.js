@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.30.5';
+  const APP_VERSION = '0.30.6';
   const APP_BUILD_DATE = '2026-08-21';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -1271,8 +1271,31 @@
   // v0.27.3 er dermed overflødige og fjernet — isInCurrentScope()/
   // currentAreaLabel() dekker nå akkurat det de gjorde, pluss resten av
   // appen.
+  // RETTET 2026-08-21, runde 4 (endelig bekreftet med rå diagnostikk fra
+  // bruker: filterMode=fylke fylkeFilter=alle → faller korrekt gjennom til
+  // HER — allLocations=31978 (ekte data, INTET hentefeil-problem), men
+  // scoped=0, zoom=11, kartSynlig=false). Mekanismen var IKKE den forrige,
+  // motbeviste fitBounds-teorien (se getSize()-vakten i renderMap()) — den
+  // handlet om at fitBounds mot en skjult container FEILAKTIG skulle presse
+  // zoom over terskelen. Den er ikke nødvendig her: zoom 11 er et LEGITIMT,
+  // tiltenkt resultat av geolokasjon ved oppstart (showMyLocationOnMap(...,
+  // {zoom:11}), se geolocateStartupView()) — over ARTSKART_MIN_ZOOM (9) helt
+  // uavhengig av noen fitBounds-feilberegning. Selve bug'en er at DENNE
+  // funksjonen stolte på getZoom() ALENE for å avgjøre om kartutsnittet
+  // "teller" som et bevisst brukervalg — uten å sjekke om containeren i det
+  // hele tatt var synlig. Mobil-standard er "Liste" for innloggede (se
+  // .sp-mobile-view-liste) — kartet er display:none, 0×0, når
+  // geolokasjonen setter zoom 11 ved oppstart. getBounds() på en 0×0-
+  // container gir en DEGENERERT (null-utstrekning) boks (verifisert direkte
+  // mot ekte Leaflet, se scratchpad-testen fra forrige runde) — isInCurrentScope()
+  // sin .contains()-sjekk mot den bokseen forkaster dermed praktisk talt alt,
+  // selv om ekte, lastet data (31978 steder) fantes hele tiden. Fikset ved
+  // kilden (her, IKKE i hver enkelt kaller) — samme funksjon brukes av
+  // isInCurrentScope()/currentAreaLabel()/"Foreslå områder" samtidig, se
+  // begrunnelsen over.
   function viewportImpliesScope(){
-    return !!leafletMap && !artskartOmradeErAvgrenset() && leafletMap.getZoom() >= ARTSKART_MIN_ZOOM;
+    return !!leafletMap && leafletMap.getSize().x > 0 && leafletMap.getSize().y > 0
+      && !artskartOmradeErAvgrenset() && leafletMap.getZoom() >= ARTSKART_MIN_ZOOM;
   }
 
   // Ekte Artsdatabanken-observasjoner (art/koordinat/dato), hentet av

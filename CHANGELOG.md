@@ -1,5 +1,36 @@
 # Endringslogg
 
+## 0.30.6 — Fiks (bekreftet): tom liste kom av kartutsnitt-scope mot skjult kart
+Diagnostikk-linjen fra 0.30.5 ga svaret: `filterMode=fylke fylkeFilter=alle
+allLocations=31978 scoped=0 zoom=11 kartSynlig=false mapFittedOnce=true` —
+ekte terrengdata var lastet inn HELE TIDEN (31 978 steder, altså intet
+hentefeil-problem), men `scoped=0`.
+
+Rotårsak, denne gangen bekreftet både eksperimentelt (samme scenario
+reprodusert direkte mot ekte Leaflet: zoom 11 mot en skjult 0×0-container,
+seks testpunkter spredt over Norge — gammel logikk fant 0 av 6, ny logikk
+fant 6 av 6) og mot brukerens faktiske tall: `fylkeFilter='alle'` sender
+`isInCurrentScope()` videre til `viewportImpliesScope()`, som til nå kun
+sjekket `leafletMap.getZoom() >= ARTSKART_MIN_ZOOM (9)`. zoom 11 er et
+LEGITIMT resultat av geolokasjon ved oppstart (`showMyLocationOnMap(...,
+{zoom:11})`, se `geolocateStartupView()`) — ikke en feilberegning som i
+forrige (motbeviste) teori. Mobil-standard er "Liste" for innloggede, så
+kartcontaineren er fortsatt `display:none` (0×0) når geolokasjonen setter
+zoom 11. `getBounds()` på en 0×0-container gir en DEGENERERT
+(null-utstrekning) boks, uansett zoom — `isInCurrentScope()` sin
+`.contains()`-sjekk mot den boksen forkaster dermed praktisk talt alt.
+
+- `viewportImpliesScope()` sjekker nå også `leafletMap.getSize().x > 0 &&
+  leafletMap.getSize().y > 0` før den lar zoom telle som et bevisst
+  kartutsnitt-scope — fikset ved kilden (denne ene funksjonen), ikke i hver
+  enkelt kaller, siden `isInCurrentScope()`/`currentAreaLabel()`/"Foreslå
+  områder" alle deler den.
+- `.sp-debug-line`-diagnostikken fra 0.30.5 står foreløpig — fjernes i en
+  senere opprydding når fiksen er bekreftet i praksis, inkl. for
+  kommune-valg-tilfellet som også ble meldt tidligere.
+
+Versjon 0.30.5 → 0.30.6.
+
 ## 0.30.5 — Diagnostikk for tom liste i standalone-PWA (teori motbevist, ikke løst ennå)
 Bruker bekreftet på v0.30.4: fortsatt tom liste i standalone, ingen synlig
 terrengdataFeil-melding — men et konkret nytt funn: å bytte til "Kart" og
