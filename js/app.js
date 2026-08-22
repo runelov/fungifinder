@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.30.6';
+  const APP_VERSION = '0.30.7';
   const APP_BUILD_DATE = '2026-08-21';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -4711,23 +4711,7 @@
           : filterMode === 'kommune'
             ? 'Velg en annen kommune, eller se hvilke kommuner som er dekket under «Om dataene».'
             : 'Prøv et annet senterpunkt eller en større radius.';
-      // RETTET 2026-08-21 (bruker meldte: tom liste i standalone-PWA, ingen
-      // synlig feilmelding — altså IKKE terrengdataFeil, se der — men
-      // bekreftet at å bytte til "Kart" og tilbake til "Liste" UTEN andre
-      // endringer fikk punkter til å dukke opp igjen). scoped.length===0 her
-      // betyr enten (a) allLocations() er reelt tom, eller (b)
-      // isInCurrentScope() filtrerer bort alt — en direkte, testet hypotese
-      // om at fitBounds() mot en skjult 0×0-kartcontainer var årsaken via
-      // viewportImpliesScope() er MOTBEVIST (se getSize()-vakten i
-      // renderMap()). Rå diagnostikk-linje under (kun i denne konkrete
-      // tomme-tilstanden, ikke i vanlig visning) for å faktisk fange
-      // hvilken av de to det er neste gang dette skjer.
-      const diag = `filterMode=${filterMode} fylkeFilter=${fylkeFilter} kommuneFilter=${kommuneFilter} `
-        + `radiusCenter=${radiusCenter ? 'satt' : 'null'} allLocations=${allLocations().length} `
-        + `scoped=${scoped.length} zoom=${leafletMap ? leafletMap.getZoom() : 'n/a'} `
-        + `kartSynlig=${leafletMap ? (leafletMap.getSize().x > 0) : 'n/a'} mapFittedOnce=${mapFittedOnce}`;
-      container.innerHTML = `<div class="sp-empty">Ingen analyserte steder${areaLabel} ennå. ${forslag}</div>`
-        + `<div class="sp-debug-line">${escapeHtml(diag)}</div>`;
+      container.innerHTML = `<div class="sp-empty">Ingen analyserte steder${areaLabel} ennå. ${forslag}</div>`;
       return;
     }
 

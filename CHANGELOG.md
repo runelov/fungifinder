@@ -1,5 +1,16 @@
 # Endringslogg
 
+## 0.30.7 — Fjern midlertidig debug-diagnostikk
+Standalone-PWA-saken er løst (0.30.6 fikset det faktiske scope-problemet;
+et gjenstående "Load failed" viste seg å være en fastlåst økt spesifikk
+for den installerte PWA-en, løst ved å opprette den på nytt). Fjerner
+0.30.5 sin midlertidige rå diagnostikk-linje (`.sp-debug-line`,
+filterMode/fylke/kommune/zoom/kartSynlig/mapFittedOnce) under "Ingen
+analyserte steder" — den gjorde jobben sin, men hører ikke hjemme i vanlig
+bruk fremover.
+
+Versjon 0.30.6 → 0.30.7.
+
 ## 0.30.6 — Fiks (bekreftet): tom liste kom av kartutsnitt-scope mot skjult kart
 Diagnostikk-linjen fra 0.30.5 ga svaret: `filterMode=fylke fylkeFilter=alle
 allLocations=31978 scoped=0 zoom=11 kartSynlig=false mapFittedOnce=true` —
