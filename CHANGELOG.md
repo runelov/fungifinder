@@ -1,5 +1,32 @@
 # Endringslogg
 
+## 0.30.4 — Fiks: ny-versjon-varselet kunne aldri faktisk lukkes (CSS-spesifisitet)
+Bruker meldte at varselet fortsatt viste seg selv på v0.30.3, og at
+verken "Last inn på nytt" eller ✕ fikk det til å forsvinne.
+
+Fant den ekte rotårsaken denne gangen: `.sp-update-banner { display:
+flex; … }` (0.30.0) og nettleserens egen innebygde `[hidden] { display:
+none; }` har NØYAKTIG samme CSS-spesifisitet (0,1,0) — og siden
+forfatter-stilarket (`styles.css`) alltid lastes etter nettleserens eget,
+vant `display: flex` hver eneste gang, uansett om `hidden`-attributtet
+var satt eller ikke. Selve attributtet ble satt/fjernet helt korrekt av
+JS (bekreftet med `el.hidden` før og etter både dismiss og reload) — det
+hadde bare null visuell effekt. Varselet var derfor umulig å lukke fra
+første stund, uavhengig av alt arbeidet med selve
+versjonssammenligningen i 0.30.0–0.30.3.
+
+- Lagt til `.sp-update-banner[hidden] { display: none; }` — høyere
+  spesifisitet (0,2,0) enn både UA-regelen og grunnregelen, vinner
+  dermed tilbake riktig oppførsel. Verifisert direkte i nettleser:
+  `getComputedStyle(...).display` går nå none → flex → none i takt med
+  `.hidden`-property.
+- Revidert resten av `index.html` for andre `hidden`-elementer med
+  samme mønster (sp-a2hs, sp-admin-panel, sp-a2hs-action,
+  sp-invite-go-login) — ingen av dem har en egen `display`-verdi på
+  klassen sin, så ingen av dem hadde det samme problemet.
+
+Versjon 0.30.3 → 0.30.4.
+
 ## 0.30.3 — Fiks ny-versjon-varselet for godt: Fastly ignorerer query-strings
 Bruker presiserte: det er selve "Ny versjon tilgjengelig"-varselet som er
 problemet — verken "Last inn på nytt" eller ✕ fikk det til å forsvinne, selv
