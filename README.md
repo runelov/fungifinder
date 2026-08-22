@@ -133,3 +133,42 @@ Artfakta/SLU Artdatabanken og Artsdatabankens rødliste, se
 - Hold data-repoet **privat** — selve denne appen (Pages-URL-en) er offentlig
   tilgjengelig for alle som har lenken, men `fungifinder-api` krever gyldig
   sesjon for all lese-/skrivetilgang til terreng-/personlige data.
+
+## Enhetstester
+
+Ingen build/lint-steg her fortsatt, men det finnes nå et enhetstestregime
+(Node sin innebygde `node:test` + `node:sqlite`, ingen npm-avhengigheter),
+kjørt som en påkrevd GitHub Actions-sjekk på hver PR mot `main` — se
+`.github/workflows/test.yml`. Kjør lokalt fra repo-roten:
+
+```bash
+npm test
+```
+
+Dette finner rekursivt både `test/repo-consistency.test.js` (repo-rot) og
+`worker/api/test/lib/*.test.js` (kan også kjøres isolert med
+`cd worker/api && npm test`). Dekker:
+
+- **`worker/api/src/lib/`** (auth/sesjon/rate-limit/CORS/D1-mapping): ekte
+  logikk kjørt mot ekte SQL — `worker/api/test/helpers/fakeD1.js` gir en
+  D1-kompatibel `.prepare().bind().first()/.run()/.all()`-kontrakt oppå
+  `node:sqlite`, lastet med de SAMME `worker/api/migrations/*.sql`-filene
+  som brukes mot ekte D1 (ikke et duplisert testskjema). Inkluderer en
+  regresjonstest for 2026-08-16-fiksen (sesjonsutløp glir fremover ved
+  rullering, ikke fast fra innlogging) og for migrasjon 0004
+  (parkeringsfeltene i `terrengDb.js` sin camelCase-kontrakt).
+- **`test/repo-consistency.test.js`**: statiske regresjonstester for
+  konkrete hendelser — versjons-/cache-busting-konsistens (samme sjekk som
+  `.githooks/pre-commit` over, men håndhevet på PR-en uavhengig av om noen
+  har aktivert hooken lokalt, og utvidet til også å sjekke CHANGELOG.md sin
+  toppseksjon), at Turnstile-`data-sitekey` i `index.html` aldri er
+  Cloudflares always-pass-testnøkkel (hendelsen 2026-07-20), at
+  `ALLOWED_ORIGIN` i `wrangler.toml` er et konkret opphav (aldri wildcard —
+  se `worker/api/src/lib/cors.js`), og `node --check` på alle `.js`-filer
+  under `js/` og `worker/api/src/`.
+
+**Bevisst IKKE dekket ennå**: `js/app.js` sin UI-/kart-/scoring-logikk
+(inkl. `scoreLocation()`) — hele filen er én udelt IIFE-closure uten
+eksporterte funksjoner, så å teste den krever først å bryte ut rene
+funksjoner til egne moduler, en egen (mer invasiv) oppgave. Manuell
+verifisering mot en lokal server er fortsatt normen for endringer der.
