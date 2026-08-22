@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.30.4';
+  const APP_VERSION = '0.30.5';
   const APP_BUILD_DATE = '2026-08-21';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -3270,11 +3270,20 @@
     layout.classList.toggle('sp-mobile-view-liste', view === 'liste');
     layout.classList.toggle('sp-mobile-view-kart', view === 'kart');
     toggle.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mobileview === view));
-    // RETTET 2026-08-21: den ekstra render()-retriggeren herfra (lagt til
-    // samme dag) er reversert igjen sammen med getSize()-vakten i
-    // renderMap() — se kommentaren der for begrunnelsen (mistenkt
-    // regresjonskilde, standalone-PWA-spesifikk, ikke rotårsak-bekreftet).
-    if (view === 'kart' && leafletMap) setTimeout(() => leafletMap.invalidateSize(), 60);
+    // Gjeninnført (se getSize()-vakten i renderMap() for hele
+    // rotårsak-sporingen, "runde 3"): render() på nytt her er ikke lenger
+    // strengt nødvendig for selve listen (den viewport-scope-lyttende
+    // moveend-hendelsen fanger uansett opp dette når invalidateSize()
+    // trigger den) — men uten dette blir kartet stående på det generiske
+    // NORGE_STARTVISNING-utsnittet fra initMap() fremfor det presise,
+    // faktiske-punkter-utsnittet renderMap() ellers ville gitt, siden
+    // fit-once-vakten der aldri fikk sjansen mens containeren var skjult.
+    if (view === 'kart' && leafletMap) {
+      setTimeout(() => {
+        leafletMap.invalidateSize();
+        if (!mapFittedOnce) render();
+      }, 60);
+    }
   }
 
   // ---------- min posisjon (GPS, engangs) ----------
@@ -3681,16 +3690,29 @@
       }).addTo(radiusLayer);
     }
 
-    // RETTET 2026-08-21 (bruker meldte at INGEN steder lenger ble listet —
-    // verken default, ved zoom eller ved kommune-valg — og at "Foreslå
-    // områder" alltid var grået ut, kun i standalone-PWA på mobil, ikke i
-    // nettleser): denne getSize()-vakten (lagt til samme dag, se
-    // "Redesignforslag 2026-08-21" endring 2) er reversert igjen — mistenkt
-    // årsak til regresjonen, ikke bekreftet ned til eksakt linje (kunne ikke
-    // reprodusere standalone-modus i dette miljøet), men brukeren var sikker
-    // på at det virket før den ble innført. initMap() sin fitBounds-vs-
-    // setView-fallback (uendret, se der) er lavere risiko og beholdt.
-    if (!mapFittedOnce && scoredAll.length) {
+    // RETTET 2026-08-21, runde 3: getSize()-vakten under ble fjernet i en
+    // tidligere runde samme dag på (uverifisert) mistanke om at DEN var
+    // kilden til "ingen steder listet, kun i standalone-PWA på mobil" —
+    // reverten løste ingenting (bekreftet av brukeren på tvers av
+    // 0.29.2–0.30.4), så det var feil spor for AKKURAT det symptomet.
+    //
+    // En konkret hypotese om MEKANISMEN (fitBounds mot en 0×0-container
+    // dytter zoom over ARTSKART_MIN_ZOOM, som gjør at viewportImpliesScope()
+    // feilaktig slår inn) ble bygget og testet direkte mot ekte Leaflet
+    // (samme minZoom/lagoppsett/fitBounds-kall som her) — og MOTBEVIST:
+    // fitBounds mot en 0×0-container klemmer zoom NED til minZoom (4), ikke
+    // opp, og viewportImpliesScope() forblir false gjennom hele forløpet,
+    // også etter invalidateSize()/moveend. Årsaken til at "gå til kartet og
+    // tilbake" faktisk får punkter til å dukke opp, er dermed IKKE funnet
+    // ennå — se terrengdataFeil/sp-terrengdata-feil for videre diagnostikk,
+    // og den ekstra diagnostikken i render() sin "Ingen analyserte
+    // steder"-gren.
+    //
+    // Vakten under beholdes likevel — fitBounds() mot en 0×0-container er
+    // uansett meningsløst arbeid (bounds.pad(0.15) på null piksler), og
+    // risikoen ved å la den stå er lav. Den er derfor ikke bekreftet å løse
+    // det rapporterte symptomet, kun en generell forsvarlighetsfiks.
+    if (!mapFittedOnce && scoredAll.length && leafletMap.getSize().x > 0 && leafletMap.getSize().y > 0) {
       const bounds = L.latLngBounds(scoredAll.map(({loc}) => [loc.lat, loc.lon]));
       leafletMap.fitBounds(bounds.pad(0.15));
       mapFittedOnce = true;
@@ -4666,7 +4688,23 @@
           : filterMode === 'kommune'
             ? 'Velg en annen kommune, eller se hvilke kommuner som er dekket under «Om dataene».'
             : 'Prøv et annet senterpunkt eller en større radius.';
-      container.innerHTML = `<div class="sp-empty">Ingen analyserte steder${areaLabel} ennå. ${forslag}</div>`;
+      // RETTET 2026-08-21 (bruker meldte: tom liste i standalone-PWA, ingen
+      // synlig feilmelding — altså IKKE terrengdataFeil, se der — men
+      // bekreftet at å bytte til "Kart" og tilbake til "Liste" UTEN andre
+      // endringer fikk punkter til å dukke opp igjen). scoped.length===0 her
+      // betyr enten (a) allLocations() er reelt tom, eller (b)
+      // isInCurrentScope() filtrerer bort alt — en direkte, testet hypotese
+      // om at fitBounds() mot en skjult 0×0-kartcontainer var årsaken via
+      // viewportImpliesScope() er MOTBEVIST (se getSize()-vakten i
+      // renderMap()). Rå diagnostikk-linje under (kun i denne konkrete
+      // tomme-tilstanden, ikke i vanlig visning) for å faktisk fange
+      // hvilken av de to det er neste gang dette skjer.
+      const diag = `filterMode=${filterMode} fylkeFilter=${fylkeFilter} kommuneFilter=${kommuneFilter} `
+        + `radiusCenter=${radiusCenter ? 'satt' : 'null'} allLocations=${allLocations().length} `
+        + `scoped=${scoped.length} zoom=${leafletMap ? leafletMap.getZoom() : 'n/a'} `
+        + `kartSynlig=${leafletMap ? (leafletMap.getSize().x > 0) : 'n/a'} mapFittedOnce=${mapFittedOnce}`;
+      container.innerHTML = `<div class="sp-empty">Ingen analyserte steder${areaLabel} ennå. ${forslag}</div>`
+        + `<div class="sp-debug-line">${escapeHtml(diag)}</div>`;
       return;
     }
 

@@ -1,5 +1,33 @@
 # Endringslogg
 
+## 0.30.5 — Diagnostikk for tom liste i standalone-PWA (teori motbevist, ikke løst ennå)
+Bruker bekreftet på v0.30.4: fortsatt tom liste i standalone, ingen synlig
+terrengdataFeil-melding — men et konkret nytt funn: å bytte til "Kart" og
+tilbake til "Liste" UTEN andre endringer får punkter til å dukke opp.
+
+Bygde en direkte, testbar hypotese fra dette (fitBounds() mot en skjult
+0×0-kartcontainer dytter zoom over ARTSKART_MIN_ZOOM, som gjør at
+viewportImpliesScope() feilaktig behandler default-visningen som et
+avgrenset kartutsnitt) og testet den mot EKTE Leaflet (samme
+minZoom/lagoppsett/fitBounds-kall som appen selv bruker, se
+`leaflet-zoom-test.html` i scratchpad). Hypotesen var **feil**: fitBounds
+mot en 0×0-container klemmer zoom NED til minZoom (4), ikke opp, og
+viewportImpliesScope() forblir false gjennom hele forløpet, også etter
+invalidateSize()/moveend. Ærlig oppdatert kommentaren i koden i stedet for
+å la en feil forklaring stå — den faktiske årsaken til hvorfor
+kart-fram-og-tilbake fikser det, er fortsatt ukjent.
+
+- getSize()-vakten i renderMap() er likevel beholdt (generell
+  forsvarlighet — fitBounds mot 0 piksler er uansett meningsløst — men
+  IKKE lenger hevdet å løse det rapporterte symptomet).
+- Ny rå diagnostikk-linje (`.sp-debug-line`) vist DIREKTE under "Ingen
+  analyserte steder"-meldingen: filterMode, fylke-/kommune-/radiusfilter,
+  allLocations().length, scoped.length, kartets zoom/synlighet,
+  mapFittedOnce. Skal fange nøyaktig hvilken tilstand som faktisk
+  foreligger neste gang dette skjer, i stedet for enda en uverifisert teori.
+
+Versjon 0.30.4 → 0.30.5.
+
 ## 0.30.4 — Fiks: ny-versjon-varselet kunne aldri faktisk lukkes (CSS-spesifisitet)
 Bruker meldte at varselet fortsatt viste seg selv på v0.30.3, og at
 verken "Last inn på nytt" eller ✕ fikk det til å forsvinne.
