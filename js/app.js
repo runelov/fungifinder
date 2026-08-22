@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.30.7';
-  const APP_BUILD_DATE = '2026-08-21';
+  const APP_VERSION = '0.31.0';
+  const APP_BUILD_DATE = '2026-08-22';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
   // kommentar der) — de to må holdes i sync manuelt siden repoet bevisst
@@ -36,7 +36,7 @@
     { id:'kantarell', name:'Kantarell', latin:'Cantharellus cibarius', season:[7,10],
       treslag:['gran','furu','bjork'], skogalder:['middels','gammel'], fuktighet:['frisk','fuktig'], berggrunn:['fattig','moderat'],
       weather:{ minNedbor14:15, idealNedbor14:35, minTempAvg:8 },
-      why:(loc,t)=>`Blandingsskog med ${t.treslagTekst} og ${t.fuktighetTekst} bunn i mosedekket, ${t.alderTekst} skog — nøyaktig kombinasjonen kantarell liker best.`,
+      why:(loc,t)=>`Lever i mykorrhiza med flere treslag samtidig, derfor typisk i blandingsskog snarere enn rene bestand — et tykt mosedekke i bunnsjiktet er ofte et bedre tegn enn selve treslaget.`,
       fieldTips:'Gul-oransje traktformet hatt med bølget kant. Under hatten er det <b>lave, grove, gaffelgrenede ribber</b> som løper langt ned på stilken — ikke tynne, skarpe gjeller. Kjøttet er hvitt-gult gjennomgående, og lukten minner om modne aprikoser.',
       lookalike:'Falsk kantarell (Hygrophoropsis aurantiaca) ligner, men har tynne, skarpe, ekte gjeller (ikke butte ribber) og er mørkere oransje. Ikke farlig, men smaker dårlig — sjekk gjellene nøye.',
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/2007-07-14_Cantharellus_cibarius_cropped.jpg/500px-2007-07-14_Cantharellus_cibarius_cropped.jpg', artist:'Andreas Kunze', license:'CC BY-SA 4.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2007-07-14_Cantharellus_cibarius_cropped.jpg' } },
@@ -54,7 +54,7 @@
       // mm), som behandles som outliers heller enn reelt sesongmønster —
       // samme prinsipp som kransmusserong-sesongfiksen samme dag.
       weather:{ minNedbor14:11, idealNedbor14:45, minTempAvg:4 },
-      why:(loc,t)=>`Fuktig, mosekledd ${t.treslagTekst}-skog — traktkantarellens favorittmiljø. Tåler kjøligere vær enn kantarell.`,
+      why:(loc,t)=>`Nær slektning av kantarell, men tåler kjøligere og fuktigere forhold — ofte det som fortsatt vokser når kantarellsesongen er over for året.`,
       fieldTips:'Liten, gråbrun-gulbrun sopp med <b>trakt-/pipeformet hatt</b> og hul stilk. Undersiden har lave, grålilla-gule ribber. Vokser ofte i <b>tette forekomster</b> i tykt mosedekke.',
       lookalike:'Få farlige forvekslingsarter. Skilles fra svart trompetsopp på farge (gulbrun, ikke gråsvart) og fra rørsopper ved at det ikke er noe rørlag under hatten.',
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/2011-07-12_Craterellus_tubaeformis_71471.jpg/500px-2011-07-12_Craterellus_tubaeformis_71471.jpg', artist:'Mushroom Observer-bruker', license:'CC BY-SA 3.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2011-07-12_Craterellus_tubaeformis_71471.jpg' } },
@@ -66,7 +66,7 @@
     { id:'trompetsopp', name:'Svart trompetsopp', latin:'Craterellus cornucopioides', season:[8,10],
       treslag:['bjork'], skogalder:['gammel'], fuktighet:['fuktig'], berggrunn:['moderat','rik'],
       weather:{ minNedbor14:20, idealNedbor14:40, minTempAvg:6 },
-      why:(loc,t)=>`Fuktig løv-/blandingsskog på ${t.berggrunnTekst} grunn — trompetsoppens foretrukne miljø, ofte sammen med hassel eller bøk/eik.`,
+      why:(loc,t)=>`Vokser ofte skjult under løv i fuktige forsenkninger, gjerne i følge med hassel eller bøk/eik — den mørke fargen gjør den lett å gå forbi, så let systematisk i strølaget.`,
       fieldTips:'Gråsvart, traktformet og helt hul gjennom hele soppen, uten tydelige gjeller eller ribber (helt glatt eller svakt rynket underside). Ligner et lite, mørkt horn. Vokser ofte i store, skjulte klynger under løv.',
       lookalike:'Svært distinkt art med få forvekslingsfarer — hovedutfordringen er å få øye på den i skyggen mellom løv og mørk jord.',
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/2011-11-20_Craterellus_cornucopioides_%28L.%29_Pers_183522_cropped.jpg/500px-2011-11-20_Craterellus_cornucopioides_%28L.%29_Pers_183522_cropped.jpg', artist:'John Kirkpatrick (Mushroom Observer)', license:'CC BY-SA 3.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2011-11-20_Craterellus_cornucopioides_(L.)_Pers_183522_cropped.jpg' } },
@@ -74,7 +74,7 @@
     { id:'steinsopp', name:'Steinsopp', latin:'Boletus edulis', season:[8,10],
       treslag:['gran','furu','bjork'], skogalder:['gammel'], fuktighet:['tørr','frisk'], berggrunn:['fattig','moderat'],
       weather:{ minNedbor14:20, idealNedbor14:40, minTempAvg:10 },
-      why:(loc,t)=>`Eldre ${t.treslagTekst}-skog med blåbærlyng og ${t.fuktighetTekst} mark. Steinsopp trenger et varmt spell etterfulgt av regn.`,
+      why:(loc,t)=>`Trenger en varm periode etterfulgt av regn for å sette fruktlegemer i det hele tatt — sjekk værhistorikken like mye som selve stedet, og let gjerne i blåbærlyngen.`,
       fieldTips:'Rørsopp: under hatten er det et <b>svampaktig rørlag</b>, aldri gjeller. Stilken er tykk, kølleformet, med fint hvitt <b>nettmønster</b> øverst. Kjøttet forblir hvitt og blir <b>ikke blått eller rødt</b> ved kutt.',
       lookalike:'Ingen rørsopper i Norge er giftige, men galleboletus (Tylopilus felleus) ligner og smaker svært bittert — sjekk at nettmønsteret er hvitt (ikke mørkt) og smak en liten bit rått (bitter = kast).',
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Boletus_edulis1.jpg/500px-Boletus_edulis1.jpg', artist:'Tocekas', license:'CC BY-SA 3.0', sourcePage:'https://commons.wikimedia.org/wiki/File:Boletus_edulis1.jpg' } },
@@ -85,7 +85,7 @@
     { id:'rodskrubb', name:'Rødskrubb / Brunskrubb', latin:'Leccinum versipelle / scabrum', season:[7,10],
       treslag:['bjork'], skogalder:['middels','gammel'], fuktighet:['frisk','fuktig'], berggrunn:['fattig','moderat','rik'],
       weather:{ minNedbor14:15, idealNedbor14:35, minTempAvg:8 },
-      why:(loc,t)=>`Bjørkeinnslag i ${t.treslagTekst}-skog — disse rørsoppene lever i mykorrhiza spesifikt med bjørk.`,
+      why:(loc,t)=>`Lever i mykorrhiza spesifikt med bjørk, ikke gran eller furu — selv et lite bjørkeinnslag i ellers barskogdominert terreng er nok til at disse rørsoppene kan finnes.`,
       fieldTips:'Rørsopp med tynn, rank stilk dekket av mørke, skjellete flekker («skrubb»-mønster). Hatten er oransje-rød (rødskrubb) eller gråbrun (brunskrubb). Kjøttet kan mørkne noe ved kutt, men ikke blått/rødt kraftig.',
       lookalike:'Ingen farlige forvekslingsarter blant rørsopper i Norge. Vokser alltid nær bjørk — finner du den langt fra bjørk, sjekk artsbestemmelsen ekstra nøye.',
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/2006-09-02_Leccinum_versipelle.jpg/500px-2006-09-02_Leccinum_versipelle.jpg', artist:'Andreas Kunze', license:'CC BY-SA 3.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2006-09-02_Leccinum_versipelle.jpg' } },
@@ -103,7 +103,7 @@
       // artene delte tidligere samme fuktighetsgrense selv om
       // fuktighet-aksen sier de er ulike.
       weather:{ minNedbor14:8, idealNedbor14:30, minTempAvg:8 },
-      why:(loc,t)=>`Furudominert skog på ${t.berggrunnTekst} grunn. Matriske trenger furu som partner og sandholdig, veldrenert jord.`,
+      why:(loc,t)=>`Krever furu som mykorrhizapartner, ikke andre treslag — gulmelken den avgir ved snitt eller brekk er den sikreste bekreftelsen i felt.`,
       fieldTips:'Kutt i lamellene: ekte matriske gir en <b>gulrotoransje melkesaft</b> som gradvis blir <b>grønnlig</b> ved oksidering. Hatten har ofte konsentriske, mørkere ringer. Vokser nesten utelukkende under furu.',
       lookalike:'⚠ De fleste alvorlige soppforgiftninger i Norge skjer fordi folk forveksler spiss giftslørsopp med matriske. Sjekk ALLTID melkesaften: ekte matriske "blør" tydelig gulrotoransje når du kutter i den — giftslørsopp gjør ikke det. Er du i tvil, la soppen stå.',
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/2009-09-28_Lactarius_deliciosus.jpg/500px-2009-09-28_Lactarius_deliciosus.jpg', artist:'furtwangl', license:'CC BY 2.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2009-09-28_Lactarius_deliciosus.jpg' } },
@@ -111,7 +111,7 @@
     { id:'piggsopp', name:'Piggsopp (lys)', latin:'Hydnum repandum', season:[8,10],
       treslag:['gran','bjork','furu'], skogalder:['middels','gammel'], fuktighet:['frisk'], berggrunn:['fattig','moderat'],
       weather:{ minNedbor14:15, idealNedbor14:30, minTempAvg:8 },
-      why:(loc,t)=>`Blandingsskog med ${t.treslagTekst} gir gode vertstrær for piggsopp, mindre kravstor enn kantarell.`,
+      why:(loc,t)=>`Mindre kravstor enn kantarell og ofte oversett — pigger på undersiden av hatten i stedet for lameller er raskeste bekreftelse i felt.`,
       fieldTips:'Under hatten: i stedet for gjeller/rør har piggsopp <b>myke, hengende pigger</b>. Kremhvit-lys oransje, tykt kjøtt. Mild i smak.',
       lookalike:'Bruk kun lyse piggsopper med lys hatt og lyse pigger. Mørkhattede piggsopper (bitterpiggsopp) er ikke farlige, men smaker svært bittert — kjenn etter på farge og smak en liten bit rått.',
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/7/72/2012-08-29_Hydnum_repandum_L_256175.jpg/500px-2012-08-29_Hydnum_repandum_L_256175.jpg', artist:'Alan Rockefeller (Mushroom Observer)', license:'CC BY-SA 3.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2012-08-29_Hydnum_repandum_L_256175.jpg' } },
@@ -119,7 +119,7 @@
     { id:'faresopp', name:'Fåresopp', latin:'Albatrellus ovinus', season:[7,9],
       treslag:['gran'], skogalder:['gammel'], fuktighet:['frisk'], berggrunn:['fattig','moderat'],
       weather:{ minNedbor14:15, idealNedbor14:30, minTempAvg:8 },
-      why:(loc,t)=>`Gammel granskog med mose — fåresopp vokser direkte i bakken, ofte i ring, nær gran.`,
+      why:(loc,t)=>`Vokser direkte i bakken uten synlig tilknytning til stubbe eller ved, ofte i ring rundt eldre gran — en heksering er et godt tegn å lete videre ut fra.`,
       fieldTips:'Lys, kremhvit poresopp som vokser <b>på bakken</b> (ikke på trær), ofte flere sammenvokste hatter. Fine porer under hatten, ikke gjeller. Fast, hvitt kjøtt.',
       lookalike:'Lyse poresopper som vokser på bakken i Norge har ingen farlige forvekslingsarter — hovedregelen er lys farge og bakkevekst (ikke å forveksle med kjuker som vokser på trestammer).',
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Albatrellus_ovinus_1.jpg/500px-Albatrellus_ovinus_1.jpg', artist:'Karelj', license:'Public domain', sourcePage:'https://commons.wikimedia.org/wiki/File:Albatrellus_ovinus_1.jpg' } },
@@ -135,7 +135,7 @@
     { id:'parasollsopp', name:'Parasollsopp (stor)', latin:'Macrolepiota procera', season:[7,10],
       treslag:['apen','bjork'], skogalder:['apen','middels'], fuktighet:['frisk'], berggrunn:['moderat','rik'],
       weather:{ minNedbor14:10, idealNedbor14:25, minTempAvg:8 },
-      why:(loc,t)=>`Åpne skogkanter og lysninger på ${t.berggrunnTekst} grunn — store parasollsopper trives i gress- og feltsjikt i overgangssoner.`,
+      why:(loc,t)=>`Trives i overgangssonen mellom skog og åpen mark snarere enn inne i selve skogen — se etter i gress- og feltsjikt langs stier, veikanter og lysninger.`,
       fieldTips:'Stor sopp (kan bli 20-40 cm høy) med lang, slank stilk som har et tydelig <b>slangeskinn-mønster</b> og en løs, bevegelig <b>dobbeltring</b>. Hatten er brun-skjellete og parasollformet når utsprunget.',
       lookalike:'⚠ Bruk kun STORE eksemplarer med tydelig slangemønster på stilken og fri, bevegelig ring — små, brune paraplysopper (Lepiota-arter) kan være dødelig giftige og ligner unge parasollsopper. Er soppen liten, la den stå.',
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/1_-_Macrolepiota_procera_%28St%C5%AFl%29.JPG/500px-1_-_Macrolepiota_procera_%28St%C5%AFl%29.JPG', artist:'Fredy.00', license:'Public domain', sourcePage:'https://commons.wikimedia.org/wiki/File:1_-_Macrolepiota_procera_(St%C5%AFl).JPG' } },
@@ -144,7 +144,7 @@
     { id:'sjampinjong', name:'Markjordbær-sjampinjong', latin:'Agaricus campestris', season:[7,10],
       treslag:['apen'], skogalder:['apen'], fuktighet:['frisk'], berggrunn:['moderat','rik'],
       weather:{ minNedbor14:10, idealNedbor14:25, minTempAvg:8 },
-      why:(loc,t)=>`Åpen beitemark/eng på ${t.berggrunnTekst} grunn — sjampinjong vokser i gress, liker kalkholdig jord.`,
+      why:(loc,t)=>`En ren engsopp, ikke en skogsopp — finnes i kortklipt gress på beite eller plen, ofte i ring, aldri under trekroner.`,
       fieldTips:'Sjekk tre ting: <b>rosa gjeller</b> som mørkner til sjokoladebrune, en løs <b>ring på stilken</b>, og kjøtt som <b>ikke blir gult</b> ved trykk.',
       lookalike:'⚠ Unge, hvite fluesopp-knapper kan i sjeldne tilfeller minne om sjampinjong før hatten er utsprunget. Sjekk ALLTID gjellefargen (rosa/brun hos sjampinjong, aldri hvit) og grav opp foten — ekte sjampinjong har ingen "eggeskall" (volva) ved roten.',
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/2010-08-07_Agaricus_campestris.jpg/500px-2010-08-07_Agaricus_campestris.jpg', artist:'Andreas Kunze', license:'CC BY-SA 3.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2010-08-07_Agaricus_campestris.jpg' } },
@@ -181,7 +181,7 @@
       // nok dokumentert til å tallfestes (se elevationScore/scoreLocation).
       hoydeMoh:{ ideal:400, max:600 },
       weather:{ minNedbor14:15, idealNedbor14:30, minTempAvg:6 },
-      why:(loc,t)=>`Gammel, tørr furuskog på ${t.berggrunnTekst} sandgrunn — det sjeldne, kontinentale furumo-habitatet furuknippesopp krever.`,
+      why:(loc,t)=>`Et av de sjeldneste stedene på lista — kun kjent fra spredte, kontinentale furumoer, og verdt en ekstra kontrollrunde selv ved en moderat score.`,
       fieldTips:'Vokser i tette knipper direkte i sandholdig skogbunn i gammel, lysåpen furuskog, ofte med reinlav og blåbærlyng i bunnsjiktet. Gråbrun, fast hatt og hvitt kjøtt med en karakteristisk, litt melaktig-nøttete lukt. Regnes som en delikatesse i Japan (der kalt "shimeji"), men er svært sjelden i Norge og finnes stort sett i kontinentale furumoer på Østlandet.',
       lookalike:'⚠ Tilhører slekten knippesopp (Lyophyllum), som har flere likeartede sopper — vær nøye med artsbestemmelsen og bruk soppkontroll ved usikkerhet. Arten er dessuten sjelden/rødlistet i Norge: vis varsomhet og ikke tøm hele forekomsten om du finner den.',
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/7/7b/Honshimeji.jpg', artist:'トリュフ (Toryufu)', license:'Public domain', sourcePage:'https://commons.wikimedia.org/wiki/File:Honshimeji.jpg' } },
@@ -205,7 +205,7 @@
       treslag:['furu'], skogalder:['gammel'], fuktighet:['tørr'], berggrunn:['fattig'],
       hoydeMoh:{ ideal:400, max:600 },
       weather:{ minNedbor14:15, idealNedbor14:30, minTempAvg:6 },
-      why:(loc,t)=>`Sandholdig, gammel furuskog — kransmusserongens svært spesifikke voksested, best kjent fra furumoer på Østlandet (bl.a. rundt Elverum).`,
+      why:(loc,t)=>`Norges mest ettertraktede matsopp og trolig den mest stedbundne — samme individ kan gi funn år etter år på nøyaktig samme flekk, så gode koordinater herfra er gull verdt.`,
       fieldTips:'Kraftig, hvit-brun sopp med tydelig ring på stilken og en kraftig, kanelaktig/krydret duft som skiller den fra det meste annet. Vokser gjerne delvis nedgravd i sandjord under gammel furu, ofte i mose eller reinlav. Internasjonalt kjent som matsutake — en ettertraktet delikatesse i Japan.',
       lookalike:'⚠ Slekten musseronger/riddersopp (Tricholoma) inneholder også giftige arter (bl.a. tigermusserong, som gir kraftige mageplager) — sjekk ring, lukt og voksested nøye, og bruk soppkontroll ved usikkerhet. Kransmusserong er svært ettertraktet og forholdsvis sjelden i Norge — vis varsomhet og plukk med måte.',
       image:{ url:'https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/2010-08-06_Tricholoma_matsutake_%28S._Ito_%26_S._Imai%29_Singer_97084.jpg/500px-2010-08-06_Tricholoma_matsutake_%28S._Ito_%26_S._Imai%29_Singer_97084.jpg', artist:'Ryane Snow (Mushroom Observer)', license:'CC BY-SA 3.0', sourcePage:'https://commons.wikimedia.org/wiki/File:2010-08-06_Tricholoma_matsutake_(S._Ito_%26_S._Imai)_Singer_97084.jpg' } }
@@ -2857,15 +2857,12 @@
     return html;
   }
 
-  // Ekte Artsdatabanken-funn av DENNE arten nær stedet — antall og
-  // nærmeste/nyeste, hentet fra kjenteFunnDetaljer (se scoreLocation()).
-  function knownFindsHtml(loc, speciesId){
-    const detaljer = (loc.kjenteFunnDetaljer || []).filter(f => f.art === speciesId);
-    if (!detaljer.length) return '';
-    const sp = SPECIES.find(s => s.id === speciesId);
-    const parts = detaljer.slice(0, 3).map(f => `${f.avstandM} m unna (${escapeHtml(f.dato || 'ukjent dato')})`);
-    return `<div class="sp-known-finds">🔎 ${detaljer.length} kjent${detaljer.length > 1 ? 'e' : ''} Artsdatabanken-funn av ${escapeHtml(sp ? sp.name.toLowerCase() : speciesId)} her: ${parts.join(', ')}</div>`;
-  }
+  // RETTET 2026-08-22 (kort-redesign, fase 1): knownFindsHtml() er fjernet —
+  // den viste ANTALL KJENTE FUNN UANSETT AVSTAND i en egen boks, mens
+  // whyHereFactors() rett over viste et ANNET antall (kun <500 m) i "Hvorfor
+  // her?" på samme kort. To tall for "kjente funn" på ett kort så ut som en
+  // feil, ikke et bevisst skille. Begge tall vises nå i én linje inne i
+  // Hvorfor her? (se "Kjente Artsdatabanken-funn"-raden i whyHereFactors()).
 
   function locTexts(loc){
     const t1 = Array.isArray(loc.treslag) ? loc.treslag : [loc.treslag];
@@ -4243,6 +4240,20 @@
   // `state` og rendres som et lite ikon+farge-merke i stedet for en stolpe.
   // Kun Kjente funn beholder `pct`/stolpe — det er det ene feltet som
   // faktisk ER en kontinuerlig, gradert måling (antall funn).
+  // RETTET 2026-08-22 (kort-redesign, fase 1) — skilt ut fra whyHereFactors()
+  // slik at accessMetaLineHtml() (se cardHtml()) kan spørre "har denne arten
+  // allerede en egen ✓/✗/?-rad for høyde/sørvendt skråning i Hvorfor her?"
+  // uten å gjenta betingelsen selv. Uten dette ville høyde/helning risikert å
+  // dukke opp BÅDE i Hvorfor her OG i adkomst-boksens metalinje — nøyaktig
+  // den samme typen dobbeltvisning resten av denne rettelsen fjerner andre
+  // steder på kortet.
+  function hasElevationFactor(species, loc){
+    return !!(species.hoydeMoh && loc.hoydeMoh != null);
+  }
+  function hasSlopeFactor(species, loc){
+    return !!(WARMTH_LOVING_SPECIES.has(species.id) && loc.himmelretning && loc.helningGrader != null);
+  }
+
   function whyHereFactors(species, loc){
     const t = locTexts(loc);
     const factors = [];
@@ -4268,7 +4279,7 @@
     // dokumentert høydespenn til å tallfeste), og da sier et merke ingenting.
     // Tre ordnede tilstander (ideell/innenfor/for høyt), derfor 'mid' i tillegg
     // til good/bad.
-    if (species.hoydeMoh && loc.hoydeMoh != null) {
+    if (hasElevationFactor(species, loc)) {
       const { ideal, max } = species.hoydeMoh;
       const state = loc.hoydeMoh <= ideal ? 'good' : loc.hoydeMoh <= max ? 'mid' : 'bad';
       factors.push({ label: 'Høyde over havet', valueText: `${Math.round(loc.hoydeMoh)} moh`, state });
@@ -4277,7 +4288,7 @@
     // Kun relevant for varmekrevende arter (samme WARMTH_LOVING_SPECIES-sett
     // som scoreLocation() bruker for +4-bonusen) — for andre arter er
     // himmelretning ikke noe scoren bryr seg om, så et merke ville vært støy.
-    if (WARMTH_LOVING_SPECIES.has(species.id) && loc.himmelretning && loc.helningGrader != null) {
+    if (hasSlopeFactor(species, loc)) {
       // Samme glidende vekt (sorvendtVekt()) som selve +4-bonusen i
       // scoreLocation() — se den for begrunnelse. Terskel-mappet til
       // kortets tre visningstilstander (good/mid/bad), som fortsatt er
@@ -4287,14 +4298,30 @@
       factors.push({ label: 'Sørvendt skråning', valueText: `${loc.helningGrader}°, ${loc.himmelretning}-vendt`, state });
     }
 
-    // Samme 500 m-terskel som scoreLocation()s tetthetsbonus nå bruker (se
-    // RETTET 2026-08-18 der) — bevisst IKKE ETL-ens videre 1,5 km-
-    // koblingsradius, som er et urealistisk stort "søkeområde" å vise fram
-    // som "kjent funnsted". Eneste faktor som beholder pct/stolpe — dette
-    // er en reell kontinuerlig telling, ikke en tilstand.
-    const funn = (loc.kjenteFunnDetaljer || []).filter(f => f.art === species.id && f.avstandM < 500);
-    const pctFunn = funn.length === 0 ? 12 : Math.min(90, 30 + funn.length * 15);
-    factors.push({ label: 'Kjente funn < 500 m', valueText: funn.length ? `${funn.length} stk` : 'ingen kjente', pct: pctFunn });
+    // RETTET 2026-08-22 (kort-redesign, fase 1) — denne raden og den
+    // tidligere egne knownFindsHtml()-blokken lenger ned på kortet viste
+    // "kjente funn" med TO ULIKE terskler samtidig (denne: <500 m, den
+    // andre: uansett avstand) — kunne se ut som en motsigelse på samme kort
+    // ("2 stk" her, "5 kjente funn" der). Slått sammen til én kilde: pct/
+    // stolpe styres fortsatt kun av <500 m-tallet (samme 500 m-terskel som
+    // scoreLocation()s tetthetsbonus, se RETTET 2026-08-18 der — bevisst
+    // IKKE ETL-ens videre 1,5 km-koblingsradius), men valueText viser nå
+    // begge tall + nærmeste treff når de to avvider fra hverandre, i stedet
+    // for å gjemme totalen i en egen boks. knownFindsHtml() er fjernet.
+    const alleFunn = (loc.kjenteFunnDetaljer || []).filter(f => f.art === species.id);
+    const nareFunn = alleFunn.filter(f => f.avstandM < 500);
+    const pctFunn = nareFunn.length === 0 ? 12 : Math.min(90, 30 + nareFunn.length * 15);
+    let funnTekst;
+    if (!alleFunn.length) {
+      funnTekst = 'ingen kjente';
+    } else {
+      const nearest = alleFunn.reduce((a, b) => a.avstandM < b.avstandM ? a : b);
+      const nearestTekst = `nærmest ${nearest.avstandM} m${nearest.dato ? ', ' + nearest.dato : ''}`;
+      funnTekst = nareFunn.length
+        ? `${nareFunn.length} stk <500 m${alleFunn.length > nareFunn.length ? ` (${alleFunn.length} totalt, ${nearestTekst})` : ` (${nearestTekst})`}`
+        : `${alleFunn.length} stk, ${nearestTekst} — over 500 m unna`;
+    }
+    factors.push({ label: 'Kjente Artsdatabanken-funn', valueText: funnTekst, pct: pctFunn });
 
     return factors;
   }
@@ -4330,46 +4357,85 @@
       </div>`;
   }
 
+  // ---------- kort-byggeklosser delt mellom cardHtml() og cardHtmlFavorites() ----------
+  //
+  // RETTET 2026-08-22 (kort-redesign, fase 1) — disse tre var tidligere
+  // inline-duplisert i begge kort-funksjonene (samme markup skrevet to
+  // ganger, én for enkeltart-modus, én for favoritt-modus — reell
+  // driftrisiko, se kommentaren ved cardHtmlFavorites()). Skilt ut hit slik
+  // at en fremtidig endring kun gjøres ett sted.
+
+  // Kilde-merket (eget sted/auto-hentet) — hørte tidligere hjemme i
+  // .sp-tags-raden, flyttet inn i kommune-linjen siden det er metadata om
+  // STEDET, ikke et vekstvilkår eller en advarsel.
+  function sourceTagHtml(loc){
+    if (loc.custom) return ` <span class="sp-tag custom">eget sted</span>`;
+    if (loc.kilde === 'auto-etl') return ` <span class="sp-tag good">auto-hentet</span>`;
+    return '';
+  }
+
+  // Historikk (egen funnhistorikk her) og advarsler (flatehogd/egen hogst-
+  // merking/ekskludert fra anbefaling) samlet i én rad rett under toppen av
+  // kortet — dette er STATUS for stedet, ikke vekstvilkår, og fortjener å
+  // stå fremst, ikke gjemt nederst blant nøytrale fakta-tags slik de gjorde
+  // i den gamle .sp-tags-raden.
+  function statusRowHtml(loc, res){
+    const chips = [
+      res.histNote ? `<span class="sp-status-chip hist">★ ${escapeHtml(res.histNote)}</span>` : '',
+      loc.hogstAr ? `<span class="sp-status-chip warn">flatehogd ${escapeHtml(String(loc.hogstAr))}</span>` : '',
+      userCuts.includes(loc.id) ? `<span class="sp-status-chip warn">egen merking: hogd</span>` : '',
+      res.isCut ? `<span class="sp-status-chip warn">ekskludert fra anbefaling</span>` : ''
+    ].filter(Boolean);
+    return chips.length ? `<div class="sp-status-row">${chips.join('')}</div>` : '';
+  }
+
+  // Rene terrengfakta (høyde/helning/folketetthet) som IKKE er et vekstvilkår
+  // for akkurat denne arten (se hasElevationFactor()/hasSlopeFactor() —
+  // brukt her for å UNNGÅ å vise høyde/helning på nytt når de allerede har
+  // sin egen ✓/✗/?-rad i Hvorfor her? for denne arten). Dempet metalinje
+  // nederst i adkomst-boksen, ikke egne tags.
+  function accessMetaLineHtml(species, loc){
+    const parts = [];
+    if (loc.hoydeMoh != null && !hasElevationFactor(species, loc)) parts.push(`${Math.round(loc.hoydeMoh)} moh`);
+    if (loc.helningGrader != null && !hasSlopeFactor(species, loc)) parts.push(`${loc.helningGrader}° helning${loc.himmelretning ? ', ' + loc.himmelretning + '-vendt' : ''}`);
+    const befolkningTekst = loc.befolkning === 'lav' ? 'rolig, lite folk'
+      : loc.befolkning === 'hoy' ? 'mye ferdsel'
+      : (loc.befolkning === 'ukjent' || !loc.befolkning) ? 'folketetthet ukjent' : 'moderat ferdsel';
+    const befolkningFarge = loc.befolkning === 'lav' ? 'var(--russet-deep)' : loc.befolkning === 'hoy' ? 'var(--danger)' : 'var(--ink-soft)';
+    parts.push(`<span style="color:${befolkningFarge}">${befolkningTekst}</span>`);
+    return `<div class="sp-access-meta">${parts.join(' · ')}</div>`;
+  }
+
+  function accessBoxHtml(loc, res, species){
+    const parkWarn = res.accessTags.some(tg => tg.cls === 'warn' && tg.text.includes('parkering'));
+    return `
+        <div class="sp-access-box">
+          <div>🚗 <b>Parkering:</b> ${escapeHtml(loc.parkeringNotat) || 'ikke oppgitt'}${parkWarn ? ' <span class="sp-access-warn">— bekreft selv at det ikke er privat grunn</span>' : ''}${parkeringKartUrl(loc) ? ` <a href="${parkeringKartUrl(loc)}" target="_blank" rel="noopener">Vis på kart →</a>` : ''}</div>
+          <div>🥾 <b>Sti/skogsbilvei i terrenget:</b> ${loc.stier==='ja'?'ja':loc.stier==='nei'?'nei, ingen kjent sti':'ukjent'}${loc.avstandStiM != null ? ` (${loc.avstandStiM} m)` : ''}${loc.avstandParkeringM ? ` · ca ${loc.avstandParkeringM} m å gå fra parkering` : ''}</div>
+          ${accessMetaLineHtml(species, loc)}
+        </div>`;
+  }
+
   function cardHtml(loc, res){
-    const t = locTexts(loc);
     const finds = findsFor(loc.id);
     const w = res.weather;
-    const parkWarn = res.accessTags.some(tg => tg.cls === 'warn' && tg.text.includes('parkering'));
+    const species = species_for_card();
     return `
       <div class="sp-card ${res.isCut ? 'sp-excluded' : ''}" data-loc="${loc.id}">
         <div class="sp-card-top">
           <div>
             <div class="sp-card-name">${escapeHtml(loc.name)}</div>
-            <div class="sp-card-kommune">${escapeHtml(loc.kommune)}, ${escapeHtml(loc.fylke)} · ${loc.lat.toFixed(3)}, ${loc.lon.toFixed(3)}</div>
+            <div class="sp-card-kommune">${escapeHtml(loc.kommune)}, ${escapeHtml(loc.fylke)} · ${loc.lat.toFixed(3)}, ${loc.lon.toFixed(3)}${sourceTagHtml(loc)}</div>
           </div>
-          <div class="sp-gauge-wrap" data-score-loc="${loc.id}" data-score-species="${species_for_card().id}" title="Klikk for å se score-beregningen">${gaugeSvg(res.total)}<div class="sp-gauge-label">score</div><div class="sp-gauge-basis ${res.hasEvidence ? 'evidence' : 'terrain'}">${res.hasEvidence ? '✓ kjent funnsted' : '🔍 terrengbasert'}</div></div>
+          <div class="sp-gauge-wrap" data-score-loc="${loc.id}" data-score-species="${species.id}" title="Klikk for å se score-beregningen">${gaugeSvg(res.total)}<div class="sp-gauge-label">score</div><div class="sp-gauge-basis ${res.hasEvidence ? 'evidence' : 'terrain'}">${res.hasEvidence ? '✓ kjent funnsted' : '🔍 terrengbasert'}</div></div>
         </div>
-        <div class="sp-tags">
-          ${loc.custom ? `<span class="sp-tag custom">eget sted</span>` : ''}
-          ${loc.kilde==='auto-etl' ? `<span class="sp-tag good">auto-hentet</span>` : ''}
-          <span class="sp-tag">${t.treslagTekst}</span>
-          <span class="sp-tag">${t.fuktighetTekst} mark${loc.fuktighetIndex!=null ? ' (målt)' : ''}</span>
-          <span class="sp-tag">${t.berggrunnTekst}</span>
-          <span class="sp-tag">${t.alderTekst} skog</span>
-          ${loc.helningGrader!=null ? `<span class="sp-tag">${loc.helningGrader}° helning${loc.himmelretning ? ', ' + loc.himmelretning + '-vendt' : ''}</span>` : ''}
-          ${loc.hoydeMoh!=null ? `<span class="sp-tag">${Math.round(loc.hoydeMoh)} moh</span>` : ''}
-          <span class="sp-tag ${loc.befolkning==='lav'?'good':loc.befolkning==='hoy'?'warn':''}">${loc.befolkning==='lav'?'rolig, lite folk':loc.befolkning==='hoy'?'mye ferdsel':loc.befolkning==='ukjent'||!loc.befolkning?'folketetthet ukjent':'moderat ferdsel'}</span>
-          ${res.accessTags.map(tg => `<span class="sp-tag ${tg.cls}">${tg.text}</span>`).join('')}
-          ${loc.hogstAr ? `<span class="sp-tag warn">flatehogd ${loc.hogstAr}</span>` : ''}
-          ${userCuts.includes(loc.id) ? `<span class="sp-tag warn">egen merking: hogd</span>` : ''}
-          ${res.isCut ? `<span class="sp-tag warn">ekskludert fra anbefaling</span>` : ''}
-        </div>
-        ${whyHereHtml(species_for_card(), loc, res)}
-        <div class="sp-access-box">
-          <div>🚗 <b>Parkering:</b> ${escapeHtml(loc.parkeringNotat) || 'ikke oppgitt'}${parkWarn ? ' <span class="sp-access-warn">— bekreft selv at det ikke er privat grunn</span>' : ''}${parkeringKartUrl(loc) ? ` <a href="${parkeringKartUrl(loc)}" target="_blank" rel="noopener">Vis på kart →</a>` : ''}</div>
-          <div>🥾 <b>Sti/skogsbilvei i terrenget:</b> ${loc.stier==='ja'?'ja':loc.stier==='nei'?'nei, ingen kjent sti':'ukjent'}${loc.avstandStiM != null ? ` (${loc.avstandStiM} m)` : ''}${loc.avstandParkeringM ? ` · ca ${loc.avstandParkeringM} m å gå fra parkering` : ''}</div>
-        </div>
-        ${res.histNote ? `<div class="sp-hist-note">★ ${res.histNote}</div>` : ''}
-        ${knownFindsHtml(loc, species_for_card().id)}
-        <div class="sp-explain">${species_for_card().why(loc, t)}</div>
+        ${statusRowHtml(loc, res)}
+        ${whyHereHtml(species, loc, res)}
+        ${accessBoxHtml(loc, res, species)}
+        <div class="sp-explain">${species.why(loc, locTexts(loc))}</div>
         <div class="sp-microtips-label">Sjekk spesielt i terrenget her</div>
-        <ul class="sp-microtips">${terrainMicrotips(species_for_card(), loc).map(tip => `<li>${tip}</li>`).join('')}</ul>
-        ${crossSpeciesTipsHtml(loc, species_for_card().id)}
+        <ul class="sp-microtips">${terrainMicrotips(species, loc).map(tip => `<li>${tip}</li>`).join('')}</ul>
+        ${crossSpeciesTipsHtml(loc, species.id)}
         ${w ? `<div class="sp-breakdown">Vær nå: <span>${w.precip14} mm</span> nedbør siste 14 dager, snitt temp <span>${w.tempAvg ?? '–'}°C</span>. ${res.weatherVerdict || ''}</div>` : ''}
         ${finds.length ? `<div class="sp-findlist">${finds.map(f => `<div class="sp-find-row"><span>${escapeHtml(SPECIES.find(s=>s.id===f.speciesId)?.name || f.speciesId)} — ${escapeHtml(f.date)}</span><span class="sp-dots">${[1,2,3,4,5].map(n=>`<span class="${n<=f.mengde?'filled':''}"></span>`).join('')}</span></div>`).join('')}</div>` : ''}
         <div class="sp-card-actions">
@@ -4386,44 +4452,25 @@
   // det vanlige kortet, bare hentet fra beste favoritt i stedet for
   // selectedSpecies.
   function cardHtmlFavorites(loc, favResults){
-    const t = locTexts(loc);
     const finds = findsFor(loc.id);
     const top = favResults[0];
     const topSpecies = top.species, res = top.res;
     const w = res.weather;
-    const parkWarn = res.accessTags.some(tg => tg.cls === 'warn' && tg.text.includes('parkering'));
     return `
       <div class="sp-card ${res.isCut ? 'sp-excluded' : ''}" data-loc="${loc.id}">
         <div class="sp-card-top">
           <div>
             <div class="sp-card-name">${escapeHtml(loc.name)}</div>
-            <div class="sp-card-kommune">${escapeHtml(loc.kommune)}, ${escapeHtml(loc.fylke)} · ${loc.lat.toFixed(3)}, ${loc.lon.toFixed(3)}</div>
+            <div class="sp-card-kommune">${escapeHtml(loc.kommune)}, ${escapeHtml(loc.fylke)} · ${loc.lat.toFixed(3)}, ${loc.lon.toFixed(3)}${sourceTagHtml(loc)}</div>
           </div>
         </div>
         <div class="sp-fav-scorelist">
           ${favResults.map(r => `<span class="sp-fav-score-chip ${r.res.isCut?'cut':''}" data-score-loc="${loc.id}" data-score-species="${r.species.id}" title="${r.res.hasEvidence ? 'Kjent funnsted' : 'Terrengbasert (ingen kjent funnhistorikk)'} — klikk for å se score-beregningen">${r.res.hasEvidence ? '✓ ' : ''}${escapeHtml(r.species.name)} <b>${r.res.total}</b></span>`).join('')}
         </div>
-        <div class="sp-tags">
-          ${loc.custom ? `<span class="sp-tag custom">eget sted</span>` : ''}
-          ${loc.kilde==='auto-etl' ? `<span class="sp-tag good">auto-hentet</span>` : ''}
-          <span class="sp-tag">${t.treslagTekst}</span>
-          <span class="sp-tag">${t.fuktighetTekst} mark${loc.fuktighetIndex!=null ? ' (målt)' : ''}</span>
-          <span class="sp-tag">${t.berggrunnTekst}</span>
-          <span class="sp-tag">${t.alderTekst} skog</span>
-          ${loc.helningGrader!=null ? `<span class="sp-tag">${loc.helningGrader}° helning${loc.himmelretning ? ', ' + loc.himmelretning + '-vendt' : ''}</span>` : ''}
-          ${loc.hoydeMoh!=null ? `<span class="sp-tag">${Math.round(loc.hoydeMoh)} moh</span>` : ''}
-          ${res.accessTags.map(tg => `<span class="sp-tag ${tg.cls}">${tg.text}</span>`).join('')}
-          ${loc.hogstAr ? `<span class="sp-tag warn">flatehogd ${loc.hogstAr}</span>` : ''}
-          ${res.isCut ? `<span class="sp-tag warn">ekskludert fra anbefaling</span>` : ''}
-        </div>
+        ${statusRowHtml(loc, res)}
         ${whyHereHtml(topSpecies, loc, res)}
-        <div class="sp-access-box">
-          <div>🚗 <b>Parkering:</b> ${escapeHtml(loc.parkeringNotat) || 'ikke oppgitt'}${parkWarn ? ' <span class="sp-access-warn">— bekreft selv at det ikke er privat grunn</span>' : ''}${parkeringKartUrl(loc) ? ` <a href="${parkeringKartUrl(loc)}" target="_blank" rel="noopener">Vis på kart →</a>` : ''}</div>
-          <div>🥾 <b>Sti/skogsbilvei i terrenget:</b> ${loc.stier==='ja'?'ja':loc.stier==='nei'?'nei, ingen kjent sti':'ukjent'}${loc.avstandStiM != null ? ` (${loc.avstandStiM} m)` : ''}${loc.avstandParkeringM ? ` · ca ${loc.avstandParkeringM} m å gå fra parkering` : ''}</div>
-        </div>
-        ${res.histNote ? `<div class="sp-hist-note">★ ${res.histNote}</div>` : ''}
-        ${knownFindsHtml(loc, topSpecies.id)}
-        <div class="sp-explain"><b>${escapeHtml(topSpecies.name)}:</b> ${topSpecies.why(loc, t)}</div>
+        ${accessBoxHtml(loc, res, topSpecies)}
+        <div class="sp-explain"><b>${escapeHtml(topSpecies.name)}:</b> ${topSpecies.why(loc, locTexts(loc))}</div>
         <div class="sp-microtips-label">Sjekk spesielt i terrenget her (for ${escapeHtml(topSpecies.name)})</div>
         <ul class="sp-microtips">${terrainMicrotips(topSpecies, loc).map(tip => `<li>${tip}</li>`).join('')}</ul>
         ${crossSpeciesTipsHtml(loc, topSpecies.id, { hideFavorites: true })}

@@ -1,5 +1,52 @@
 # Endringslogg
 
+## 0.31.0 — Kort-redesign: fjern tredobbel gjentakelse på stedkortet
+Fase 1 av en designgjennomgang (2026-08-22, se mockup til godkjenning før
+implementasjon) av stedkortet og kart-lagene. Dette er kun kortet — kart-
+lagfiksene (foreslåtte områder vs. artsfunn, målepunkt-visning) og
+voksestedslag-beslutningen er egne, senere faser.
+
+Roten til problemet: treslag/fuktighet/berggrunn/skogalder ble vist TRE
+GANGER på samme kort — som pills i `.sp-tags`, som ✓/✗/?-rader i "Hvorfor
+her?", og en tredje gang gjentatt ordrett i løpende tekst nederst
+(`species.why()` interpolerte de samme tekstene). "Kjente funn" hadde i
+tillegg to ulike avstandsterskler på samme kort (whyHereFactors: <500 m,
+den separate `knownFindsHtml()`-boksen: uansett avstand) — kunne se ut som
+en motsigelse.
+
+Endringer:
+- `.sp-tags`-raden er fjernet fra stedkortet. Treslag/fuktighet/berggrunn/
+  skogalder/sesong/høyde/sørvendt skråning finnes nå KUN i "Hvorfor her?".
+- Adkomst (parkering/sti) finnes nå kun i adkomst-boksen, ikke lenger også
+  som tags.
+- Kilde (eget sted/auto-hentet) flyttet inn i kommune-linjen under
+  stedsnavnet — det er metadata om proveniens, ikke et vekstvilkår.
+- Flatehogd/egen hogst-merking/ekskludert-varsler samlet i en ny
+  `.sp-status-row` rett under toppen av kortet (sammen med egen
+  funnhistorikk), i stedet for gjemt nederst blant nøytrale fakta-tags.
+- `knownFindsHtml()` fjernet — "kjente Artsdatabanken-funn" er nå én rad i
+  "Hvorfor her?" som viser BEGGE tall når de avviker (f.eks. "2 stk <500 m
+  (5 totalt, nærmest 180 m, 12.08.2025)") i stedet for to steder med to
+  ulike terskler.
+- Høyde/helning vises nå i en dempet metalinje i adkomst-boksen KUN når
+  arten ikke allerede har sin egen ✓/✗/?-rad for dem i "Hvorfor her?" (nye
+  `hasElevationFactor()`/`hasSlopeFactor()`-hjelpere, delt mellom de to
+  stedene som trenger å vite dette) — unngår å gjeninnføre nøyaktig samme
+  type duplisering ett hakk lenger ned på kortet.
+- Alle 12 artenes `why()`-tekst omskrevet til å forklare økologisk
+  sammenheng/identifikasjonstips (mykorrhizapartner, forvekslingsfare,
+  sjeldenhet) i stedet for å gjenta de samme tag-tekstene som allerede vises
+  i "Hvorfor her?".
+- `cardHtml()`/`cardHtmlFavorites()` delte tidligere store deler av markup
+  som to nesten identiske kopier — kilde-tag/status-rad/adkomst-boks er nå
+  skilt ut til `sourceTagHtml()`/`statusRowHtml()`/`accessBoxHtml()`, brukt
+  av begge, for å redusere driftrisikoen fremover.
+
+Resultat: samme informasjon, ca. 35–40 % kortere kort, ingen fakta vist mer
+enn én gang.
+
+Versjon 0.30.7 → 0.31.0.
+
 ## 0.30.7 — Fjern midlertidig debug-diagnostikk
 Standalone-PWA-saken er løst (0.30.6 fikset det faktiske scope-problemet;
 et gjenstående "Load failed" viste seg å være en fastlåst økt spesifikk

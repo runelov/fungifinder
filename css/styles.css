@@ -294,7 +294,22 @@
   .sp-divider-excl { text-align: center; font-family: 'JetBrains Mono', monospace; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.1em; color: var(--danger); margin: 18px 0 10px; opacity: 0.75; }
   .sp-divider-excl::before, .sp-divider-excl::after { content: ''; display: inline-block; width: 40px; height: 1px; background: var(--danger); vertical-align: middle; margin: 0 8px; opacity: 0.4; }
 
-  .sp-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  /* RETTET 2026-08-22 (designgjennomgang: kort-redesign, fase 1) — den
+     tidligere .sp-tags-raden viste treslag/fuktighet/berggrunn/skogalder
+     som pills HER, en gang til som ✓/✗/?-rader i .sp-why-here rett under, og
+     en tredje gang i løpende tekst i .sp-explain (species.why()) — samme
+     fire fakta, tre visuelle former, på samme kort. De fire er fjernet
+     herfra og finnes nå KUN i .sp-why-here. Adkomst (parkering/sti) fjernet
+     herfra av samme grunn — finnes kun i .sp-access-box. Kilde (eget sted/
+     auto-hentet) flyttet inn i .sp-card-kommune-linjen (gjenbruker .sp-tag),
+     og advarsler (hogstår/ekskludert) flyttet til egen .sp-status-row rett
+     under toppen av kortet — se den for begrunnelse. Høyde/helning vises nå
+     KUN i .sp-access-meta når arten IKKE har en egen ✓/✗/?-rad for dem i
+     .sp-why-here (se hasElevationFactor()/hasSlopeFactor() i app.js), for å
+     unngå å gjeninnføre nøyaktig samme duplisering ett hakk lenger ned.
+     .sp-tag selv beholdes (fortsatt brukt av kilde-pillen og andre steder i
+     appen, f.eks. "⏳ beriker …" på ventende funn), kun selve .sp-tags-raden
+     er borte fra stedkortet. */
   .sp-tag { font-size: var(--fs-xs); font-family: 'JetBrains Mono', monospace; padding: 2px 8px; border-radius: 20px; background: rgba(108,122,82,0.18); color: var(--pine-deep); border: 1px solid rgba(108,122,82,0.35); }
   .sp-tag.warn { background: rgba(162,62,46,0.14); color: var(--danger); border-color: rgba(162,62,46,0.35); }
   .sp-tag.good { background: rgba(200,151,74,0.2); color: var(--russet-deep); border-color: rgba(200,151,74,0.45); }
@@ -303,9 +318,19 @@
   .sp-explain { font-size: var(--fs-md); color: var(--ink); margin: 10px 0 6px; padding-left: 12px; border-left: 2px solid var(--gold); }
   .sp-breakdown { font-size: var(--fs-sm); color: var(--ink-soft); margin-bottom: 10px; }
   .sp-breakdown span { font-family: 'JetBrains Mono', monospace; }
-  .sp-hist-note { font-size: var(--fs-sm); color: var(--russet-deep); background: rgba(179,96,42,0.1); border-radius: 3px; padding: 6px 9px; margin-bottom: 8px; }
-  .sp-known-finds { font-size: var(--fs-sm); color: var(--pine-deep); background: rgba(108,122,82,0.12); border-radius: 3px; padding: 6px 9px; margin-bottom: 8px; }
   .sp-cross-tip { font-size: var(--fs-sm); color: var(--ink-soft); margin-bottom: 6px; }
+
+  /* Erstatter tidligere .sp-hist-note (fullbredde boks) — historikk og
+     advarsler (flatehogd/egen hogst-merking/ekskludert) er begge "status
+     for dette stedet", ikke vekstvilkår, og hører nå sammen rett under
+     navnet/gauge-en i stedet for nederst blant nøytrale fakta-tags (se
+     samme RETTET-kommentar over .sp-explain). Gjenbruker paletten fra
+     .sp-tag.good (gull = positivt/bekreftet) og .sp-tag.warn (rust = advarsel)
+     — appen har ingen egen "grønn = bra"-farge, med vilje. */
+  .sp-status-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+  .sp-status-chip { font-family: 'JetBrains Mono', monospace; font-size: var(--fs-xs); font-weight: 600; padding: 3px 9px; border-radius: 20px; }
+  .sp-status-chip.hist { background: rgba(200,151,74,0.22); color: var(--russet-deep); border: 1px solid rgba(200,151,74,0.5); }
+  .sp-status-chip.warn { background: rgba(162,62,46,0.14); color: var(--danger); border: 1px solid rgba(162,62,46,0.35); }
 
   .sp-fav-scorelist { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
   .sp-fav-score-chip { font-family: 'JetBrains Mono', monospace; font-size: var(--fs-xs); padding: 3px 9px; border-radius: 20px; background: rgba(200,151,74,0.2); color: var(--russet-deep); border: 1px solid rgba(200,151,74,0.45); cursor: pointer; }
@@ -315,6 +340,11 @@
   .sp-access-box { font-size: var(--fs-sm); color: var(--ink); background: rgba(52,67,44,0.06); border-radius: 3px; padding: 8px 10px; margin: 8px 0; }
   .sp-access-box div { margin-bottom: 2px; }
   .sp-access-box .sp-access-warn { color: var(--danger); font-weight: 600; }
+  /* Høyde/helning (når ikke allerede dekket av .sp-why-here, se
+     hasElevationFactor()/hasSlopeFactor()) + folketetthet — rene
+     terrengfakta, ikke art-match, derfor en dempet metalinje nederst i
+     adkomst-boksen i stedet for egne tags. */
+  .sp-access-meta { font-size: var(--fs-xs); color: var(--ink-soft); margin-top: 4px; }
 
   /* "Hvorfor her?"-kort — Del 1.4 i "Voksestedslaget"-planen (fig. 3).
      Faktorstolpene under er ren UI-eksponering av felt scoreLocation()
