@@ -1,5 +1,40 @@
 # Endringslogg
 
+## 0.31.3 — Skill artsfakta fra stedsfakta (designgjennomgang del 2)
+To tekstblokker på hvert stedkort var artsgenerelle, ikke stedsspesifikke,
+og gjentok seg ordrett på alle kort for samme art: `species.why()`
+(omskrevet i v0.31.0 til nettopp ikke å referere stedsdata lenger — det
+gjorde den utilsiktet 100 % artsgenerisk i stedet for delvis) og de to
+faste `BASE_MICROTIPS`-tipsene per art. Begge flyttet til artsreferansen
+(`sp-species-info`-boksen), der appen allerede har fieldTips/lookalike —
+ingen tekst er omskrevet eller fjernet, kun flyttet.
+
+- `speciesReferenceExtraHtml()`: ny "Hvorfor & habitat" (`species.why()`)
+  og "Søketips" (`speciesSearchTipsHtml()`, tidl. `BASE_MICROTIPS`)
+  i artsreferansen, enkeltart-modus.
+- `terrainMicrotips()` returnerer nå KUN stedsbetingede tips (fuktighet/
+  skogalder/eget sted) — kan være tom for et gitt sted. `microtipsHtml()`
+  viser da en ærlig "ingen stedsspesifikke observasjoner utover det
+  generelle"-linje i stedet for en tom liste under en overskrift som lovet
+  noe stedsspesifikt appen ikke hadde. Etikett endret fra "Sjekk spesielt
+  i terrenget her" til "Spesielt for dette stedet" (+ artsnavn i
+  favoritt-modus, der beste favoritt kan variere fra kort til kort).
+- **Favoritt-modus manglet motsatt ting helt**: ingen fieldTips/
+  forvekslingsfare/habitat for NOEN favoritt uten å bytte til enkeltart-
+  modus — inkl. en reelt sikkerhetsrelevant forvekslingsfare (matriske vs.
+  spiss giftslørsopp). `favoriteSpeciesReferenceHtml()` gir nå hver
+  favoritt samme fulle artsreferanse i oppsummeringen, bevisst ikke
+  forkortet.
+- `cardHtml()`/`cardHtmlFavorites()`: `.sp-explain` (artsprosaen) fjernet
+  fra kortet.
+
+Verifisert live mot appens demo-data: species-info-boksen viser nå
+"Hvorfor & habitat"/"Søketips", kortene viser kun stedsbetingede tips
+(eller den ærlige tomme-varianten), og favoritt-modus viser full
+artsreferanse — inkl. den fulle giftslørsopp-advarselen — for hver stjernet art.
+
+Versjon 0.31.2 → 0.31.3.
+
 ## 0.31.2 — Skjul "Målepunkter" som eget kartlag inntil videre
 Bruker: laget oppleves for massivt uansett når det slås på, og det holder
 at punkter vises i KONTEKST av et foreslått område (a.members i

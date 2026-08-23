@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.31.2';
-  const APP_BUILD_DATE = '2026-08-22';
+  const APP_VERSION = '0.31.3';
+  const APP_BUILD_DATE = '2026-08-23';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
   // kommentar der) — de to må holdes i sync manuelt siden repoet bevisst
@@ -3164,6 +3164,13 @@
     return Array.from(set).sort((a,b)=>a.localeCompare(b,'no'));
   }
 
+  // RETTET 2026-08-23 (designgjennomgang del 2: "art vs. sted") — disse to
+  // faste tipsene per art var tidligere ALLTID først i terrainMicrotips()
+  // sin liste, identiske på hvert kort for samme art uansett sted — ren
+  // artskunnskap, ikke noe om akkurat DETTE stedet. Flyttet til
+  // artsreferansen (species-info-boksen, se render() og
+  // speciesSearchTipsHtml()) der de vises ÉN gang. Ingen tekst er endret
+  // eller fjernet, kun flyttet — se CHANGELOG for hvor.
   const BASE_MICROTIPS = {
     kantarell: ['Sjekk overgangen mellom tett og glissen skog, gjerne nær foten av eldre graner.', 'Se etter svakt hellende terreng — nok helning til å drenere, men ikke bratt nok til å tørke raskt ut.'],
     traktkantarell: ['Let i tykke mosematter under gammel gran, spesielt i svake forsenkninger.', 'Nordvendte, fuktige skråninger nær bekkedrag er ofte ekstra gode sent i sesongen.'],
@@ -3178,13 +3185,51 @@
     furuknippesopp: ['Se spesielt i gammel, lysåpen furuskog med rikelig reinlav i bunnen — tett/mørk skog er mindre aktuelt.', 'Grav forsiktig i sandjorda ved foten av gamle furutrær; knippene kan ligge delvis skjult under strø/lav.'],
     kransmusserong: ['Let i sandholdig, gammel furuskog — kjenner du en kraftig, kanelaktig lukt fra bakken, er du nære.', 'Sjekk gjerne samme sted flere år på rad — arten kommer ofte tilbake til samme punkt om den ikke forstyrres.']
   };
+  // Rendrer BASE_MICROTIPS for én art som en artsreferanse-seksjon — brukt
+  // fra render() (enkeltart- og favoritt-modus) og fra favoritt-oppsummeringen.
+  function speciesSearchTipsHtml(species){
+    const tips = BASE_MICROTIPS[species.id] || [];
+    if (!tips.length) return '';
+    return `<div class="sp-microtips-label">Søketips (generelt for arten)</div>
+      <ul class="sp-microtips">${tips.map(tip => `<li>${tip}</li>`).join('')}</ul>`;
+  }
+  // "Hvorfor & habitat" (species.why(), se RETTET 2026-08-22 i species-
+  // definisjonene — allerede en ren artsforklaring uten stedsdata etter
+  // fase 1) + søketipsene, samlet i én blokk brukt av BÅDE enkeltart- og
+  // favoritt-modus sin artsreferanse. why() sin (loc,t)-signatur er
+  // historisk (fra da teksten interpolerte stedsdata) — ingen av de 12
+  // artene bruker parameterne lenger, kalles derfor uten argumenter her.
+  function speciesReferenceExtraHtml(species){
+    return `
+      <div class="sp-microtips-label">Hvorfor &amp; habitat</div>
+      <div class="sp-explain" style="margin-top:4px;">${species.why()}</div>
+      ${speciesSearchTipsHtml(species)}`;
+  }
+  // RETTET 2026-08-23 (designgjennomgang del 2) — favoritt-modus viste
+  // tidligere INGEN artsfakta for noen favoritt (motsatt feil av
+  // hovedproblemet på kortene). Bevisst full lengde, ikke forkortet —
+  // forvekslingsfare kan være sikkerhetskritisk (se f.eks. matriske/
+  // giftslørsopp), og skal ikke krympes bort for å spare plass.
+  function favoriteSpeciesReferenceHtml(sp){
+    return `<div class="sp-fav-species-ref">
+      <div class="sp-fav-species-name">${escapeHtml(sp.name)}<em>${escapeHtml(sp.latin)}</em></div>
+      <div class="sp-fav-species-body">${sp.fieldTips}</div>
+      <div class="sp-lookalike"><b>⚠ Forvekslingsfare:</b> ${sp.lookalike}</div>
+      ${speciesReferenceExtraHtml(sp)}
+    </div>`;
+  }
+  // RETTET 2026-08-23: returnerer nå KUN stedsbetingede tips (fuktighet/
+  // skogalder/eget sted) — de to artsgenerelle BASE_MICROTIPS-tipsene er
+  // flyttet ut, se speciesSearchTipsHtml(). Kan derfor være tom for et gitt
+  // sted (typisk maks 3 stk: fuktig ELLER tørr, pluss gammel, pluss eget
+  // sted) — det er forventet og korrekt, ikke en feil, se microtipsHtml().
   function terrainMicrotips(species, loc){
-    const tips = [...(BASE_MICROTIPS[species.id] || [])];
+    const tips = [];
     if (loc.fuktighet === 'fuktig') tips.push('Terrenget er gjennomgående fuktig her — finner du lite i selve bunnen, prøv de tørreste mikro-hevningene (tuer, rotvelter).');
     if (loc.fuktighet === 'tørr') tips.push('Terrenget er tørt generelt — oppsøk eventuelle fuktigere lommer, bekkedrag eller nordvendte skråninger i nærheten.');
     if (loc.skogalder === 'gammel') tips.push('Gammel skog gir trolig godt utviklet mosedekke og dødt trevirke — positivt tegn for de fleste mykorrhizasopper.');
     if (loc.custom) tips.push('Dette er ditt eget erfarne sted: prøv å kjenne igjen nøyaktig hvilken del av terrenget som pleide å gi funn, og sjekk om den er intakt.');
-    return tips.slice(0,4);
+    return tips;
   }
 
   function seasonTiming(species){
@@ -4495,6 +4540,24 @@
         </div>`;
   }
 
+  // RETTET 2026-08-23 (designgjennomgang del 2: "art vs. sted") — erstatter
+  // den tidligere faste "Sjekk spesielt i terrenget her"-overskriften +
+  // species.why()-prosaen over den. terrainMicrotips() returnerer nå kun
+  // stedsbetingede tips og kan være tom — i så fall sier kortet det ærlig
+  // i stedet for en tom liste under en overskrift som lover noe
+  // stedsspesifikt appen ikke har. `speciesLabel` brukes kun i
+  // favoritt-modus, der beste favoritt kan variere fra kort til kort.
+  function microtipsHtml(species, loc, speciesLabel){
+    const tips = terrainMicrotips(species, loc);
+    const label = 'Spesielt for dette stedet' + (speciesLabel ? ` (${escapeHtml(species.name)})` : '');
+    if (!tips.length) {
+      return `<div class="sp-microtips-label">${label}</div>
+        <div class="sp-microtips-empty">Ingen stedsspesifikke observasjoner utover det generelle for ${escapeHtml(species.name.toLowerCase())} — se artsinfo over resultatlisten.</div>`;
+    }
+    return `<div class="sp-microtips-label">${label}</div>
+      <ul class="sp-microtips">${tips.map(tip => `<li>${tip}</li>`).join('')}</ul>`;
+  }
+
   function cardHtml(loc, res){
     const finds = findsFor(loc.id);
     const w = res.weather;
@@ -4511,9 +4574,7 @@
         ${statusRowHtml(loc, res)}
         ${whyHereHtml(species, loc, res)}
         ${accessBoxHtml(loc, res, species)}
-        <div class="sp-explain">${species.why(loc, locTexts(loc))}</div>
-        <div class="sp-microtips-label">Sjekk spesielt i terrenget her</div>
-        <ul class="sp-microtips">${terrainMicrotips(species, loc).map(tip => `<li>${tip}</li>`).join('')}</ul>
+        ${microtipsHtml(species, loc)}
         ${crossSpeciesTipsHtml(loc, species.id)}
         ${w ? `<div class="sp-breakdown">Vær nå: <span>${w.precip14} mm</span> nedbør siste 14 dager, snitt temp <span>${w.tempAvg ?? '–'}°C</span>. ${res.weatherVerdict || ''}</div>` : ''}
         ${finds.length ? `<div class="sp-findlist">${finds.map(f => `<div class="sp-find-row"><span>${escapeHtml(SPECIES.find(s=>s.id===f.speciesId)?.name || f.speciesId)} — ${escapeHtml(f.date)}</span><span class="sp-dots">${[1,2,3,4,5].map(n=>`<span class="${n<=f.mengde?'filled':''}"></span>`).join('')}</span></div>`).join('')}</div>` : ''}
@@ -4549,9 +4610,7 @@
         ${statusRowHtml(loc, res)}
         ${whyHereHtml(topSpecies, loc, res)}
         ${accessBoxHtml(loc, res, topSpecies)}
-        <div class="sp-explain"><b>${escapeHtml(topSpecies.name)}:</b> ${topSpecies.why(loc, locTexts(loc))}</div>
-        <div class="sp-microtips-label">Sjekk spesielt i terrenget her (for ${escapeHtml(topSpecies.name)})</div>
-        <ul class="sp-microtips">${terrainMicrotips(topSpecies, loc).map(tip => `<li>${tip}</li>`).join('')}</ul>
+        ${microtipsHtml(topSpecies, loc, true)}
         ${crossSpeciesTipsHtml(loc, topSpecies.id, { hideFavorites: true })}
         ${w ? `<div class="sp-breakdown">Vær nå: <span>${w.precip14} mm</span> nedbør siste 14 dager, snitt temp <span>${w.tempAvg ?? '–'}°C</span>. ${res.weatherVerdict || ''}</div>` : ''}
         ${finds.length ? `<div class="sp-findlist">${finds.map(f => `<div class="sp-find-row"><span>${escapeHtml(SPECIES.find(s=>s.id===f.speciesId)?.name || f.speciesId)} — ${escapeHtml(f.date)}</span><span class="sp-dots">${[1,2,3,4,5].map(n=>`<span class="${n<=f.mengde?'filled':''}"></span>`).join('')}</span></div>`).join('')}</div>` : ''}
@@ -4705,10 +4764,21 @@
     if (viewMode === 'favorites') {
       _currentSpecies = null;
       document.getElementById('sp-results-title').textContent = 'Forslag for dine favoritter';
-      const favNames = favoriteSpecies.map(id => SPECIES.find(s => s.id === id)?.name).filter(Boolean);
+      const favSpecies = favoriteSpecies.map(id => SPECIES.find(s => s.id === id)).filter(Boolean);
+      const favNames = favSpecies.map(s => s.name);
+      // RETTET 2026-08-23 (designgjennomgang del 2: "art vs. sted") —
+      // favoritt-modus viste FØR dette ingen artsfakta i det hele tatt for
+      // NOEN favoritt (verken utseende, forvekslingsfare eller habitat) —
+      // måtte bytte til enkeltart-modus for å se dem. Motsatt feil av
+      // hovedproblemet på kortene (som viste for MYE artsgenerisk tekst per
+      // sted), men samme rotårsak: artsfakta manglet et fast hjem. Én
+      // referanse-blokk per favoritt under oppsummeringen, se
+      // favoriteSpeciesReferenceHtml() — bevisst IKKE forkortet (spesielt
+      // forvekslingsfare kan være sikkerhetskritisk, se f.eks. matriske).
       document.getElementById('sp-species-info').innerHTML = favNames.length
         ? `<div class="sp-species-info-top"><div class="sp-si-name">Dine favoritter</div></div>
-           <div class="sp-species-info-body">${favNames.join(', ')} — hvert sted under vises med score for hver av disse, sortert på beste treff.</div>`
+           <div class="sp-species-info-body">${favNames.join(', ')} — hvert sted under vises med score for hver av disse, sortert på beste treff.</div>
+           ${favSpecies.map(favoriteSpeciesReferenceHtml).join('')}`
         : `<div class="sp-species-info-body">Ingen favoritter valgt ennå — klikk ★ på artene i lista til venstre for å legge dem til.</div>`;
 
       // Hvert sted får score for ALLE favoritter (favResults), sortert best
@@ -4747,6 +4817,7 @@
         <div class="sp-timing-bar"><div class="sp-timing-bar-marker" style="left:${timing.pct}%"></div></div>
         <div class="sp-species-info-body">${species.fieldTips}</div>
         <div class="sp-lookalike"><b>⚠ Forvekslingsfare:</b> ${species.lookalike}</div>
+        ${speciesReferenceExtraHtml(species)}
       `;
 
       scoredAll = locsAll.map(loc => ({ loc, res: scoreLocation(species, loc) }));

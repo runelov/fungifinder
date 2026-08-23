@@ -343,6 +343,15 @@
   .sp-fav-score-chip.cut { background: rgba(162,62,46,0.1); color: var(--danger); border-color: rgba(162,62,46,0.3); text-decoration: line-through; opacity: 0.7; }
   .sp-fav-score-chip b { font-weight: 700; }
 
+  /* Artsreferanse per favoritt i sp-species-info (designgjennomgang del 2,
+     2026-08-23) — samme "ett hjem for artsfakta"-prinsipp som enkeltart-
+     modus, gjentatt én gang per favoritt i stedet for én gang per art totalt
+     (siden favoritt-modus ikke har noe enkelt "valgt art" å knytte det til). */
+  .sp-fav-species-ref { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .sp-fav-species-name { font-family: 'Fraunces', serif; font-weight: 600; font-size: var(--fs-md); color: var(--pine-deep); }
+  .sp-fav-species-name em { font-style: italic; font-weight: 400; color: var(--ink-soft); margin-left: 6px; font-size: var(--fs-sm); }
+  .sp-fav-species-body { font-size: var(--fs-sm); color: var(--ink); margin: 4px 0; }
+
   .sp-access-box { font-size: var(--fs-sm); color: var(--ink); background: rgba(52,67,44,0.06); border-radius: 3px; padding: 8px 10px; margin: 8px 0; }
   .sp-access-box div { margin-bottom: 2px; }
   .sp-access-box .sp-access-warn { color: var(--danger); font-weight: 600; }
@@ -455,6 +464,11 @@
   .sp-microtips { margin: 8px 0 10px; padding-left: 18px; }
   .sp-microtips li { font-size: var(--fs-md); color: var(--ink); margin-bottom: 4px; }
   .sp-microtips-label { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--russet-deep); font-weight: 600; margin-top: 8px; }
+  /* RETTET 2026-08-23 (designgjennomgang del 2) — terrainMicrotips() kan nå
+     være tom for et gitt sted (de artsgenerelle tipsene er flyttet til
+     artsreferansen, se speciesSearchTipsHtml()); vis det ærlig i stedet for
+     en tom <ul> under "Spesielt for dette stedet". */
+  .sp-microtips-empty { font-size: var(--fs-sm); color: var(--ink-soft); font-style: italic; margin: 4px 0 10px; }
 
   .sp-timing-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0 12px; }
   .sp-timing-badge { font-family: 'JetBrains Mono', monospace; font-size: var(--fs-xs); padding: 4px 11px; border-radius: 20px; white-space: nowrap; }
