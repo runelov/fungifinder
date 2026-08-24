@@ -256,6 +256,11 @@
   .sp-nibio-gradient-bar { height: 8px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
   .sp-nibio-gradient-labels { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-soft); margin-top: 3px; }
   .sp-nibio-legend-context { font-size: var(--fs-xs); color: var(--ink-soft); line-height: 1.5; margin-top: 5px; padding-left: 2px; }
+  /* RETTET 2026-08-24, runde 3 (NIBIO_MIN_ZOOM i app.js) — --gold brukt som
+     "legg merke til dette"-signal, samme farge som "middels score"-prikken
+     i den andre legend-seksjonen, så det ikke introduserer en helt ny
+     fargekode i panelet. */
+  .sp-nibio-zoom-hint { display: flex; align-items: flex-start; gap: 6px; font-size: var(--fs-xs); color: var(--russet-deep); line-height: 1.5; background: rgba(200,151,74,0.16); border: 1px solid rgba(200,151,74,0.4); border-radius: 6px; padding: 6px 9px; margin-bottom: 8px; }
 
   .sp-results-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
   .sp-results-head h2 { font-family: 'Fraunces', serif; font-size: 19px; margin: 0; color: var(--pine-deep); }

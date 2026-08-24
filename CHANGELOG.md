@@ -1,5 +1,53 @@
 # Endringslogg
 
+## 0.32.3 — NIBIO-lag: zoom-hint i stedet for stille tomt kart
+
+Bruker-rapport: velger "Bonitet" som kartlag og klikker Lukk — ingenting
+tegnes i kartet. Innhold dukker først opp når man zoomer mye inn, og vises
+ikke på kommunenivå (eksempel: Indre Østfold). Bruker spurte eksplisitt: er
+det slik for alle tre NIBIO-lagene, og hvordan bør det håndteres?
+
+**Rotårsak, verifisert empirisk, ikke antatt:**
+- NIBIOs egen `GetCapabilities` for `sr16`-tjenesten oppgir
+  `MaxScaleDenominator=100005` for **alle tre** lag (`SRVTRESLAG`,
+  `SRVBONITET`, `SRVKRONEDEK`) — identisk grense, altså ja, samme for alle
+  tre.
+- Hentet ekte `GetMap`-bilder for Bonitet på Indre Østfold (59.5°N) for
+  Leaflet-zoom 8–15 og målte andel ikke-transparente piksler: 0 % ved zoom
+  8–11 (byte-identisk 2561-byte tomt svar på alle fire nivåer — NIBIOs
+  server *nekter å tegne noe i det hele tatt*, ikke en datalakune), 54,3 %
+  ved zoom 12. Krysningspunktet ligger mellom zoom 11 og 12 — nøyaktig det
+  nivået et kommune-utsnitt typisk fittes til, derfor "ingenting på
+  kommunenivå".
+
+**Løsning, to deler:**
+1. `minZoom: 12` lagt til på selve WMS-laget (`nibioLayer()` i `initMap()`,
+   `js/app.js`) — Leaflet ber da ikke lenger NIBIO om fliser under den
+   terskelen der de uansett kommer tomme tilbake.
+2. Nytt zoom-hint i `#sp-nibio-legend` (`renderNibioLegend()`): når et
+   NIBIO-lag er aktivt og kartet er zoomet lenger ut enn nivå 12, vises
+   "🔍 Zoom inn (til nabolagsnivå) for at NIBIO-laget skal tegnes i
+   kartet — vises ikke på kommune-/fylkesnivå. Dette er en begrensning i
+   NIBIOs egen kartjeneste, ikke en feil." øverst i legend-panelet, i
+   stedet for et stille tomt kart. Selve fargeforklaringen vises fortsatt
+   under hintet uansett zoomnivå, slik at man vet hva man vil finne når man
+   zoomer inn. Hintet oppdateres live via en ny `zoomend`-lytter i
+   `initMap()` (tidligere ble legend-panelet kun re-rendret ved
+   av/på-kryssing av lag eller ved `render()`).
+
+`NIBIO_MIN_ZOOM = 12` er et bevisst konservativt, delt tall (definert én
+gang, brukt begge steder over) — mpp (meter per piksel) ved gitt zoom
+synker med økende breddegrad, så nord i Norge nås NIBIOs skala-terskel ved
+en litt lavere zoom enn 12 i praksis. 12 er trygt for hele landet (Sør-Norge
+er "verste fall" i denne beregningen), aldri for sent.
+
+Ny CSS-klasse `.sp-nibio-zoom-hint` (`css/styles.css`) — gjenbruker
+`--gold`/`--russet-deep` (samme signalfarge som "middels score"-prikken i
+den andre legend-seksjonen) i stedet for å introdusere en ny fargekode i
+panelet.
+
+Verifisert: `node --check js/app.js`, `npm test` (84/84 grønn).
+
 ## 0.32.2 — Legend-panel: samlet, kontekstavhengig, ekte fargeswatsjer
 Fire nye funn fra videre admin-testing av v0.32.1:
 
