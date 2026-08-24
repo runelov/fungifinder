@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.31.5';
-  const APP_BUILD_DATE = '2026-08-23';
+  const APP_VERSION = '0.32.0';
+  const APP_BUILD_DATE = '2026-08-24';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
   // kommentar der) — de to må holdes i sync manuelt siden repoet bevisst
@@ -220,62 +220,6 @@
     { id:'demo-1', name:'Eksempelskog A (demo)', fylke:'Demo', kommune:'Demo', lat:60.0, lon:10.0, treslag:['gran','bjork'], skogalder:'gammel', fuktighet:'frisk', berggrunn:'fattig', avstandVeiM:null, befolkning:'ukjent', hogstAr:null, kjenteFunn:[], custom:false, kjorbarVei:'ukjent', parkeringNotat:'Logg inn for ekte steder', stier:'ukjent', avstandStiM:null, avstandParkeringM:null },
     { id:'demo-2', name:'Eksempelskog B (demo)', fylke:'Demo', kommune:'Demo', lat:60.2, lon:10.4, treslag:['furu'], skogalder:'middels', fuktighet:'tørr', berggrunn:'moderat', avstandVeiM:null, befolkning:'ukjent', hogstAr:null, kjenteFunn:[], custom:false, kjorbarVei:'ukjent', parkeringNotat:'Logg inn for ekte steder', stier:'ukjent', avstandStiM:null, avstandParkeringM:null }
   ];
-
-  // ---------- Voksestedslag: per-art fargekode ----------
-  // Del 1.3 i "Voksestedslaget"-planen (2026-08-16, se
-  // https://claude.ai/code/artifact/70ef4f71-bc60-4973-a35c-cd34755351b0) —
-  // én kulør per art i stedet for appens delte score-fargeskala
-  // (scoreColor under, fortsatt brukt av de vanlige markørene/Målepunkter-
-  // laget). Kulør identifiserer ARTEN, metning/lyshet innenfor kuløren er
-  // SCOREN. Valgt til å minne om artens faktiske utseende der det gir
-  // mening (kantarell=gul, steinsopp=rødbrun) — ren UI/konfigurasjon, ingen
-  // ny data, ingen backend-endring.
-  const SPECIES_HUE = {
-    kantarell: '#C9922C',
-    traktkantarell: '#8A7358',
-    trompetsopp: '#5B4B66',
-    steinsopp: '#8A5A34',
-    rodskrubb: '#B3552E',
-    matriske: '#C2632A',
-    piggsopp: '#CBAE82',
-    faresopp: '#B7AF92',
-    parasollsopp: '#A9895E',
-    sjampinjong: '#B98A7A',
-    furuknippesopp: '#8C8268',
-    kransmusserong: '#7A4B3A'
-  };
-
-  function hexToRgb(hex){
-    const n = parseInt(hex.slice(1), 16);
-    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
-  }
-  function mixHex(hexA, hexB, t){
-    t = Math.max(0, Math.min(1, t));
-    const a = hexToRgb(hexA), b = hexToRgb(hexB);
-    const r = Math.round(a.r + (b.r - a.r) * t);
-    const g = Math.round(a.g + (b.g - a.g) * t);
-    const bl = Math.round(a.b + (b.b - a.b) * t);
-    return '#' + [r, g, bl].map(v => v.toString(16).padStart(2, '0')).join('');
-  }
-  // Lys→mørk-skala for én art, generert fra én enkelt basiskulør i stedet
-  // for håndplukkede stopp — "kulør ved 60%" matcher gradient-oppsettet i
-  // plandokumentets fig. 2.
-  function speciesGradientStops(hex){
-    return { light: mixHex(hex, '#ffffff', 0.72), mid: hex, dark: mixHex(hex, '#000000', 0.55) };
-  }
-  function speciesGradientCss(hex){
-    const s = speciesGradientStops(hex);
-    return `linear-gradient(90deg, ${s.light}, ${s.mid} 60%, ${s.dark})`;
-  }
-  // Fargen på ETT punkt i voksestedslaget: kulør = art, lyshet = score
-  // (0–100). Samme 60 %-knekkpunkt som speciesGradientCss over, slik at
-  // punktfargen på kartet og tegnforklaringens stolpe alltid stemmer
-  // visuelt overens.
-  function speciesPointColor(hex, score){
-    const s = speciesGradientStops(hex);
-    const pct = Math.max(0, Math.min(100, score)) / 100;
-    return pct <= 0.6 ? mixHex(s.light, s.mid, pct / 0.6) : mixHex(s.mid, s.dark, (pct - 0.6) / 0.4);
-  }
 
   // Arter som er kjent for å foretrekke varme, soleksponerte vokseplasser —
   // brukes til å gi et lite tillegg for sørvendte skråninger når vi har ekte
@@ -847,7 +791,7 @@
       adminPanel.hidden = !isAdmin();
       if (isAdmin()) { renderAdminBrukere(); renderAdminInvitasjoner(); renderAdminStatistikk(); }
     }
-    updateVoksestedslagAvailability();
+    updateNibioLayersAvailability();
   }
 
   function wireLoginForm(){
@@ -3267,13 +3211,19 @@
   let findsLayer = null;
   let artskartLayer = null;
   let delteFunnLayer = null; // andre brukeres delte funn — se loadDelteFunn()/renderDelteFunnLayer()
-  let voksestedslagLayer = null; // fargelag per art/score — se renderVoksestedslag()
   // RETTET 2026-08-22 (kart-lagfiks, fase 2) — eget, alltid-på infrastruktur-
   // lag (ikke i lag-kontrollen, akkurat som radiusLayer/routeLayer) for å
   // vise ETT enkelt punkt uten å måtte slå på hele markerLayer. Se
   // locateOnMap().
   let singlePointLayer = null;
-  let layersControl = null; // L.control.layers-instansen — se updateVoksestedslagAvailability()
+  // RETTET 2026-08-24 (designgjennomgang: voksestedslag) — det tidligere
+  // punktbaserte fargelaget (renderVoksestedslag(), SPECIES_HUE m.fl.) er
+  // fjernet og erstattet med tre NIBIO WMS-referanselag (ekte skogfigurer,
+  // se nibioLayer()/initMap()). Se CHANGELOG for begrunnelse/research.
+  let nibioTreslagLayer = null;
+  let nibioBonitetLayer = null;
+  let nibioKronedekLayer = null;
+  let layersControl = null; // L.control.layers-instansen — se updateNibioLayersAvailability()
   let artskartMoveDebounce = null; // se moveend-lytteren i initMap()
   let findMarkersById = {};
   let mapFittedOnce = false;
@@ -3601,23 +3551,17 @@
     // laget ikke er på kartet ennå), og locateOnMap()/handleMapMarkerClick()
     // skrur det på automatisk igjen når man faktisk trenger å se et punkt.
     markerLayer = L.layerGroup();
-    // Voksestedslaget starter AV, samme begrunnelse som Målepunkter-laget
-    // over (se kommentaren der) — pluss at det er et alternativt, ikke et
-    // tillegg til, den vanlige markørvisningen. renderVoksestedslag() fyller
-    // laget uansett på/av-tilstand, slik at det er ferdig tegnet i det
-    // øyeblikket avkrysningen skrus på.
-    voksestedslagLayer = L.layerGroup();
     // RETTET 2026-08-22 (kart-lagfiks, fase 3) — Leaflet stabler lag i
     // overlayPane etter DEN REKKEFØLGEN de legges til kartet, ikke etter
     // noen egen z-index. routeLayer ("Foreslåtte områder") lå tidligere FØR
     // artskartLayer/delteFunnLayer her, så artsfunn-prikker (default PÅ)
     // ble alltid tegnet OVENPÅ områdesirklene (default PÅ) — se
     // designgjennomgangen 2026-08-22. routeLayer flyttet til etter dem,
-    // slik at områdegrensen alltid vinner. (markerLayer/voksestedslagLayer
-    // starter av og legges til dynamisk når brukeren skrur dem på —
-    // de havner uansett øverst av alle i det øyeblikket, siden Leaflet
-    // legger et lag til på slutten av paneet ved addLayer(); det er en
-    // separat, akseptert avveining, ikke noe denne rettelsen dekker.)
+    // slik at områdegrensen alltid vinner. (markerLayer starter av og
+    // legges til dynamisk når brukeren skrur det på — det havner uansett
+    // øverst av alle i det øyeblikket, siden Leaflet legger et lag til på
+    // slutten av paneet ved addLayer(); det er en separat, akseptert
+    // avveining, ikke noe denne rettelsen dekker.)
     radiusLayer = L.layerGroup().addTo(leafletMap);
     hogstLayer = L.layerGroup().addTo(leafletMap);
     findsLayer = L.layerGroup().addTo(leafletMap);
@@ -3626,16 +3570,56 @@
     routeLayer = L.layerGroup().addTo(leafletMap);
     singlePointLayer = L.layerGroup().addTo(leafletMap);
 
+    // RETTET 2026-08-24 (designgjennomgang: voksestedslag) — det tidligere
+    // punktbaserte fargelaget (rutenett-firkanter, konfetti-effekt, se
+    // CHANGELOG) er erstattet med tre NIBIO WMS-referanselag: ferdig
+    // rendrede kartbilder av ekte skogfigurer (samme datakilde,
+    // SRVTRESLAG/SRVBONITET/SRVKRONEDEK, som terrengscoringen allerede
+    // stoler på for treslag). Ingen ETL, ingen ny backend — vanlig
+    // L.tileLayer.wms() akkurat som topoLayer/standardLayer over.
+    //
+    // Egen pane med fast zIndex mellom bunnkartet (tilePane, 200) og
+    // appens egne sirkler/markører (overlayPane 400 / markerPane 600) —
+    // UAVHENGIG av når laget faktisk slås på. Uten dette ville disse
+    // lagene rammet AKKURAT samme z-rekkefølge-bug som satellittlaget
+    // hadde (se RETTET-kommentaren over): siden de starter av og legges
+    // til dynamisk, ville Leaflet stablet dem øverst av alt — inkl. over
+    // Foreslåtte områder/Mine funn/Artsdatabanken-funn — i det øyeblikket
+    // en admin slår dem på. En fast pane løser dette permanent, uavhengig
+    // av addLayer()-rekkefølge, i stedet for å måtte huske riktig
+    // .addTo()-rekkefølge for hvert fremtidig lag (slik satellitt-fiksen
+    // måtte).
+    leafletMap.createPane('nibioPane');
+    leafletMap.getPane('nibioPane').style.zIndex = 350;
+    // 55% opacitet — testet direkte (pikselnøyaktig komposittert med et
+    // ekte topo-utsnitt): ved full opasitet druknet høydekoter/stier/
+    // stedsnavn nesten helt, ved 55% er begge deler leselige samtidig.
+    function nibioLayer(layerName){
+      return L.tileLayer.wms('https://wms.nibio.no/cgi-bin/sr16', {
+        layers: layerName,
+        format: 'image/png',
+        transparent: true,
+        version: '1.3.0',
+        opacity: 0.55,
+        pane: 'nibioPane',
+        attribution: 'Skogdata &copy; <a href="https://www.nibio.no/">NIBIO</a> (SR16)'
+      });
+    }
+    nibioTreslagLayer = nibioLayer('SRVTRESLAG');
+    nibioBonitetLayer = nibioLayer('SRVBONITET');
+    nibioKronedekLayer = nibioLayer('SRVKRONEDEK');
+
     // Lag-kontroll: bytt bakgrunnskart (radioknapper) og skru målepunkter/
     // rundtur/hogstfelt/funn av/på (avkrysning) — praktisk når man vil se
     // rent terreng for å merke seg egne funnsteder uten at prikkene er i veien.
-    // "Voksestedslag (fargelag)" er BEVISST IKKE med i den statiske
-    // overlay-listen her — isAdmin() er alltid usann i det øyeblikket
-    // initMap() kjører (currentUser settes først når initAuth() resolves
-    // ETTER initMap(), se init()), så et betinget objekt-literal her ville
-    // aldri fått med laget, selv for en faktisk admin. Legges i stedet til
+    // NIBIO-referanselagene er BEVISST IKKE med i den statiske overlay-
+    // listen her — isAdmin() er alltid usann i det øyeblikket initMap()
+    // kjører (currentUser settes først når initAuth() resolves ETTER
+    // initMap(), se init()), så et betinget objekt-literal her ville aldri
+    // fått med lagene, selv for en faktisk admin. Legges i stedet til
     // dynamisk via layersControl.addOverlay()/removeOverlay(), se
-    // updateVoksestedslagAvailability() (kalt fra reflectAccountUi()).
+    // updateNibioLayersAvailability() (kalt fra reflectAccountUi()) — admin-
+    // only inntil videre ("valider i ro og mak" før bredere utrulling).
     // RETTET 2026-08-24 (designgjennomgang: kartlagsvelger åpne/lukke) —
     // L.Control.Layers med collapsed:true (under) gjør selv
     // `this._map.on("click", this.collapse, this)` i sin _initLayout()
@@ -3684,14 +3668,6 @@
     L.DomEvent.on(layersCloseBtn, 'click', (e) => {
       L.DomEvent.stop(e);
       layersControl.collapse();
-    });
-
-    // Tegnforklaring/dekningstekst for voksestedslaget vises kun mens laget
-    // faktisk er på kartet — se renderVoksestedslagLegend()/
-    // renderVoksestedslagCoverage() (fylles uansett) og
-    // voksestedslagPanelsVisible() (styrer synlighet).
-    leafletMap.on('overlayadd overlayremove', (e) => {
-      if (e.layer === voksestedslagLayer) voksestedslagPanelsVisible(e.type === 'overlayadd');
     });
 
     leafletMap.on('click', (e) => {
@@ -3908,120 +3884,40 @@
     }
   }
 
-  // ---------- Voksestedslag (dekningsbevisst fargelag) ----------
+  // ---------- NIBIO-referanselag (treslag/bonitet/kronedekning) ----------
   //
-  // Del 1.1/1.2 i "Voksestedslaget"-planen: et rendringslag bygget
-  // UTELUKKENDE på scoredAll — samme allerede-lastede/allerede-scorede
-  // punkter som renderMap() over tegner som sirkelmarkører — pluss
-  // SPECIES_HUE/speciesPointColor (se toppen av filen). Ingen ny
-  // backend-endring, ingen ny tabell, ingen egen henting: laget er en ren
-  // alternativ tegning av data appen allerede har lastet inn for det
-  // synlige området.
-  //
-  // Hvilken art et gitt punkt fargelegges etter: i favoritt-modus brukes
-  // samme "beste favoritt her"-logikk som resten av kortene (favResults[0],
-  // se cardHtmlFavorites/scoreForRoute) — ett punkt kan kun ha ÉN farge.
-  function speciesForVoksestedspunkt(item){
-    if (viewMode === 'favorites') {
-      return (item.favResults && item.favResults[0]) ? item.favResults[0].species : null;
-    }
-    return _currentSpecies;
-  }
-
-  // Tegner ett lite, kant-løst rektangel per punkt (ikke sirkel — leser mer
-  // som en rutenett-"celle" enn en markør, nærmere fig. 1 i planen) i
-  // stedet for interpolasjon mellom punkter. dLon korrigeres for breddegrad
-  // slik at cellen ser tilnærmet kvadratisk ut både i Sør- og Nord-Norge.
-  // Flatehogde steder (res.isCut) hoppes over — samme eksklusjon som
-  // resten av appen bruker, et nylig hogd punkt skal ikke se ut som et godt
-  // voksested her heller.
-  function renderVoksestedslag(scoredAll){
-    if (!voksestedslagLayer) return;
-    voksestedslagLayer.clearLayers();
-    scoredAll.forEach(item => {
-      const { loc, res } = item;
-      if (res.isCut) return;
-      const species = speciesForVoksestedspunkt(item);
-      if (!species) return;
-      const hue = SPECIES_HUE[species.id] || SPECIES_HUE.kantarell;
-      const fill = speciesPointColor(hue, res.total);
-      const dLat = 0.0021;
-      const dLon = dLat / Math.max(0.3, Math.cos(loc.lat * Math.PI / 180));
-      const rect = L.rectangle(
-        [[loc.lat - dLat, loc.lon - dLon], [loc.lat + dLat, loc.lon + dLon]],
-        { stroke: false, fillColor: fill, fillOpacity: 0.7 }
-      );
-      rect.bindTooltip(`${escapeHtml(species.name)}: ${res.total}`, { direction: 'top', offset: [0, -4] });
-      rect.on('click', () => handleMapMarkerClick(loc));
-      rect.addTo(voksestedslagLayer);
-    });
-  }
-
-  // Dekningstekst — ALDRI en areal-/prosentandel av kommunen (appen har
-  // ikke kommunens faktiske polygonareal tilgjengelig klientsidig), kun et
-  // reelt telt antall tegnede punkter. Samme ærlighetsprinsipp som
-  // "tynt datagrunnlag"-linjen over "Foreslå områder" (se
-  // AREA_COVERAGE_THIN_THRESHOLD): ingen tall appen ikke kan stå inne for.
-  function renderVoksestedslagCoverage(scoredAll){
-    const el = document.getElementById('sp-voksested-coverage');
-    if (!el) return;
-    const painted = scoredAll.filter(item => !item.res.isCut && speciesForVoksestedspunkt(item)).length;
-    el.textContent = painted === 0
-      ? 'Ingen fargelagte punkter i valgt område ennå — terrengdata er ikke hentet her.'
-      : `Fargelegger ${painted} kjent${painted === 1 ? '' : 'e'} punkt${painted === 1 ? '' : 'er'} i valgt område. Fargelaget dekker kun der terrengdata faktisk er hentet — resten av kartet vises umerket, ingen interpolering mellom punktene.`;
-  }
-
-  function voksestedslagRelevantSpecies(){
-    if (viewMode === 'favorites' && favoriteSpecies.length) {
-      return favoriteSpecies.map(id => SPECIES.find(s => s.id === id)).filter(Boolean);
-    }
-    return _currentSpecies ? [_currentSpecies] : [];
-  }
-
-  // Tegnforklaring (fig. 2) — én rad per relevant art (valgt art, eller alle
-  // favoritter i favoritt-modus), gjenbrukt fra samme SPECIES_HUE/
-  // speciesGradientCss som selve fargelaget, slik at stolpen alltid stemmer
-  // visuelt med punktfargene på kartet.
-  function renderVoksestedslagLegend(){
-    const el = document.getElementById('sp-voksested-legend');
-    if (!el) return;
-    const species = voksestedslagRelevantSpecies();
-    el.innerHTML = species.map(sp => `
-      <div class="sp-vlegend-row">
-        <span class="sp-vlegend-name">${escapeHtml(sp.name)}</span>
-        <span class="sp-vlegend-bar" style="background:${speciesGradientCss(SPECIES_HUE[sp.id] || SPECIES_HUE.kantarell)}"></span>
-        <span class="sp-vlegend-labels"><span>lav</span><span>høy</span></span>
-      </div>`).join('');
-  }
-
-  function voksestedslagPanelsVisible(visible){
-    const legend = document.getElementById('sp-voksested-legend');
-    const coverage = document.getElementById('sp-voksested-coverage');
-    if (legend) legend.style.display = visible ? 'flex' : 'none';
-    if (coverage) coverage.style.display = visible ? 'block' : 'none';
-  }
-
-  // Voksestedslaget er admin-only inntil videre (bruker-ønske 2026-08-16:
-  // "gjør voksestedslaget kun tilgjengelig for admin frem til jeg er
-  // fornøyd med kvaliteten") — legges til/fjernes fra selve
-  // lag-kontrollen dynamisk her, i stedet for kun å styre CSS-synlighet,
-  // slik at vanlige brukere verken ser avkrysningen eller kan skru den på
-  // via DevTools. Kalt fra reflectAccountUi() (dermed ved oppstart,
-  // innlogging og utlogging).
-  function updateVoksestedslagAvailability(){
-    if (!layersControl || !voksestedslagLayer) return;
+  // Erstatter det tidligere punktbaserte "voksestedslaget" (fjernet
+  // 2026-08-24, se CHANGELOG) — isolerte firkanter på et 1,5 km rutenett
+  // ga aldri annet enn et konfetti-inntrykk, uansett fargevalg. I stedet
+  // for å bygge egen rendring viser disse laget NIBIOs EGNE, ferdig
+  // rendrede WMS-kartbilder (ekte skogfigurer, samme datakilde som
+  // terrengscoringen for treslag) — se nibioLayer()/initMap() for selve
+  // laget. Admin-only inntil videre, samme begrunnelse som forgjengeren
+  // hadde ("valider i ro og mak" før bredere utrulling) — legges til/
+  // fjernes fra selve lag-kontrollen dynamisk her, i stedet for kun å
+  // styre CSS-synlighet, slik at vanlige brukere verken ser avkrysningene
+  // eller kan skru dem på via DevTools. Kalt fra reflectAccountUi()
+  // (dermed ved oppstart, innlogging og utlogging).
+  function updateNibioLayersAvailability(){
+    if (!layersControl) return;
+    const entries = [
+      [nibioTreslagLayer, 'Treslag (NIBIO)'],
+      [nibioBonitetLayer, 'Bonitet (NIBIO)'],
+      [nibioKronedekLayer, 'Kronedekning (NIBIO)']
+    ];
     // removeLayer() FØRST, uansett (IKKE removeOverlay() — L.Control.Layers
     // i Leaflet 1.9.4 har ingen slik metode, kun addOverlay()/
-    // removeLayer(); verifisert live mot window.L før dette ble skrevet).
-    // Gjør funksjonen trygg å kalle flere ganger uten å hope opp duplikate
-    // rader i lag-kontrollen (addOverlay() sjekker ikke selv om laget
-    // allerede er lagt til).
-    layersControl.removeLayer(voksestedslagLayer);
+    // removeLayer(); verifisert live mot window.L da dette mønsteret ble
+    // skrevet for det opprinnelige voksestedslaget). Gjør funksjonen trygg
+    // å kalle flere ganger uten å hope opp duplikate rader i lag-
+    // kontrollen (addOverlay() sjekker ikke selv om laget allerede finnes).
+    entries.forEach(([layer]) => { if (layer) layersControl.removeLayer(layer); });
     if (isAdmin()) {
-      layersControl.addOverlay(voksestedslagLayer, 'Voksestedslag (fargelag)');
+      entries.forEach(([layer, label]) => { if (layer) layersControl.addOverlay(layer, label); });
     } else {
-      if (leafletMap && leafletMap.hasLayer(voksestedslagLayer)) leafletMap.removeLayer(voksestedslagLayer);
-      voksestedslagPanelsVisible(false);
+      entries.forEach(([layer]) => {
+        if (layer && leafletMap && leafletMap.hasLayer(layer)) leafletMap.removeLayer(layer);
+      });
     }
   }
 
@@ -4903,16 +4799,10 @@
     let scoped = scoredAll.filter(s => isInCurrentScope(s.loc));
 
     renderMap(scoped);
-    // Voksestedslaget er admin-only inntil videre (se
-    // updateVoksestedslagAvailability()) — ikke bare skjult fra
-    // lag-kontrollen, men heller ikke tegnet/fylt for andre i det hele
-    // tatt, så det ikke finnes noe å oppdage via DevTools heller.
-    if (isAdmin()) {
-      renderVoksestedslag(scoped);
-      renderVoksestedslagLegend();
-      renderVoksestedslagCoverage(scoped);
-      if (leafletMap) voksestedslagPanelsVisible(leafletMap.hasLayer(voksestedslagLayer));
-    }
+    // NIBIO-referanselagene (Treslag/Bonitet/Kronedekning) trenger ingen
+    // per-render-oppdatering — de er statiske L.tileLayer.wms()-lag, ikke
+    // data-drevne som det tidligere voksestedslaget var. Tilgjengelighet
+    // (admin-only) styres separat, se updateNibioLayersAvailability().
     renderHogstZones();
     renderFindsLayer();
     renderDelteFunnLayer();

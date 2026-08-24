@@ -1,5 +1,50 @@
 # Endringslogg
 
+## 0.32.0 — Voksestedslag erstattet med NIBIO-referanselag (admin-only)
+Fullfører designgjennomgangen av voksestedslaget. Det tidligere punktbaserte
+fargelaget (isolerte ~470m-firkanter på et 1,5 km rutenett, `SPECIES_HUE`/
+`renderVoksestedslag()`) ga aldri annet enn et konfetti-inntrykk uansett
+fargevalg — fjernet helt, kode og UI.
+
+Erstattet med tre nye lag som viser NIBIOs egne, ferdig rendrede
+WMS-kartbilder — ekte skogfigurer, ikke rutenett-celler:
+- **Treslag (NIBIO)** — `SRVTRESLAG`, samme datakilde som terrengscoringen
+  allerede stoler på for treslag (ingen SR16V/SR16R-uenighet).
+- **Bonitet (NIBIO)** — `SRVBONITET`, markproduktivitet.
+- **Kronedekning (NIBIO)** — `SRVKRONEDEK`, kronetetthet.
+
+Ingen ETL, ingen ny backend — vanlig `L.tileLayer.wms()`, samme mønster
+som topo-/OSM-/satellittlaget. Verifisert direkte mot NIBIOs server før
+implementasjon: HTTP/2, ~0,2–0,35s/flis, `Fees: no conditions apply`,
+dekker hele Norge.
+
+To presiseringer fra brukertesting av mockupen, begge innebygd i laget
+fra start (ikke noe brukeren må stille inn selv):
+- **Opasitet 0,55** — testet med et pikselnøyaktig komposittbilde
+  (ekte Kartverket-topo + ekte NIBIO-treslag): ved full opasitet druknet
+  høydekoter/stier/stedsnavn nesten helt, ved 55% er begge deler leselige.
+- **Egen Leaflet-pane** (`nibioPane`, `zIndex: 350`) mellom bunnkartet
+  (200) og appens egne sirkler/markører (400/600) — uten dette ville
+  lagene rammet AKKURAT samme z-rekkefølge-bug som satellittlaget hadde
+  (v0.31.1): siden de starter av og legges til dynamisk, ville Leaflet
+  stablet dem øverst av alt (inkl. over Foreslåtte områder/Mine funn)
+  i det øyeblikket en admin slår dem på. Panen løser dette permanent,
+  uavhengig av `.addTo()`-rekkefølge.
+
+**Admin-only inntil videre** ("valider i ro og mak" før bredere
+utrulling) — samme mønster forgjengeren hadde:
+`updateNibioLayersAvailability()` (erstatter
+`updateVoksestedslagAvailability()`) legger lagene til/fjerner dem fra
+selve lag-kontrollen dynamisk, ikke bare CSS-synlighet.
+
+Verifisert: `node --check`, live i nettleser at panen faktisk får
+`zIndex: 350` (`leaflet-nibio-pane` — Leaflet strippet "Pane" fra
+navnet i klassenavnet, verdt å huske), og at lag-kontrollen viser
+nøyaktig de 5 forventede overlegg-radene (ingen NIBIO-rader, ingen
+gjenværende "Voksestedslag") for en ikke-innlogget bruker.
+
+Versjon 0.31.5 → 0.32.0.
+
 ## 0.31.5 — Fiks kartlagsvelger: trygg og synlig lukking
 Designgjennomgang av kartlagsvelgeren (åpne/spesielt lukke). Fant, via
 Leaflet 1.9.4s egen kildekode (`L.Control.Layers._initLayout()`), at
