@@ -229,6 +229,15 @@
   .sp-map-legend span { display: inline-flex; align-items: center; gap: 4px; }
   .sp-leg-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 
+  /* Tegnforklaring for NIBIO-referanselagene — se renderNibioLegend() i
+     app.js. Én rad per aktivt lag, med NIBIOs egen GetLegendGraphic-bilde
+     (ikke noe FungiFinder tegner selv) + en kort forklaringslinje. */
+  .sp-nibio-legend { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+  .sp-nibio-legend-row { display: flex; align-items: flex-start; gap: 10px; }
+  .sp-nibio-legend-row img { border-radius: 3px; border: 1px solid var(--line); background: var(--paper); flex-shrink: 0; }
+  .sp-nibio-legend-text { font-size: var(--fs-xs); color: var(--ink-soft); line-height: 1.5; }
+  .sp-nibio-legend-text b { color: var(--ink); font-weight: 600; }
+
   .sp-results-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
   .sp-results-head h2 { font-family: 'Fraunces', serif; font-size: 19px; margin: 0; color: var(--pine-deep); }
   .sp-count { font-family: 'JetBrains Mono', monospace; font-size: var(--fs-xs); color: var(--ink-soft); }
