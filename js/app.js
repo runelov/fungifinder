@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.31.4';
+  const APP_VERSION = '0.31.5';
   const APP_BUILD_DATE = '2026-08-23';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -3636,6 +3636,28 @@
     // aldri fått med laget, selv for en faktisk admin. Legges i stedet til
     // dynamisk via layersControl.addOverlay()/removeOverlay(), se
     // updateVoksestedslagAvailability() (kalt fra reflectAccountUi()).
+    // RETTET 2026-08-24 (designgjennomgang: kartlagsvelger åpne/lukke) —
+    // L.Control.Layers med collapsed:true (under) gjør selv
+    // `this._map.on("click", this.collapse, this)` i sin _initLayout()
+    // (verifisert direkte i leaflet.js 1.9.4s kildekode) — altså en lytter
+    // på nøyaktig samme kart-klikk-hendelse som handleren lenger ned. Det
+    // er ELLERS eneste måte en touch-bruker kan lukke panelet på (ikonet
+    // som åpner det får display:none mens det er utvidet, se
+    // .sp-layers-close i CSS), men ETHVERT slikt trykk ville da OGSÅ
+    // trigget handleren under — bekreftet empirisk: "Logg inn for å
+    // registrere funn"-alert (ikke innlogget) eller "Registrer nytt
+    // funn"-skjemaet (innlogget) dukket opp bare fordi brukeren ville
+    // lukke lag-menyen. Leaflet har ingen måte for én map-klikk-lytter å
+    // stoppe en annen, så vakten må ligge i VÅR handler i stedet.
+    // Registrert FØR layersControl opprettes, slik at denne kjører FØR
+    // Leaflets egen collapse() rekker å fjerne "expanded"-klassen fra DOM-en.
+    let ignoreNextMapClick = false;
+    leafletMap.on('click', () => {
+      if (document.querySelector('.leaflet-control-layers-expanded')) {
+        ignoreNextMapClick = true;
+      }
+    });
+
     // RETTET 2026-08-22 (designgjennomgang: "Målepunkter" som eget valgbart
     // lag fjernet inntil videre — brukeren opplevde det som for massivt
     // uansett når det først slås på, og mener det holder at punkter vises i
@@ -3650,6 +3672,20 @@
       { collapsed: true }
     ).addTo(leafletMap);
 
+    // Synlig lukkeknapp (designgjennomgang: kartlagsvelger åpne/lukke) —
+    // se .sp-layers-close i CSS for hvorfor. Ligger inni kontrollens egen
+    // container, som Leaflet allerede skjermer mot kart-klikk
+    // (L.Control sin disableClickPropagation) — trenger derfor ikke
+    // ignoreNextMapClick-vakten over, kun selve collapse()-kallet.
+    const layersCloseBtn = L.DomUtil.create('a', 'sp-layers-close', layersControl._section);
+    layersCloseBtn.href = '#';
+    layersCloseBtn.textContent = '✕ Lukk';
+    layersCloseBtn.setAttribute('role', 'button');
+    L.DomEvent.on(layersCloseBtn, 'click', (e) => {
+      L.DomEvent.stop(e);
+      layersControl.collapse();
+    });
+
     // Tegnforklaring/dekningstekst for voksestedslaget vises kun mens laget
     // faktisk er på kartet — se renderVoksestedslagLegend()/
     // renderVoksestedslagCoverage() (fylles uansett) og
@@ -3659,6 +3695,7 @@
     });
 
     leafletMap.on('click', (e) => {
+      if (ignoreNextMapClick) { ignoreNextMapClick = false; return; }
       if (markingHogstMode) {
         openHogstOmradeModal(e.latlng.lat, e.latlng.lng);
       } else if (filterMode === 'radius') {

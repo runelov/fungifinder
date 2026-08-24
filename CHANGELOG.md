@@ -1,5 +1,38 @@
 # Endringslogg
 
+## 0.31.5 — Fiks kartlagsvelger: trygg og synlig lukking
+Designgjennomgang av kartlagsvelgeren (åpne/spesielt lukke). Fant, via
+Leaflet 1.9.4s egen kildekode (`L.Control.Layers._initLayout()`), at
+kontrollen selv gjør `map.on("click", this.collapse, this)` når
+`collapsed:true` — samme kart-klikk-hendelse som appens egen
+`leafletMap.on('click', ...)`-handler lytter på. Touch-brukerens ENESTE
+vei til å lukke panelet (ikonet får `display:none` mens det er utvidet)
+var derfor å trykke utenfor det — men det trykket trigget GARANTERT også
+appens handling: "Logg inn for å registrere funn"-alert (ikke innlogget)
+eller "Registrer nytt funn"-skjemaet (innlogget). Bekreftet empirisk, ikke
+bare i teorien: dispatchet et ekte klikk-event mot et åpent panel og
+fanget opp `alert()`-kallet direkte.
+
+- Ny vakt (`ignoreNextMapClick`) — en `leafletMap.on('click', ...)`-lytter
+  registrert FØR `layersControl` opprettes, som sjekker om panelet er
+  utvidet og i så fall lar den påfølgende, eksisterende klikk-handleren
+  (radius/hogst/`openFindModal`) hoppe over akkurat den ene hendelsen.
+  Leaflet har ingen mekanisme for at én map-klikk-lytter kan stoppe en
+  annen, så vakten måtte ligge i vår egen handler.
+- Ny synlig "✕ Lukk"-knapp nederst i selve panelet (`.sp-layers-close`) —
+  fjerner behovet for å oppdage "trykk utenfor" i det hele tatt. Ligger
+  inni kontrollens container, som Leaflet allerede skjermer mot
+  kart-klikk, og trenger derfor ikke vakten over.
+
+Verifisert live: åpnet panelet, dispatchet et ekte klikk-event mot et tomt
+punkt i kartet — ingen alert, panelet lukket seg korrekt. Bekreftet at
+vanlig kart-klikk (panel IKKE åpent) fortsatt trigger samme handling som
+før (alerten kom som forventet). `✕ Lukk`-knappen testet separat, samme
+resultat. Dessuten testet at et ekte klikk lenger unna, uten panelet åpent,
+fortsatt gir vanlig oppførsel.
+
+Versjon 0.31.4 → 0.31.5.
+
 ## 0.31.4 — Fiks treg/hakkete satellittlag
 Bruker meldte at satellittlaget "fryser til/lagger" og virker lite
 responsivt. Undersøkt direkte mot Esris fliseserver, ikke gjettet:
