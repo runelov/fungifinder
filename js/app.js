@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.32.3';
+  const APP_VERSION = '0.32.4';
   const APP_BUILD_DATE = '2026-08-24';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -3245,23 +3245,34 @@
   //
   // RETTET 2026-08-24, runde 3 (bruker: velger Bonitet, klikker Lukk, ser
   // ingenting i kartet før man zoomer MYE inn — ikke synlig på kommunenivå,
-  // f.eks. Indre Østfold). Undersøkt empirisk, ikke antatt: NIBIOs egen
-  // GetCapabilities oppgir MaxScaleDenominator=100005 for SRVTRESLAG,
-  // SRVBONITET og SRVKRONEDEK — identisk for alle tre. Hentet ekte
-  // GetMap-bilder for Bonitet på Indre Østfold (59.5°N) for zoom 8-15 og
-  // målte andel ikke-transparente piksler: 0% ved zoom 8-11 (byte-identisk
-  // 2561-byte tomt svar — NIBIOs server NEKTER å tegne noe, ikke en
-  // datalakune), 54.3% ved zoom 12. Krysningspunktet ligger altså mellom
-  // zoom 11 og 12, og zoom 8-11 dekker nettopp det kommune-utsnitt typisk
-  // fittes til. 12 er et bevisst KONSERVATIVT tall — mpp (meter per piksel)
-  // ved gitt zoom er `156543 * cos(breddegrad) / 2^zoom`, og synker med
-  // økende breddegrad, så nord i Norge nås samme skala-terskel ved en noe
-  // lavere zoom enn 12. 12 er trygt for hele landet (Sør-Norge er
-  // "verste fall"), aldri for sent. Brukt to steder: `minZoom` på selve
-  // WMS-laget (nibioLayer() i initMap() — unngår bortkastede requests mot
-  // NIBIO under zoom 12) og som terskel for zoom-hintet i
-  // renderNibioLegend() under.
-  const NIBIO_MIN_ZOOM = 12;
+  // f.eks. Indre Østfold). Første fiks (v0.32.3) satte denne til 12 — VISTE
+  // SEG FEIL, bruker rapporterte en gjenværende "mellomzoom" (nøyaktig
+  // Leaflet-zoom 12, verifisert ved å matche stedsnavn i et skjermbilde mot
+  // et eget testoppsett) hvor laget fortsatt var blankt OG hintet under
+  // heller ikke vistes. Rotårsak i selve UTREGNINGEN: første runde brukte
+  // `156543 * cos(breddegrad) / 2^zoom` (ekte BAKKE-meter per piksel) for å
+  // regne ut bbox-bredden i en test-GetMap-forespørsel — men en WMS BBOX i
+  // CRS=EPSG:3857 skal oppgis i PROJISERTE Web Mercator-meter, som ikke har
+  // cos(breddegrad)-faktoren. Det gjorde alle testbildene i v0.32.3 dobbelt
+  // så smale som en ekte Leaflet-flis ved samme zoom — i praksis identisk
+  // med NESTE zoom-nivå. Derfor så "zoom 12" ut til å ha innhold i den
+  // opprinnelige testen, mens ekte 256×256 Leaflet-fliser ved zoom 12 er
+  // fullstendig blanke (334-byte transparent PNG, bekreftet direkte mot en
+  // URL kopiert fra en ekte kjørende Leaflet-instans, IKKE en selvlaget
+  // bbox). Ny, korrekt måling (riktig formel: `156543 / 2^zoom`, UTEN
+  // cos(breddegrad) — bbox-bredden i projiserte meter er faktisk lik over
+  // hele kloden for en gitt zoom, DERFOR ingen breddegrad-avhengighet i det
+  // hele tatt, i motsetning til det forrige rundens "konservativt tall"-
+  // resonnement antok) — testet for alle tre lag, to breddegrader
+  // (Indre Østfold 59.5°N og Bodø 67.3°N): 334 byte (tomt) ved zoom 12,
+  // ekte innhold (7,8-70 KB) ved zoom 13, for ALLE seks kombinasjoner.
+  // Krysningspunktet er derfor zoom 13, ikke 12 — og identisk over hele
+  // Norge (projisert bbox-bredde er breddegrad-uavhengig, så «konservativt
+  // tall»-resonnementet fra v0.32.3 var overflødig, ikke bare feil verdi).
+  // Brukt to steder: `minZoom` på selve WMS-laget (nibioLayer() i
+  // initMap() — unngår bortkastede requests mot NIBIO under zoom 13) og
+  // som terskel for zoom-hintet i renderNibioLegend() under.
+  const NIBIO_MIN_ZOOM = 13;
 
   // Delt metadata mellom updateNibioLayersAvailability() (lag-kontroll) og
   // renderNibioLegend() (tegnforklaring under kartet, se index.html
@@ -3676,9 +3687,10 @@
     // ekte topo-utsnitt): ved full opasitet druknet høydekoter/stier/
     // stedsnavn nesten helt, ved 55% er begge deler leselige samtidig.
     // minZoom: NIBIO_MIN_ZOOM (se den store kommentaren der) — NIBIOs egen
-    // server tegner uansett ingenting under zoom 12 (MaxScaleDenominator i
-    // GetCapabilities, empirisk bekreftet), så dette unngår bare bortkastede
-    // requester under den terskelen. Zoom-hintet i renderNibioLegend()
+    // server tegner uansett ingenting under zoom 13 (MaxScaleDenominator i
+    // GetCapabilities, empirisk bekreftet mot ekte Leaflet-fliser), så dette
+    // unngår bare bortkastede requester under den terskelen. Zoom-hintet i
+    // renderNibioLegend()
     // forklarer selve ÅRSAKEN til brukeren.
     function nibioLayer(layerName){
       return L.tileLayer.wms('https://wms.nibio.no/cgi-bin/sr16', {
@@ -4047,7 +4059,7 @@
       return;
     }
     el.style.display = 'flex';
-    // RETTET 2026-08-24, runde 3 (se NIBIO_MIN_ZOOM) — under zoom 12 tegner
+    // RETTET 2026-08-24, runde 3 (se NIBIO_MIN_ZOOM) — under zoom 13 tegner
     // NIBIOs server ingenting, uansett hvilket av de tre lagene som er
     // aktivt. Ett samlet hint øverst (ikke duplisert per lag) forklarer
     // ÅRSAKEN i stedet for et stille tomt kart. Fargeforklaringen vises

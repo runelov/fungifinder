@@ -1,5 +1,40 @@
 # Endringslogg
 
+## 0.32.4 — Rettet: NIBIO-terskelen i v0.32.3 var faktisk zoom 13, ikke 12
+
+Bruker rapporterte, rett etter at v0.32.3 ble skipsatt: "Det virker å være
+et mellomnivå av zoom (kartlaget er valgbart, men vises ikke) hvor det
+heller ikke gis noe visuelt hint om å zoome inn mer" — med skjermbilde av
+Østmarka/Lørenskog. Undersøkt live, ikke bare re-lest kode:
+
+1. Matchet stedsnavnene i skjermbildet (Manglerud/Bøler/Losby/Østmarka/
+   Geitsjøen osv.) mot et eget Leaflet-testoppsett med samme Kartverket-
+   kartlag appen selv bruker — traff eksakt på **Leaflet-zoom 12**.
+2. Testet ekte 256×256-fliser (kopiert direkte fra en kjørende Leaflet-
+   instans sin faktiske tile-URL, ikke en selvlaget bbox) for alle tre lag:
+   334-byte tomt svar ved zoom 12, ekte innhold ved zoom 13.
+3. Fant rotårsaken til hvorfor v0.32.3 konkluderte "zoom 12": den testen
+   regnet bbox-bredden med `156543 * cos(breddegrad) / 2^zoom` (BAKKE-meter
+   ved den breddegraden) — men en WMS BBOX i `CRS=EPSG:3857` skal oppgis i
+   *projiserte* Web Mercator-meter, som IKKE har cos(breddegrad)-leddet.
+   Det gjorde testbildet dobbelt så smalt som en ekte flis ved samme zoom —
+   i praksis identisk med NESTE zoom-nivå. Derfor "så" v0.32.3 innhold ved
+   zoom 12 som i virkeligheten hørte til zoom 13.
+4. Re-testet med korrekt formel (`156543 / 2^zoom`, uten breddegrad-ledd)
+   for alle tre lag på to breddegrader (Indre Østfold 59.5°N og Bodø
+   67.3°N): identisk resultat alle seks steder — tomt ved zoom 12, innhold
+   ved zoom 13. Projisert bbox-bredde er faktisk breddegrad-UAVHENGIG for
+   en gitt zoom, så "12 er et konservativt tall for hele Norge"-
+   resonnementet i v0.32.3 var overflødig i tillegg til å være feil verdi.
+
+`NIBIO_MIN_ZOOM` i `js/app.js` rettet fra 12 til 13 (definert ett sted,
+brukt av både `minZoom`-optionen på WMS-laget og zoom-hintet i
+`renderNibioLegend()` — ingen andre kodeendringer nødvendig siden begge
+allerede leste fra samme konstant). Verifisert: `node --check js/app.js`,
+`npm test` (86/86 grønn), og en frittstående Leaflet-testside mot ekte
+`wms.nibio.no` som bekrefter innhold vises korrekt fra zoom 13 og ingenting
+under.
+
 ## 0.32.3 — NIBIO-lag: zoom-hint i stedet for stille tomt kart
 
 Bruker-rapport: velger "Bonitet" som kartlag og klikker Lukk — ingenting
