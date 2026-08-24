@@ -91,13 +91,28 @@ function radTilArtsfunn(rad) {
 // alltid sender alle fire sammen (fra leafletMap.getBounds().pad(0.5)).
 // Normaliserer min/maks selv (Math.min/max) — defensivt mot en evt.
 // ombyttet forespørsel, koster ingenting.
-export async function hentArtsfunnFraDb(env, { minLat, maxLat, minLon, maxLon } = {}) {
+//
+// `limit` (2026-08-24, RETTET): valgfri, KUN satt av routes/terreng.js sin
+// interaktive hentArtsfunn() — se ARTSFUNN_INTERAKTIV_MAKS der. Et bredt
+// (men helt legitimt, f.eks. et zoomet-ut kommune-fitBounds + pad(0.5))
+// synlig utsnitt kan treffe et stort mindretall av hele tabellen — én
+// reell hendelse traff 12 207 av 31 508 rader og fikk Workeren til å gi
+// "Error: Worker exceeded CPU time limit." (rå 503 til klienten, utenom
+// index.js sin egen try/catch, som kun fanger JS-unntak — ikke at CF
+// dreper isolatet midt i kjøringen). etlImport.js sin eksporterTerrengdata()
+// kaller FORTSATT uten limit — den trenger et komplett datasett, en stille
+// LIMIT-avkorting der ville vært datatap, ikke bare en visningsbegrensning.
+export async function hentArtsfunnFraDb(env, { minLat, maxLat, minLon, maxLon, limit } = {}) {
   const harBbox = [minLat, maxLat, minLon, maxLon].every((v) => typeof v === 'number' && Number.isFinite(v));
   let sql = 'SELECT * FROM artsfunn';
   const binds = [];
   if (harBbox) {
     sql += ' WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?';
     binds.push(Math.min(minLat, maxLat), Math.max(minLat, maxLat), Math.min(minLon, maxLon), Math.max(minLon, maxLon));
+  }
+  if (typeof limit === 'number' && Number.isFinite(limit) && limit > 0) {
+    sql += ' LIMIT ?';
+    binds.push(Math.floor(limit));
   }
   const stmt = binds.length ? env.DB.prepare(sql).bind(...binds) : env.DB.prepare(sql);
   const { results } = await stmt.all();
