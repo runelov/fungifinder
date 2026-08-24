@@ -158,6 +158,25 @@ describe('hentArtsfunnFraDb', () => {
     const resultat = await hentArtsfunnFraDb(env, { minLat: 60, maxLat: 59, minLon: 11, maxLon: 10.8 });
     assert.deepEqual(resultat.map((f) => f.id), ['innenfor']);
   });
+
+  // RETTET 2026-08-24: se ARTSFUNN_INTERAKTIV_MAKS-kommentaren i
+  // routes/terreng.js — dette er selve grensen som hindrer et bredt synlig
+  // kartutsnitt fra å blåse Workerens CPU-budsjett.
+  test('limit begrenser antall rader når satt', async () => {
+    for (let i = 0; i < 5; i++) {
+      db.prepare('INSERT INTO artsfunn (id, art, lat, lon) VALUES (?,?,?,?)').run(`obs${i}`, 'kantarell', 59.5, 10.9);
+    }
+    const resultat = await hentArtsfunnFraDb(env, { limit: 3 });
+    assert.equal(resultat.length, 3);
+  });
+
+  test('ingen limit satt -> ubegrenset (eksporterTerrengdata sin bruksmåte)', async () => {
+    for (let i = 0; i < 5; i++) {
+      db.prepare('INSERT INTO artsfunn (id, art, lat, lon) VALUES (?,?,?,?)').run(`obs${i}`, 'kantarell', 59.5, 10.9);
+    }
+    const resultat = await hentArtsfunnFraDb(env, {});
+    assert.equal(resultat.length, 5);
+  });
 });
 
 describe('hentFetchedAreasFraDb', () => {

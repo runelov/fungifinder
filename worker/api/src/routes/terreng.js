@@ -37,6 +37,21 @@ export async function hentTerrengdata({ request, env, url }) {
 // js/app.js sin loadArtsfunn() ved oppstart og panorering/zooming. Krever
 // ALLE fire gyldige tall for å filtrere, ellers uendret oppførsel (hele
 // datasettet).
+//
+// RETTET 2026-08-24 (bruker meldte 503 på dette endepunktet for Nordre
+// Follo og Indre Østfold — "Worker exceeded CPU time limit" fanget live med
+// wrangler tail): et bredt, men fullt legitimt synlig utsnitt (zoomet-ut
+// kommune-fitBounds + loadArtsfunn() sin egen 50%-padding) kan treffe et
+// stort mindretall av hele artsfunn-tabellen — ett fanget tilfelle traff
+// 12 207 av 31 508 rader og blåste CPU-budsjettet, som Cloudflare svarer på
+// med en rå 503 (utenom index.js sin try/catch). ARTSFUNN_INTERAKTIV_MAKS
+// er en myk, vilkårlig-men-romslig grense (typiske paddede kommune-utsnitt
+// er langt under dette) — velges godt under de 12 207 radene som faktisk
+// felte Workeren, med god margin. eksporterTerrengdata() (etlImport.js)
+// bruker fortsatt hentArtsfunnFraDb() UTEN limit — den skal ha komplette
+// data, ikke et avkortet utvalg.
+const ARTSFUNN_INTERAKTIV_MAKS = 4000;
+
 export async function hentArtsfunn({ request, env, url }) {
   const cors = corsHeaders(env);
   const bruker = await requireSession(request, env);
@@ -51,6 +66,7 @@ export async function hentArtsfunn({ request, env, url }) {
   const data = await hentArtsfunnFraDb(env, {
     minLat: tall('minLat'), maxLat: tall('maxLat'),
     minLon: tall('minLon'), maxLon: tall('maxLon'),
+    limit: ARTSFUNN_INTERAKTIV_MAKS,
   });
   return json(data, 200, cors);
 }
