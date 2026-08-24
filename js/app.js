@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.32.0';
+  const APP_VERSION = '0.32.1';
   const APP_BUILD_DATE = '2026-08-24';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -3223,6 +3223,21 @@
   let nibioTreslagLayer = null;
   let nibioBonitetLayer = null;
   let nibioKronedekLayer = null;
+  // RETTET 2026-08-24 (bruker: "det mangler beskrivelse av de tre nye
+  // kartlagene, og hvilke fargekoder som vises der" + "forklaring bør vel
+  // være avhengig av hvilket lag som er valgt") — delt metadata mellom
+  // updateNibioLayersAvailability() (lag-kontroll) og renderNibioLegend()
+  // (tegnforklaring under kartet, se index.html #sp-nibio-legend). `layer`
+  // er en getter (ikke en fast verdi) fordi denne konstanten defineres FØR
+  // initMap() har rukket å sette de faktiske nibio*Layer-variablene.
+  const NIBIO_LAYER_META = [
+    { get layer(){ return nibioTreslagLayer; }, wmsName: 'SRVTRESLAG', label: 'Treslag',
+      hint: 'Farge viser dominerende treslag i skogfiguren — samme datakilde som terrengscoringen selv bruker for treslag.' },
+    { get layer(){ return nibioBonitetLayer; }, wmsName: 'SRVBONITET', label: 'Bonitet',
+      hint: 'Mørkere = mer produktiv skogbunn (indirekte indikasjon på vegetasjonsrikdom).' },
+    { get layer(){ return nibioKronedekLayer; }, wmsName: 'SRVKRONEDEK', label: 'Kronedekning',
+      hint: 'Mørkere = tettere trekroner (mer skygge, mindre bunnvegetasjon).' }
+  ];
   let layersControl = null; // L.control.layers-instansen — se updateNibioLayersAvailability()
   let artskartMoveDebounce = null; // se moveend-lytteren i initMap()
   let findMarkersById = {};
@@ -3670,6 +3685,16 @@
       layersControl.collapse();
     });
 
+    // Tegnforklaringen under kartet (#sp-nibio-legend, se renderNibioLegend())
+    // skal kun vise rader for NIBIO-lag som faktisk er slått PÅ akkurat nå —
+    // ikke en fast tekst uavhengig av hva som er valgt. 'overlayadd'/
+    // 'overlayremove' er Leaflets EGNE hendelser fra L.Control.Layers sin
+    // checkbox-interaksjon (ikke et generisk map.removeLayer()-ekko, se
+    // RETTET-kommentaren i updateNibioLayersAvailability()).
+    leafletMap.on('overlayadd overlayremove', (e) => {
+      if (NIBIO_LAYER_META.some(m => m.layer === e.layer)) renderNibioLegend();
+    });
+
     leafletMap.on('click', (e) => {
       if (ignoreNextMapClick) { ignoreNextMapClick = false; return; }
       if (markingHogstMode) {
@@ -3900,25 +3925,56 @@
   // (dermed ved oppstart, innlogging og utlogging).
   function updateNibioLayersAvailability(){
     if (!layersControl) return;
-    const entries = [
-      [nibioTreslagLayer, 'Treslag (NIBIO)'],
-      [nibioBonitetLayer, 'Bonitet (NIBIO)'],
-      [nibioKronedekLayer, 'Kronedekning (NIBIO)']
-    ];
     // removeLayer() FØRST, uansett (IKKE removeOverlay() — L.Control.Layers
     // i Leaflet 1.9.4 har ingen slik metode, kun addOverlay()/
     // removeLayer(); verifisert live mot window.L da dette mønsteret ble
     // skrevet for det opprinnelige voksestedslaget). Gjør funksjonen trygg
     // å kalle flere ganger uten å hope opp duplikate rader i lag-
     // kontrollen (addOverlay() sjekker ikke selv om laget allerede finnes).
-    entries.forEach(([layer]) => { if (layer) layersControl.removeLayer(layer); });
+    NIBIO_LAYER_META.forEach(m => { if (m.layer) layersControl.removeLayer(m.layer); });
     if (isAdmin()) {
-      entries.forEach(([layer, label]) => { if (layer) layersControl.addOverlay(layer, label); });
+      NIBIO_LAYER_META.forEach(m => { if (m.layer) layersControl.addOverlay(m.layer, `${m.label} (NIBIO)`); });
     } else {
-      entries.forEach(([layer]) => {
-        if (layer && leafletMap && leafletMap.hasLayer(layer)) leafletMap.removeLayer(layer);
+      NIBIO_LAYER_META.forEach(m => {
+        if (m.layer && leafletMap && leafletMap.hasLayer(m.layer)) leafletMap.removeLayer(m.layer);
       });
     }
+    // RETTET 2026-08-24: leafletMap.removeLayer() over (gren for ikke-admin)
+    // går IKKE via lag-kontrollens egen checkbox-UI, og trigger derfor ALDRI
+    // Leaflets 'overlayremove'-hendelse (den er spesifikk for
+    // L.Control.Layers sin egen interaksjon, ikke et generisk
+    // map.removeLayer()-ekko) — uten dette kallet kunne tegnforklaringen
+    // blitt stående og vise et lag som nettopp ble fjernet programmatisk
+    // (f.eks. en admin som logger ut med et NIBIO-lag aktivt).
+    renderNibioLegend();
+  }
+
+  function nibioLegendUrl(wmsName){
+    return `https://wms.nibio.no/cgi-bin/sr16?language=nor&version=1.3.0&service=WMS&request=GetLegendGraphic&sld_version=1.1.0&layer=${wmsName}&format=image/png`;
+  }
+
+  // RETTET 2026-08-24 (bruker: manglende beskrivelse av de tre NIBIO-lagene
+  // + forklaringen under kartet burde avhenge av hvilket lag som faktisk er
+  // valgt) — én rad PER AKTIVT lag, ikke en fast tekst. Bruker NIBIOs egen
+  // GetLegendGraphic (samme som ble verifisert i research-fasen) — ikke noe
+  // FungiFinder tegner/vedlikeholder selv. Kalt fra overlayadd/overlayremove
+  // i initMap() (dermed hver gang en admin krysser av/på et av lagene) og
+  // fra updateNibioLayersAvailability() (innlogging/utlogging).
+  function renderNibioLegend(){
+    const el = document.getElementById('sp-nibio-legend');
+    if (!el || !leafletMap) return;
+    const active = NIBIO_LAYER_META.filter(m => m.layer && leafletMap.hasLayer(m.layer));
+    if (!active.length) {
+      el.style.display = 'none';
+      el.innerHTML = '';
+      return;
+    }
+    el.style.display = 'flex';
+    el.innerHTML = active.map(m => `
+      <div class="sp-nibio-legend-row">
+        <img src="${nibioLegendUrl(m.wmsName)}" alt="Tegnforklaring ${escapeHtml(m.label)}" width="90"/>
+        <div class="sp-nibio-legend-text"><b>${escapeHtml(m.label)} (NIBIO)</b><br/>${escapeHtml(m.hint)}</div>
+      </div>`).join('');
   }
 
   // ---------- turforslag (rundtur) ----------

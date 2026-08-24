@@ -1,5 +1,33 @@
 # Endringslogg
 
+## 0.32.1 — Dynamisk tegnforklaring for NIBIO-referanselagene
+Oppfølging til v0.32.0 — bruker påpekte to mangler ved admin-testing:
+"under kartet står det noen statiske tekster, hva som vises av forklaring
+bør vel være avhengig av hvilket lag som er valgt?" og "det mangler
+beskrivelse av de tre nye kartlagene, og hvilke fargekoder som vises der".
+
+- Ny `#sp-nibio-legend`-boks under kartet, fylt av `renderNibioLegend()` —
+  én rad PER AKTIVT NIBIO-lag (Treslag/Bonitet/Kronedekning), ikke en fast
+  tekst. Skjult helt når ingen av de tre er slått på.
+- Hver rad viser NIBIOs EGEN `GetLegendGraphic`-bilde (samme URL-mønster
+  verifisert i research-fasen, ikke noe FungiFinder tegner/vedlikeholder
+  selv) + en kort forklaringslinje (`NIBIO_LAYER_META`).
+- Koblet til `overlayadd`/`overlayremove` (Leaflets egne hendelser fra
+  lag-kontrollens checkbox-interaksjon) — legenden oppdaterer seg
+  automatisk når en admin krysser av/på et av lagene.
+- `updateNibioLayersAvailability()` kaller nå også `renderNibioLegend()`
+  eksplisitt, siden den grenen som fjerner lag direkte
+  (`leafletMap.removeLayer()`, ved utlogging) IKKE trigger Leaflets
+  `overlayremove` — den hendelsen er spesifikk for kontrollens egen UI,
+  ikke et generisk map.removeLayer()-ekko.
+
+Verifisert live: alle tre `GetLegendGraphic`-bildene laster korrekt i
+nettleseren (`complete: true`, riktige pikselmål), legend-boksen starter
+skjult/tom for en ikke-admin, og teksten viser riktig rekkefølge/innhold
+når simulert aktiv.
+
+Versjon 0.32.0 → 0.32.1.
+
 ## 0.32.0 — Voksestedslag erstattet med NIBIO-referanselag (admin-only)
 Fullfører designgjennomgangen av voksestedslaget. Det tidligere punktbaserte
 fargelaget (isolerte ~470m-firkanter på et 1,5 km rutenett, `SPECIES_HUE`/
