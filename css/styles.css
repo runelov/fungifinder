@@ -229,17 +229,6 @@
   .sp-map-legend span { display: inline-flex; align-items: center; gap: 4px; }
   .sp-leg-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 
-  /* "Voksestedslag (fargelag)" — tegnforklaring + dekningslinje. Del 1.2/1.3
-     i "Voksestedslaget"-planen (fig. 1/2). Skjult by default (display:none
-     satt inline i index.html), vises kun mens laget faktisk er skrudd på i
-     lag-kontrollen (se voksestedslagPanelsVisible() i app.js). */
-  .sp-voksested-legend { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
-  .sp-vlegend-row { display: flex; align-items: center; gap: 10px; }
-  .sp-vlegend-name { font-size: var(--fs-sm); min-width: 118px; color: var(--ink); }
-  .sp-vlegend-bar { flex: 1; height: 8px; border-radius: 5px; max-width: 220px; }
-  .sp-vlegend-labels { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: var(--fs-xs); color: var(--ink-soft); min-width: 52px; }
-  .sp-voksested-coverage { font-size: var(--fs-xs); color: var(--ink-soft); margin-top: 6px; line-height: 1.5; }
-
   .sp-results-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
   .sp-results-head h2 { font-family: 'Fraunces', serif; font-size: 19px; margin: 0; color: var(--pine-deep); }
   .sp-count { font-family: 'JetBrains Mono', monospace; font-size: var(--fs-xs); color: var(--ink-soft); }
