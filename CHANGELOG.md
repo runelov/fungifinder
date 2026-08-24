@@ -1,5 +1,47 @@
 # Endringslogg
 
+## 0.32.2 — Legend-panel: samlet, kontekstavhengig, ekte fargeswatsjer
+Fire nye funn fra videre admin-testing av v0.32.1:
+
+1. **"Forklaring vises selv om ikke jeg har analysert områder ennå, og det
+   ikke vises forslag"** — hele kart-legenden (score/eget sted/foreslått
+   område/parkering) skjules nå helt når det ikke finnes scorede steder i
+   valgt område (`scopedLocations().length === 0`), og "foreslått
+   område"/parkering-linjene vises kun når `suggestAreas()` faktisk har
+   produsert noe. Nye `renderMapLegend()`/`syncLegendPanelVisibility()`,
+   kalt fra `render()`, `suggestAreas()` og `clearRoute()` (de to siste
+   kaller ALDRI `render()` selv, så uten disse ville legend-linjene henge
+   igjen/dukke opp med én handling i etterkant).
+2. **"To plasser med legends, NIBIO vises under de andre"** —
+   `sp-map-legend` og `sp-nibio-legend` er nå ÉN felles ramme
+   (`#sp-map-legend-panel`) i stedet for to løsrevne blokker, med en
+   delelinje kun når begge faktisk har innhold samtidig.
+3. **"NIBIO-legend hentes som bilde, virker mindre integrert"** — byttet
+   fra NIBIOs `GetLegendGraphic`-bilde til håndbygde fargeswatsjer
+   (Treslag — diskrete kategorier) og gradientstolper (Bonitet/
+   Kronedekning — ordnede klasser) i appens egen stil. RGB-verdiene er
+   PIKSELPRØVD direkte av NIBIOs offisielle tegnforklaringsbilder, ikke
+   gjettet (se `NIBIO_LAYER_META` for de eksakte hex-verdiene). Kjent
+   avveining: må oppdateres manuelt hvis NIBIO noen gang endrer
+   fargeskjemaet sitt — akseptert for et resultat som ser ut som resten
+   av appen i stedet for et fremmed innebygget bilde.
+4. **"Burde forklares i kontekst av appens formål (finne gode steder for
+   utvalgte sopper)"** — hver NIBIO-rad har nå en 🎯-linje som kobler
+   laget til faktisk bruk. Treslag er den ENESTE av de tre som faktisk
+   inngår i `scoreLocation()` (`species.treslag`), og kan derfor si noe
+   presist og ARTSSPESIFIKT (f.eks. "Kantarell foretrekker gran/furu/
+   bjørkskog — sammenlign fargen her"), oppdatert live når valgt art
+   endres. Bonitet/Kronedekning inngår IKKE i scoringen i dag, og sier
+   derfor bevisst generelle ting — ingen presisjon appen ikke kan stå
+   inne for.
+
+Verifisert: live i nettleser at hele panelet korrekt skjuler seg i demo-
+modus når `suggestedRoute` er tom (viser kun score-dots + "eget sted",
+ikke "foreslått område"/parkering), og en isolert visuell test av
+swatsj-/gradient-CSS-en mot ekte fargeverdier.
+
+Versjon 0.32.1 → 0.32.2.
+
 ## 0.32.1 — Dynamisk tegnforklaring for NIBIO-referanselagene
 Oppfølging til v0.32.0 — bruker påpekte to mangler ved admin-testing:
 "under kartet står det noen statiske tekster, hva som vises av forklaring
