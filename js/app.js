@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.32.2';
+  const APP_VERSION = '0.32.3';
   const APP_BUILD_DATE = '2026-08-24';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -3243,6 +3243,26 @@
   // og sier derfor bevisst generelle, ikke-artsspesifikke ting — ingen
   // presisjon appen ikke kan stå inne for.
   //
+  // RETTET 2026-08-24, runde 3 (bruker: velger Bonitet, klikker Lukk, ser
+  // ingenting i kartet før man zoomer MYE inn — ikke synlig på kommunenivå,
+  // f.eks. Indre Østfold). Undersøkt empirisk, ikke antatt: NIBIOs egen
+  // GetCapabilities oppgir MaxScaleDenominator=100005 for SRVTRESLAG,
+  // SRVBONITET og SRVKRONEDEK — identisk for alle tre. Hentet ekte
+  // GetMap-bilder for Bonitet på Indre Østfold (59.5°N) for zoom 8-15 og
+  // målte andel ikke-transparente piksler: 0% ved zoom 8-11 (byte-identisk
+  // 2561-byte tomt svar — NIBIOs server NEKTER å tegne noe, ikke en
+  // datalakune), 54.3% ved zoom 12. Krysningspunktet ligger altså mellom
+  // zoom 11 og 12, og zoom 8-11 dekker nettopp det kommune-utsnitt typisk
+  // fittes til. 12 er et bevisst KONSERVATIVT tall — mpp (meter per piksel)
+  // ved gitt zoom er `156543 * cos(breddegrad) / 2^zoom`, og synker med
+  // økende breddegrad, så nord i Norge nås samme skala-terskel ved en noe
+  // lavere zoom enn 12. 12 er trygt for hele landet (Sør-Norge er
+  // "verste fall"), aldri for sent. Brukt to steder: `minZoom` på selve
+  // WMS-laget (nibioLayer() i initMap() — unngår bortkastede requests mot
+  // NIBIO under zoom 12) og som terskel for zoom-hintet i
+  // renderNibioLegend() under.
+  const NIBIO_MIN_ZOOM = 12;
+
   // Delt metadata mellom updateNibioLayersAvailability() (lag-kontroll) og
   // renderNibioLegend() (tegnforklaring under kartet, se index.html
   // #sp-nibio-legend). `layer` er en getter (ikke en fast verdi) fordi
@@ -3655,6 +3675,11 @@
     // 55% opacitet — testet direkte (pikselnøyaktig komposittert med et
     // ekte topo-utsnitt): ved full opasitet druknet høydekoter/stier/
     // stedsnavn nesten helt, ved 55% er begge deler leselige samtidig.
+    // minZoom: NIBIO_MIN_ZOOM (se den store kommentaren der) — NIBIOs egen
+    // server tegner uansett ingenting under zoom 12 (MaxScaleDenominator i
+    // GetCapabilities, empirisk bekreftet), så dette unngår bare bortkastede
+    // requester under den terskelen. Zoom-hintet i renderNibioLegend()
+    // forklarer selve ÅRSAKEN til brukeren.
     function nibioLayer(layerName){
       return L.tileLayer.wms('https://wms.nibio.no/cgi-bin/sr16', {
         layers: layerName,
@@ -3663,6 +3688,7 @@
         version: '1.3.0',
         opacity: 0.55,
         pane: 'nibioPane',
+        minZoom: NIBIO_MIN_ZOOM,
         attribution: 'Skogdata &copy; <a href="https://www.nibio.no/">NIBIO</a> (SR16)'
       });
     }
@@ -3739,6 +3765,14 @@
     // RETTET-kommentaren i updateNibioLayersAvailability()).
     leafletMap.on('overlayadd overlayremove', (e) => {
       if (NIBIO_LAYER_META.some(m => m.layer === e.layer)) { renderNibioLegend(); syncLegendPanelVisibility(); }
+    });
+
+    // RETTET 2026-08-24, runde 3 — zoom-hintet i renderNibioLegend() (se
+    // NIBIO_MIN_ZOOM) må oppdateres når brukeren zoomer, ikke bare når et
+    // lag krysses av/på. Kun et enkelt hasLayer()-sjekk per zoom — neglisjerbar
+    // kostnad, og gjør ingenting når ingen NIBIO-lag er aktive uansett.
+    leafletMap.on('zoomend', () => {
+      if (NIBIO_LAYER_META.some(m => m.layer && leafletMap.hasLayer(m.layer))) renderNibioLegend();
     });
 
     leafletMap.on('click', (e) => {
@@ -4013,7 +4047,16 @@
       return;
     }
     el.style.display = 'flex';
-    el.innerHTML = active.map(m => {
+    // RETTET 2026-08-24, runde 3 (se NIBIO_MIN_ZOOM) — under zoom 12 tegner
+    // NIBIOs server ingenting, uansett hvilket av de tre lagene som er
+    // aktivt. Ett samlet hint øverst (ikke duplisert per lag) forklarer
+    // ÅRSAKEN i stedet for et stille tomt kart. Fargeforklaringen vises
+    // uansett zoom under hintet — nyttig å se på forhånd hva man vil
+    // finne når man zoomer inn.
+    const zoomHint = leafletMap.getZoom() < NIBIO_MIN_ZOOM
+      ? `<div class="sp-nibio-zoom-hint">🔍 Zoom inn (til nabolagsnivå) for at NIBIO-laget skal tegnes i kartet — vises ikke på kommune-/fylkesnivå. Dette er en begrensning i NIBIOs egen kartjeneste, ikke en feil.</div>`
+      : '';
+    el.innerHTML = zoomHint + active.map(m => {
       const body = m.kind === 'swatches'
         ? `<div class="sp-nibio-swatches">${m.swatches.map(s => `<span class="sp-nibio-swatch"><i style="background:${s.color}"></i>${escapeHtml(s.label)}</span>`).join('')}</div>`
         : `<div class="sp-nibio-gradient">
