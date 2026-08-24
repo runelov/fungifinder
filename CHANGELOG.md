@@ -1,5 +1,35 @@
 # Endringslogg
 
+## 0.31.4 — Fiks treg/hakkete satellittlag
+Bruker meldte at satellittlaget "fryser til/lagger" og virker lite
+responsivt. Undersøkt direkte mot Esris fliseserver, ikke gjettet:
+
+- **Rotårsak**: `server.arcgisonline.com` svarer HTTP/1.1 (bekreftet med
+  `curl --http2`, som likevel forhandles ned) — i motsetning til topo-
+  (Kartverket) og standard-laget (OSM), som begge er HTTP/2. HTTP/1.1 gir
+  nettleseren et hardt tak på ~6 samtidige tilkoblinger PER vertsnavn;
+  HTTP/2 multiplekser i praksis ubegrenset over én tilkobling. Satellitt-
+  laget var derfor det eneste av de tre som faktisk rammes av dette taket
+  ved rask panorering/zooming.
+- **Fiks 1**: lagt til subdomene-sharding (`{s}` → `server`/`services`
+  .arcgisonline.com) — verifisert (DNS/CNAME, byte-for-byte identisk
+  fliseinnhold) å være nøyaktig samme CloudFront-distribusjon, så dette
+  dobler nettleserens reelle tilkoblingstak fra 6 til 12 for laget, uten
+  noen serverendring. Samme mønster OSM-laget allerede brukte.
+- **Fiks 2**: `maxNativeZoom: 18` lagt til (maxZoom fortsatt 19) — et
+  testpunkt i Nordmarka viste at zoom 19-flisen der kun hadde 123 unike
+  farger mot 10-16 000 for zoom 14-18, altså en oppskalert/uskarp flis,
+  ikke ekte detalj. Appen slutter å BE OM nye, meningsløse fliser forbi
+  reell oppløsning i skogsterreng (der appen faktisk brukes) — CSS-
+  oppskalering av siste ekte flis er gratis, et nettverkskall er ikke det.
+- **Målt effekt**: benchmark av 49 fliser (7x7-rutenett, zoom 15, ekte
+  kall mot Esris produksjonsservere, median av 5 kjøringer per scenario):
+  1,89s → 1,08s, **43 % raskere / 1,76×**.
+- Verifisert live: subdomene-fordelingen er reell (6/6-splitt observert i
+  nettleseren ved 12 fliser i visning), ikke bare i teorien.
+
+Versjon 0.31.3 → 0.31.4.
+
 ## 0.31.3 — Skill artsfakta fra stedsfakta (designgjennomgang del 2)
 To tekstblokker på hvert stedkort var artsgenerelle, ikke stedsspesifikke,
 og gjentok seg ordrett på alle kort for samme art: `species.why()`
