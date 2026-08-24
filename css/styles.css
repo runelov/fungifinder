@@ -277,6 +277,16 @@
      kort-navnet) i stedet for --russet/--gold, for ikke å forveksles med
      scorefargen på selve sirkelen eller med parkerings-P-en (blå). */
   .sp-area-badge { background: var(--pine-deep); color: var(--paper); border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: var(--fs-md); border: 2px solid var(--paper); box-shadow: 0 1px 3px rgba(0,0,0,0.4); font-family: 'JetBrains Mono', monospace; }
+  /* Lukkeknapp i kartlagsvelgeren (designgjennomgang 2026-08-24) — ikonet
+     som ÅPNER panelet (.leaflet-control-layers-toggle) får display:none fra
+     Leaflets egen CSS mens panelet er utvidet, så det finnes ellers ingen
+     synlig vei tilbake ("trykk utenfor" virker, men er udokumentert og var
+     i tillegg utrygt før vakten i initMap() — se RETTET-kommentaren der).
+     Ligger inni .leaflet-control-layers sin egen container, som Leaflet
+     allerede skjermer mot kart-klikk (disableClickPropagation) — trenger
+     derfor ingen egen vakt. */
+  .sp-layers-close { display: block; text-align: center; font-family: 'Source Sans 3', sans-serif; font-size: var(--fs-sm); font-weight: 600; color: var(--pine-deep); background: var(--paper-deep); border-top: 1px solid var(--line); padding: 7px 0; margin: 6px -12px -6px; text-decoration: none; cursor: pointer; }
+  .sp-layers-close:hover, .sp-layers-close:focus-visible { background: var(--paper); color: var(--russet-deep); }
 
   .sp-card { background: var(--paper-deep); border: 1px solid var(--line); border-radius: 4px; padding: 16px 18px; margin-bottom: 14px; position: relative; scroll-margin-top: 20px; }
   .sp-card.sp-excluded { opacity: 0.6; border-style: dashed; }
