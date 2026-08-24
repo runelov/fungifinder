@@ -225,18 +225,37 @@
     display: none;
   }
   body.sp-map-fullscreen-active { overflow: hidden; }
-  .sp-map-legend { display: flex; gap: 14px; font-size: var(--fs-xs); color: var(--ink-soft); margin-top: 6px; flex-wrap: wrap; }
+  /* RETTET 2026-08-24, runde 2 (designgjennomgang, NIBIO-lag-oppfølging) —
+     sp-map-legend og sp-nibio-legend er nå ÉN felles ramme (dette panelet)
+     i stedet for to løsrevne blokker (bruker: "litt rart at det er to
+     plasser med legends"). Selve panelet skjules helt av
+     syncLegendPanelVisibility() når ingen av de to seksjonene har noe å
+     forklare (bruker: legend vises selv uten analyserte steder). */
+  .sp-map-legend-panel { background: var(--paper-deep); border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; margin-top: 8px; }
+  .sp-map-legend { display: flex; gap: 14px; font-size: var(--fs-xs); color: var(--ink-soft); flex-wrap: wrap; }
   .sp-map-legend span { display: inline-flex; align-items: center; gap: 4px; }
   .sp-leg-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 
   /* Tegnforklaring for NIBIO-referanselagene — se renderNibioLegend() i
-     app.js. Én rad per aktivt lag, med NIBIOs egen GetLegendGraphic-bilde
-     (ikke noe FungiFinder tegner selv) + en kort forklaringslinje. */
-  .sp-nibio-legend { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
-  .sp-nibio-legend-row { display: flex; align-items: flex-start; gap: 10px; }
-  .sp-nibio-legend-row img { border-radius: 3px; border: 1px solid var(--line); background: var(--paper); flex-shrink: 0; }
-  .sp-nibio-legend-text { font-size: var(--fs-xs); color: var(--ink-soft); line-height: 1.5; }
-  .sp-nibio-legend-text b { color: var(--ink); font-weight: 600; }
+     app.js. Fargeswatsjer/gradienter er håndbygget i appens egen stil, med
+     RGB-verdier lest direkte av NIBIOs offisielle tegnforklaringsbilder
+     (ikke et innebygget bilde lenger — bruker påpekte at det virket
+     løsrevet fra resten av kartets tegnforklaring). Delt fra
+     .sp-map-legend kun når begge faktisk er synlige samtidig
+     (.sp-map-legend-panel-divided). */
+  .sp-nibio-legend { display: flex; flex-direction: column; gap: 10px; }
+  .sp-map-legend-panel-divided .sp-nibio-legend { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+  .sp-nibio-legend-row + .sp-nibio-legend-row { margin-top: 2px; }
+  .sp-nibio-legend-head { display: flex; align-items: baseline; gap: 7px; margin-bottom: 4px; }
+  .sp-nibio-legend-head b { font-size: var(--fs-sm); color: var(--ink); }
+  .sp-nibio-legend-src { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--moss); }
+  .sp-nibio-swatches { display: flex; flex-wrap: wrap; gap: 5px 12px; }
+  .sp-nibio-swatch { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-xs); color: var(--ink-soft); }
+  .sp-nibio-swatch i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; border: 1px solid rgba(0,0,0,0.15); }
+  .sp-nibio-gradient { max-width: 260px; }
+  .sp-nibio-gradient-bar { height: 8px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
+  .sp-nibio-gradient-labels { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-soft); margin-top: 3px; }
+  .sp-nibio-legend-context { font-size: var(--fs-xs); color: var(--ink-soft); line-height: 1.5; margin-top: 5px; padding-left: 2px; }
 
   .sp-results-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
   .sp-results-head h2 { font-family: 'Fraunces', serif; font-size: 19px; margin: 0; color: var(--pine-deep); }

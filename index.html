@@ -21,7 +21,7 @@
 <!-- ?v= MÅ holdes i sync med APP_VERSION i js/app.js ved hver release —
      app.js sjekker dette selv ved oppstart og varsler i konsollen (kun der,
      ikke i UI) hvis de kommer ut av synk. -->
-<link rel="stylesheet" href="css/styles.css?v=0.32.1"/>
+<link rel="stylesheet" href="css/styles.css?v=0.32.2"/>
 </head>
 <body>
 
@@ -276,21 +276,17 @@
             </div>
           </div>
           <div id="sp-leaflet-map" class="sp-leaflet-map"></div>
-          <div class="sp-map-legend">
-            <span><i class="sp-leg-dot" style="background:#5F7A3E"></i> høy score</span>
-            <span><i class="sp-leg-dot" style="background:#8FA35C"></i> god</span>
-            <span><i class="sp-leg-dot" style="background:#C8974A"></i> middels</span>
-            <span><i class="sp-leg-dot" style="background:#A23E2E"></i> lav / hogd</span>
-            <span>◎ liten stiplet ring = eget sted</span>
-            <span>Ⓝ nummerert sirkel = foreslått godt område</span>
-            <span>🅿️ = mulig parkering</span>
+          <!-- RETTET 2026-08-24 (bruker: legend vises selv uten analyserte
+               steder/forslag, og NIBIO-legend virket løsrevet som egen
+               "plass") — begge tegnforklaringene er nå ÉN felles ramme
+               (denne diven), fylt/vist av renderMapLegend()/
+               renderNibioLegend()/syncLegendPanelVisibility() i app.js.
+               Ingen statisk innhold igjen her — hele panelet starter skjult
+               til det faktisk finnes noe å forklare. -->
+          <div class="sp-map-legend-panel" id="sp-map-legend-panel" style="display:none;">
+            <div class="sp-map-legend" id="sp-map-legend"></div>
+            <div class="sp-nibio-legend" id="sp-nibio-legend"></div>
           </div>
-          <!-- Tegnforklaring for de admin-only NIBIO-referanselagene (Treslag/
-               Bonitet/Kronedekning) — fylles av renderNibioLegend() i app.js,
-               kun med rader for lag som faktisk er slått PÅ akkurat nå (samme
-               "avhengig av valgt lag"-prinsipp som resten av kart-legend-
-               arbeidet). Skjult helt (ikke bare tom) når ingen er aktive. -->
-          <div class="sp-nibio-legend" id="sp-nibio-legend" style="display:none;"></div>
           <div class="sp-map-hint" id="sp-map-hint"></div>
 
           <div class="sp-route-panel" id="sp-route-panel">
@@ -405,7 +401,7 @@
      worker/api/README.md). Testnøkkelen (1x00000000000000000000AA) hører
      kun hjemme i worker/api/.dev.vars for lokal utvikling, aldri her. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<script src="js/api-client.js?v=0.32.1"></script>
-<script src="js/app.js?v=0.32.1"></script>
+<script src="js/api-client.js?v=0.32.2"></script>
+<script src="js/app.js?v=0.32.2"></script>
 </body>
 </html>

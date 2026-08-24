@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.32.1';
+  const APP_VERSION = '0.32.2';
   const APP_BUILD_DATE = '2026-08-24';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -3223,20 +3223,66 @@
   let nibioTreslagLayer = null;
   let nibioBonitetLayer = null;
   let nibioKronedekLayer = null;
-  // RETTET 2026-08-24 (bruker: "det mangler beskrivelse av de tre nye
-  // kartlagene, og hvilke fargekoder som vises der" + "forklaring bør vel
-  // være avhengig av hvilket lag som er valgt") — delt metadata mellom
-  // updateNibioLayersAvailability() (lag-kontroll) og renderNibioLegend()
-  // (tegnforklaring under kartet, se index.html #sp-nibio-legend). `layer`
-  // er en getter (ikke en fast verdi) fordi denne konstanten defineres FØR
-  // initMap() har rukket å sette de faktiske nibio*Layer-variablene.
+  // RETTET 2026-08-24, runde 2 (bruker testet som admin og fant tre nye
+  // ting): (a) NIBIOs GetLegendGraphic-BILDE så malplassert ut ved siden av
+  // resten av kartets håndbygde tegnforklaring — byttet til ekte farge-
+  // svatsjer/gradienter i appens egen stil, med RGB-verdier lest direkte av
+  // NIBIOs offisielle tegnforklaringsbilder (pikselprøvd, ikke gjettet — se
+  // CHANGELOG for de eksakte hex-verdiene og fremgangsmåten). Eneste
+  // ulempen: hvis NIBIO noen gang endrer fargeskjemaet sitt, må disse
+  // oppdateres manuelt (i motsetning til et live-hentet bilde) — akseptert
+  // avveining for et resultat som faktisk ser ut som resten av appen.
+  // (b) "kind" skiller mellom TRESLAG (diskrete, ikke-ordnede kategorier —
+  // fargeswatsjer, samme mønster som sp-leg-dot) og BONITET/KRONEDEKNING
+  // (ordnede/kontinuerlige klasser — gradientstolpe, samme mønster som det
+  // opprinnelige (nå fjernede) voksestedslagets artslegend hadde).
+  // (c) `context()` kobler laget til APPENS FAKTISKE FORMÅL (finn gode
+  // steder for valgt sopp) — Treslag er den ENESTE av de tre som faktisk
+  // inngår i scoreLocation() (species.treslag), så den kan si noe presist
+  // og artsspesifikt; Bonitet/Kronedekning inngår IKKE i scoringen i dag,
+  // og sier derfor bevisst generelle, ikke-artsspesifikke ting — ingen
+  // presisjon appen ikke kan stå inne for.
+  //
+  // Delt metadata mellom updateNibioLayersAvailability() (lag-kontroll) og
+  // renderNibioLegend() (tegnforklaring under kartet, se index.html
+  // #sp-nibio-legend). `layer` er en getter (ikke en fast verdi) fordi
+  // denne konstanten defineres FØR initMap() har rukket å sette de
+  // faktiske nibio*Layer-variablene.
   const NIBIO_LAYER_META = [
-    { get layer(){ return nibioTreslagLayer; }, wmsName: 'SRVTRESLAG', label: 'Treslag',
-      hint: 'Farge viser dominerende treslag i skogfiguren — samme datakilde som terrengscoringen selv bruker for treslag.' },
-    { get layer(){ return nibioBonitetLayer; }, wmsName: 'SRVBONITET', label: 'Bonitet',
-      hint: 'Mørkere = mer produktiv skogbunn (indirekte indikasjon på vegetasjonsrikdom).' },
-    { get layer(){ return nibioKronedekLayer; }, wmsName: 'SRVKRONEDEK', label: 'Kronedekning',
-      hint: 'Mørkere = tettere trekroner (mer skygge, mindre bunnvegetasjon).' }
+    {
+      get layer(){ return nibioTreslagLayer; }, wmsName: 'SRVTRESLAG', label: 'Treslag', kind: 'swatches',
+      swatches: [
+        { color: '#52b038', label: 'Grandominert' },
+        { color: '#cdaa65', label: 'Furudominert' },
+        { color: '#abcd65', label: 'Barblanding' },
+        { color: '#ffb726', label: 'Blanding' },
+        { color: '#ffdc82', label: 'Lauvdominert' },
+        { color: '#969696', label: 'Ikke tresatt' },
+        { color: '#cccccc', label: 'Ikke beregnet' }
+      ],
+      context(){
+        if (!_currentSpecies) return 'Velg én art (ikke favoritt-modus) for å se hvilke farger som er relevante for akkurat den.';
+        const t1 = Array.isArray(_currentSpecies.treslag) ? _currentSpecies.treslag : [_currentSpecies.treslag];
+        const treslagTekst = t1.map(t => TXT.treslag[t] || t).join('/');
+        return `${_currentSpecies.name} foretrekker ${treslagTekst}skog — sammenlign fargen her med det du leter etter (samme datakilde som terrengscoringen selv bruker for treslag).`;
+      }
+    },
+    {
+      get layer(){ return nibioBonitetLayer; }, wmsName: 'SRVBONITET', label: 'Bonitet', kind: 'gradient',
+      swatches: [{ color: '#f7fcf5' }, { color: '#74c476' }, { color: '#005a32' }],
+      lowLabel: 'lav (G6)', highLabel: 'høy (G26+)',
+      context(){
+        return 'Ikke en del av scoringen i dag, men et jaktkort verdt å ha: mer produktiv skogbunn gir ofte rikere bunnvegetasjon.';
+      }
+    },
+    {
+      get layer(){ return nibioKronedekLayer; }, wmsName: 'SRVKRONEDEK', label: 'Kronedekning', kind: 'gradient',
+      swatches: [{ color: '#e5f5e0' }, { color: '#41ab5d' }, { color: '#00280f' }],
+      lowLabel: '0 %', highLabel: '100 %',
+      context(){
+        return 'Ikke en del av scoringen i dag, men relevant for mange arter: tettere kroner betyr mer skygge og fuktighet — se etter overgangen mellom tett og glissen skog.';
+      }
+    }
   ];
   let layersControl = null; // L.control.layers-instansen — se updateNibioLayersAvailability()
   let artskartMoveDebounce = null; // se moveend-lytteren i initMap()
@@ -3692,7 +3738,7 @@
     // checkbox-interaksjon (ikke et generisk map.removeLayer()-ekko, se
     // RETTET-kommentaren i updateNibioLayersAvailability()).
     leafletMap.on('overlayadd overlayremove', (e) => {
-      if (NIBIO_LAYER_META.some(m => m.layer === e.layer)) renderNibioLegend();
+      if (NIBIO_LAYER_META.some(m => m.layer === e.layer)) { renderNibioLegend(); syncLegendPanelVisibility(); }
     });
 
     leafletMap.on('click', (e) => {
@@ -3947,19 +3993,16 @@
     // blitt stående og vise et lag som nettopp ble fjernet programmatisk
     // (f.eks. en admin som logger ut med et NIBIO-lag aktivt).
     renderNibioLegend();
+    syncLegendPanelVisibility();
   }
 
-  function nibioLegendUrl(wmsName){
-    return `https://wms.nibio.no/cgi-bin/sr16?language=nor&version=1.3.0&service=WMS&request=GetLegendGraphic&sld_version=1.1.0&layer=${wmsName}&format=image/png`;
-  }
-
-  // RETTET 2026-08-24 (bruker: manglende beskrivelse av de tre NIBIO-lagene
-  // + forklaringen under kartet burde avhenge av hvilket lag som faktisk er
-  // valgt) — én rad PER AKTIVT lag, ikke en fast tekst. Bruker NIBIOs egen
-  // GetLegendGraphic (samme som ble verifisert i research-fasen) — ikke noe
-  // FungiFinder tegner/vedlikeholder selv. Kalt fra overlayadd/overlayremove
-  // i initMap() (dermed hver gang en admin krysser av/på et av lagene) og
-  // fra updateNibioLayersAvailability() (innlogging/utlogging).
+  // RETTET 2026-08-24, runde 2 — se den store kommentaren ved
+  // NIBIO_LAYER_META for hele begrunnelsen (bytte fra GetLegendGraphic-bilde
+  // til håndbygde swatsjer/gradienter i appens egen stil). Én rad PER AKTIVT
+  // lag, ikke en fast tekst — kalt fra overlayadd/overlayremove i initMap()
+  // (hver gang en admin krysser av/på et lag), fra render() (species-
+  // konteksten i Treslag-raden må oppdateres når valgt art endres, ikke bare
+  // når selve laget veksler), og fra updateNibioLayersAvailability().
   function renderNibioLegend(){
     const el = document.getElementById('sp-nibio-legend');
     if (!el || !leafletMap) return;
@@ -3970,11 +4013,64 @@
       return;
     }
     el.style.display = 'flex';
-    el.innerHTML = active.map(m => `
-      <div class="sp-nibio-legend-row">
-        <img src="${nibioLegendUrl(m.wmsName)}" alt="Tegnforklaring ${escapeHtml(m.label)}" width="90"/>
-        <div class="sp-nibio-legend-text"><b>${escapeHtml(m.label)} (NIBIO)</b><br/>${escapeHtml(m.hint)}</div>
-      </div>`).join('');
+    el.innerHTML = active.map(m => {
+      const body = m.kind === 'swatches'
+        ? `<div class="sp-nibio-swatches">${m.swatches.map(s => `<span class="sp-nibio-swatch"><i style="background:${s.color}"></i>${escapeHtml(s.label)}</span>`).join('')}</div>`
+        : `<div class="sp-nibio-gradient">
+             <div class="sp-nibio-gradient-bar" style="background:linear-gradient(90deg, ${m.swatches.map(s => s.color).join(', ')})"></div>
+             <div class="sp-nibio-gradient-labels"><span>${escapeHtml(m.lowLabel)}</span><span>${escapeHtml(m.highLabel)}</span></div>
+           </div>`;
+      return `
+        <div class="sp-nibio-legend-row">
+          <div class="sp-nibio-legend-head"><b>${escapeHtml(m.label)}</b><span class="sp-nibio-legend-src">NIBIO</span></div>
+          ${body}
+          <div class="sp-nibio-legend-context">🎯 ${escapeHtml(m.context())}</div>
+        </div>`;
+    }).join('');
+  }
+
+  // RETTET 2026-08-24 (bruker: statiske tekster under kartet vises selv om
+  // ingen områder er analysert/foreslått ennå) — hele legend-blokken
+  // (score/eget sted/foreslått område/parkering) skjules nå helt når det
+  // ikke finnes noen scorede steder i valgt område, og "foreslått
+  // område"/parkering-linjene vises kun når suggestAreas() faktisk har
+  // produsert noe. Bruker scopedLocations() (samme filter som
+  // resultatlisten/kartmarkørene) i stedet for et tall sendt inn, slik at
+  // funksjonen trygt kan kalles fra suggestAreas()/clearRoute() også — ikke
+  // bare fra render() — uten å måtte tre state gjennom flere kallesteder.
+  function renderMapLegend(){
+    const el = document.getElementById('sp-map-legend');
+    if (!el) return;
+    const hasPoints = scopedLocations().length > 0;
+    if (!hasPoints) {
+      el.style.display = 'none';
+      el.innerHTML = '';
+      return;
+    }
+    const hasAreas = !!(suggestedRoute && suggestedRoute.areas && suggestedRoute.areas.length);
+    el.style.display = 'flex';
+    el.innerHTML = `
+      <span><i class="sp-leg-dot" style="background:#5F7A3E"></i> høy score</span>
+      <span><i class="sp-leg-dot" style="background:#8FA35C"></i> god</span>
+      <span><i class="sp-leg-dot" style="background:#C8974A"></i> middels</span>
+      <span><i class="sp-leg-dot" style="background:#A23E2E"></i> lav / hogd</span>
+      <span>◎ liten stiplet ring = eget sted</span>
+      ${hasAreas ? `<span>Ⓝ nummerert sirkel = foreslått godt område</span><span>🅿️ = mulig parkering</span>` : ''}
+    `;
+  }
+
+  // RETTET 2026-08-24 (bruker: "litt rart at det er to plasser med
+  // legends") — sp-map-legend og sp-nibio-legend er nå to seksjoner i ÉN
+  // felles ramme (#sp-map-legend-panel, se CSS) i stedet for to løsrevne
+  // blokker. Panelet vises kun når minst én av de to seksjonene faktisk har
+  // noe å si — begge kan uansett være tomme/skjulte hver for seg.
+  function syncLegendPanelVisibility(){
+    const panel = document.getElementById('sp-map-legend-panel');
+    if (!panel) return;
+    const mapVisible = getComputedStyle(document.getElementById('sp-map-legend')).display !== 'none';
+    const nibioVisible = getComputedStyle(document.getElementById('sp-nibio-legend')).display !== 'none';
+    panel.style.display = (mapVisible || nibioVisible) ? 'block' : 'none';
+    panel.classList.toggle('sp-map-legend-panel-divided', mapVisible && nibioVisible);
   }
 
   // ---------- turforslag (rundtur) ----------
@@ -4076,6 +4172,12 @@
     const clearBtn = document.getElementById('sp-route-clear');
     if (summary) summary.style.display = 'none';
     if (clearBtn) clearBtn.style.display = 'none';
+    // RETTET 2026-08-24: "Ⓝ nummerert sirkel = foreslått område"/parkering-
+    // linjene i legend-en skal forsvinne UMIDDELBART når ruten fjernes, ikke
+    // først ved neste hele render() (mange kallesteder for clearRoute() gjør
+    // ikke det, se f.eks. viewmode-bytte).
+    renderMapLegend();
+    syncLegendPanelVisibility();
   }
 
   // Stiplede sirkler i stedet for punkt-til-punkt-rute (se samtalen
@@ -4252,6 +4354,12 @@
       <span style="font-size:var(--fs-xs);opacity:0.8;">Sirkelen markerer et OMRÅDE med gode odds — de kjente punktene inni den er allerede tegnet, men det finnes trolig gode voksesteder mellom dem også, ikke bare akkurat der prikkene ligger. Parkeringsmarkører er hentet fra kartdata og kan avvike fra virkeligheten — bekreft alltid på stedet.</span>
     `;
     document.getElementById('sp-route-clear').style.display = '';
+    // RETTET 2026-08-24: "Ⓝ nummerert sirkel = foreslått område"/parkering-
+    // linjene skal dukke opp UMIDDELBART når områder faktisk foreslås, ikke
+    // først ved neste hele render() (suggestAreas() kaller aldri render()
+    // selv — den oppdaterer kartet/summary-teksten direkte).
+    renderMapLegend();
+    syncLegendPanelVisibility();
   }
 
   // ---------- render ----------
@@ -4855,10 +4963,17 @@
     let scoped = scoredAll.filter(s => isInCurrentScope(s.loc));
 
     renderMap(scoped);
-    // NIBIO-referanselagene (Treslag/Bonitet/Kronedekning) trenger ingen
-    // per-render-oppdatering — de er statiske L.tileLayer.wms()-lag, ikke
-    // data-drevne som det tidligere voksestedslaget var. Tilgjengelighet
-    // (admin-only) styres separat, se updateNibioLayersAvailability().
+    // NIBIO-referanselagene selv (Treslag/Bonitet/Kronedekning) trenger
+    // ingen per-render-oppdatering — de er statiske L.tileLayer.wms()-lag,
+    // ikke data-drevne som det tidligere voksestedslaget var. Tilgjengelighet
+    // (admin-only) styres separat, se updateNibioLayersAvailability(). MEN
+    // tegnforklaringen under kartet (begge deler — se renderMapLegend()/
+    // renderNibioLegend()) må friskes opp her: species-konteksten i Treslag-
+    // raden avhenger av _currentSpecies, og selve poeng-legenden avhenger av
+    // om det faktisk finnes scorede steder i valgt område akkurat nå.
+    renderMapLegend();
+    renderNibioLegend();
+    syncLegendPanelVisibility();
     renderHogstZones();
     renderFindsLayer();
     renderDelteFunnLayer();
