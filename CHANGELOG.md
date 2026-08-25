@@ -1,5 +1,76 @@
 # Endringslogg
 
+## 0.32.6 — NIBIO-lag: gråtonet bakgrunn mens laget er aktivt
+
+Tredje funn fra samme designkritikk som v0.32.5: NIBIOs egne kategoriske
+farger (grønn for Grandominert/Barblanding, tan/gul for Furudominert/
+Blanding/Lauvdominert, se `NIBIO_LAYER_META` i `js/app.js`) deler
+fargefamilie med bakgrunnskartets EGEN innebygde landskapsfarging —
+topo-laget bruker allerede grønt for skog og beige/tan for åpen mark som
+sin egen fargekoding. De to informasjonslagene smeltet derfor sammen i
+stedet for å skille seg fra hverandre, verifisert mot et ekte skjermbilde
+i gjennomgangen.
+
+Kan ikke fikses ved å endre NIBIOs egne farger (ferdigrendret WMS-bilde,
+ingen tilgang til rådata her) — løsningen angriper i stedet selve
+bakgrunnen: `.leaflet-tile-pane` (flisepanen bak, uansett hvilket av
+Topografisk/Standard/Satellitt som er valgt — filteret sitter på panen,
+ikke på ett bestemt lag) gråtones automatisk mens minst ett NIBIO-lag er
+aktivt (`grayscale(0.82) brightness(1.1) contrast(0.94)`), så NIBIO-fargene
+får et nøytralt underlag å stå imot i stedet for å drukne i det. NIBIO-
+laget selv (`#nibioPane`) er upåvirket — det skal fortsatt vise ekte farger.
+
+- Konseptet ble først vist som en frittstående mockup (Voronoi-generert
+  tilnærming av topo+NIBIO-mosaikken, samme frø i begge paneler for en
+  rettferdig før/etter-sammenligning) og godkjent av bruker før
+  implementasjon.
+- `updateNibioBackgroundFilter()` (ny, `js/app.js`) toggler klassen
+  `sp-nibio-aktiv` på kartcontaineren. Kalt fra to steder — samme mønster
+  som `renderNibioLegend()`/`syncLegendPanelVisibility()` allerede bruker:
+  `overlayadd overlayremove`-lytteren (vanlig av/på-kryssing, inkl. den
+  programmatiske av-kryssingen fra v0.32.5s gjensidig-utelukkelse-fiks) OG
+  `updateNibioLayersAvailability()` (innlogging/utlogging går IKKE via den
+  lytteren, se eget RETTET-notat der fra v0.32.4).
+- Fargeverdiene er hentet fra mockupen, ikke pikselnøyaktig testet mot
+  ekte Kartverket-fliser slik `NIBIO_MIN_ZOOM`/55%-opasiteten ble i
+  v0.32.2-v0.32.4 — juster om det viser seg for kraftig/svakt i praksis
+  ved faktisk admin-bruk.
+
+Versjon 0.32.5 → 0.32.6.
+
+## 0.32.5 — NIBIO-lag: flisretry + gjensidig utelukkelse
+
+To funn fra en oppfølgende designkritikk av NIBIO-referanselagene
+(Treslag/Bonitet/Kronedekning, se v0.32.0-v0.32.4):
+
+1. **`attachTileRetry()` var ikke koblet til NIBIO-lagene.** Funksjonen
+   fantes allerede (brukt av topo-/standard-/satellittlaget) for å prøve
+   avbrutte/feilede fliser på nytt automatisk, men de tre nye NIBIO-lagene
+   ble aldri lagt til i den listen. Spesielt uheldig her: en avbrutt/feilet
+   flis ser visuelt IDENTISK ut som "under zoom 13" (blank/gjennomsiktig)
+   — nøyaktig den forvekslingen v0.32.3/v0.32.4 brukte to runder på å
+   diagnostisere for selve zoom-terskelen. Uten retry kunne et ekte
+   nettverksglipp bli feiltolket som "zoom mer", siden zoom-hintet i
+   `renderNibioLegend()` kun ser på gjeldende zoom-nivå og ikke skiller de
+   to tilfellene. Rettet: `[nibioTreslagLayer, nibioBonitetLayer,
+   nibioKronedekLayer].forEach(attachTileRetry)` i `initMap()`.
+
+2. **De tre NIBIO-lagene kunne vises samtidig.** De ligger som
+   avkrysningsbokser i lag-kontrollen (Leaflet har ingen radio-modus for
+   overlegg, kun for bakgrunnskart) og deler samme pane ved 55 % opasitet
+   hver — to eller tre samtidig ga en uleselig fargeblanding uten
+   sammenheng med noen av legend-radene som da vises. Håndhevet gjensidig
+   utelukkelse programmatisk i `overlayadd`-lytteren: når ett NIBIO-lag
+   slås PÅ, slås de to andre AV. Måtte i tillegg kalle
+   `layersControl._update()` eksplisitt (verifisert direkte mot
+   `leaflet-src.js` 1.9.4) — en `removeLayer()` kalt fra denne lytteren
+   skjer mens `L.Control.Layers` sin egen klikkhåndtering fortsatt har
+   `_handlingClick=true`, som eksplisitt bevokter unna den vanlige
+   avkrysningsboks-synkroniseringen; uten det ekstra kallet ville boksen
+   for laget som nettopp ble fjernet blitt stående visuelt avkrysset.
+
+Versjon 0.32.4 → 0.32.5.
+
 ## 0.32.4 — Rettet: NIBIO-terskelen i v0.32.3 var faktisk zoom 13, ikke 12
 
 Bruker rapporterte, rett etter at v0.32.3 ble skipsatt: "Det virker å være

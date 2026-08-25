@@ -167,6 +167,20 @@
      "Redesignforslag 2026-08-21", endring 4. */
   .sp-mini-btn { background: none; border: 1px solid var(--line); border-radius: 3px; font-size: var(--fs-xs); padding: 14px 8px; cursor: pointer; color: var(--ink-soft); }
   .sp-leaflet-map { height: 360px; border: 1px solid var(--line); border-radius: 3px; }
+  /* NYTT (designkritikk 2026-08-25, fiks #3) — NIBIOs egne kategoriske
+     farger (grønn/tan/gul, se js/app.js NIBIO_LAYER_META) deler fargefamilie
+     med bakgrunnskartets egen landskapsfarging (topo-laget bruker også
+     grønt for skog/tan for åpen mark), så de to informasjonslagene smelter
+     sammen. Klassen sitter på selve .leaflet-tile-pane (bakgrunnsflisene),
+     IKKE på #nibioPane (se initMap()) — NIBIO-laget skal fortsatt vise
+     ekte farger, kun bakgrunnen det legges oppå skal bli nøytral. Toggles
+     av updateNibioBackgroundFilter() i js/app.js, virker uansett hvilket
+     bakgrunnskart (Topografisk/Standard/Satellitt) som er valgt siden
+     filteret sitter på panen, ikke på ett bestemt lag. Verdiene er hentet
+     fra mockupen brukeren godkjente — ikke pikselnøyaktig testet mot ekte
+     Kartverket-fliser ennå slik NIBIO_MIN_ZOOM/55%-opasiteten ble, juster
+     om det viser seg for kraftig/svakt i praksis. */
+  .sp-leaflet-map.sp-nibio-aktiv .leaflet-tile-pane { filter: grayscale(0.82) brightness(1.1) contrast(0.94); }
   /* Leaflets egne zoom-knapper er 26×26px by default — under 44px-målet
      resten av trykkflatene på siden nå følger. Se
      "Redesignforslag 2026-08-21", endring 4. */
