@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.32.4';
-  const APP_BUILD_DATE = '2026-08-24';
+  const APP_VERSION = '0.32.6';
+  const APP_BUILD_DATE = '2026-08-25';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
   // kommentar der) — de to må holdes i sync manuelt siden repoet bevisst
@@ -3707,6 +3707,16 @@
     nibioTreslagLayer = nibioLayer('SRVTRESLAG');
     nibioBonitetLayer = nibioLayer('SRVBONITET');
     nibioKronedekLayer = nibioLayer('SRVKRONEDEK');
+    // RETTET (designkritikk 2026-08-25) — attachTileRetry() fantes allerede
+    // for de tre bakgrunnskartene (topoLayer/standardLayer/satelliteLayer,
+    // se kallet like over initMap()) men var IKKE koblet til NIBIO-lagene.
+    // Ekstra viktig akkurat her: en avbrutt/feilet flis ser IDENTISK ut som
+    // "under zoom 13" (blank/gjennomsiktig) — nøyaktig den forvekslingen
+    // v0.32.3/v0.32.4 brukte to runder på å diagnostisere for selve
+    // zoom-terskelen. Uten retry kan et ekte nettverksglipp bli feiltolket
+    // som "zoom mer" av brukeren, siden zoom-hintet i renderNibioLegend()
+    // kun ser på leafletMap.getZoom() og ikke skiller de to tilfellene.
+    [nibioTreslagLayer, nibioBonitetLayer, nibioKronedekLayer].forEach(attachTileRetry);
 
     // Lag-kontroll: bytt bakgrunnskart (radioknapper) og skru målepunkter/
     // rundtur/hogstfelt/funn av/på (avkrysning) — praktisk når man vil se
@@ -3776,7 +3786,35 @@
     // checkbox-interaksjon (ikke et generisk map.removeLayer()-ekko, se
     // RETTET-kommentaren i updateNibioLayersAvailability()).
     leafletMap.on('overlayadd overlayremove', (e) => {
-      if (NIBIO_LAYER_META.some(m => m.layer === e.layer)) { renderNibioLegend(); syncLegendPanelVisibility(); }
+      if (!NIBIO_LAYER_META.some(m => m.layer === e.layer)) return;
+      // RETTET (designkritikk 2026-08-25) — NIBIO-lagene ligger som
+      // avkrysningsbokser (L.Control.Layers har ingen radio-modus for
+      // overlegg, kun for bakgrunnskart), men er IKKE ment å vises flere
+      // om gangen: de deler samme pane ved 55% opasitet hver, så to eller
+      // tre samtidig blir en uleselig fargeblanding som ikke tilsvarer
+      // noen av legend-radene som da vises. Håndhever derfor selv
+      // gjensidig utelukkelse: når ett NIBIO-lag slås PÅ, slår vi de to
+      // andre AV programmatisk.
+      if (e.type === 'overlayadd') {
+        NIBIO_LAYER_META.forEach(m => {
+          if (m.layer && m.layer !== e.layer && leafletMap.hasLayer(m.layer)) leafletMap.removeLayer(m.layer);
+        });
+        // Verifisert direkte mot leaflet-src.js 1.9.4: en removeLayer()
+        // kalt herfra skjer MENS L.Control.Layers sin egen _onInputClick
+        // fortsatt har _handlingClick=true (vi er inni samme synkrone
+        // kall-kjede som selve brukerklikket) — _onLayerChange() sin
+        // _update()-linje (som ellers synkroniserer avkrysningsboksene mot
+        // faktisk map.hasLayer()-tilstand) er eksplisitt bevoktet til IKKE
+        // å kjøre mens _handlingClick er sann, og ingenting kaller den på
+        // nytt etterpå. Uten dette kallet ville derfor avkrysningsboksen
+        // for laget vi nettopp fjernet blitt stående visuelt AVKRYSSET.
+        // _update() er en ren, sideeffektfri redraw av lag-listene (ingen
+        // state-endring utover selve DOM-en) — trygg å kalle direkte.
+        layersControl._update();
+      }
+      renderNibioLegend();
+      syncLegendPanelVisibility();
+      updateNibioBackgroundFilter();
     });
 
     // RETTET 2026-08-24, runde 3 — zoom-hintet i renderNibioLegend() (se
@@ -4040,6 +4078,12 @@
     // (f.eks. en admin som logger ut med et NIBIO-lag aktivt).
     renderNibioLegend();
     syncLegendPanelVisibility();
+    // Samme grunn som RETTET-notatet over: denne grenen når heller ikke
+    // 'overlayadd overlayremove'-lytteren i initMap(), så
+    // updateNibioBackgroundFilter() må kalles eksplisitt her også — ellers
+    // kunne bakgrunnskartet blitt stående gråtonet etter at en admin logger
+    // ut med et NIBIO-lag aktivt.
+    updateNibioBackgroundFilter();
   }
 
   // RETTET 2026-08-24, runde 2 — se den store kommentaren ved
@@ -4082,6 +4126,26 @@
           <div class="sp-nibio-legend-context">🎯 ${escapeHtml(m.context())}</div>
         </div>`;
     }).join('');
+  }
+
+  // NYTT (designkritikk 2026-08-25, fiks #3 — mockup godkjent av bruker) —
+  // NIBIOs kategoriske farger (grønn/tan/gul, se NIBIO_LAYER_META) deler
+  // fargefamilie med bakgrunnskartets EGEN innebygde landskapsfarging
+  // (topo-laget bruker også grønt for skog, beige/tan for åpen mark), så
+  // de to informasjonslagene smelter sammen i stedet for å skille seg fra
+  // hverandre. Kan ikke fikses ved å endre NIBIOs egne farger (ferdig-
+  // rendret WMS-bilde, ingen tilgang til rådata her) — løsningen angriper
+  // i stedet BAKGRUNNEN: gråtoner selve flisepanen mens et NIBIO-lag er
+  // aktivt, uansett hvilket bakgrunnskart som er valgt (klassen sitter på
+  // .leaflet-tile-pane, ikke på ett bestemt lag, se css/styles.css). Kalt
+  // fra to steder — samme mønster/begrunnelse som renderNibioLegend()/
+  // syncLegendPanelVisibility(): 'overlayadd overlayremove'-lytteren over
+  // (vanlig av/på-kryssing) OG updateNibioLayersAvailability() (innlogging/
+  // utlogging går IKKE via den lytteren, se RETTET-notatet der).
+  function updateNibioBackgroundFilter(){
+    if (!leafletMap) return;
+    const active = NIBIO_LAYER_META.some(m => m.layer && leafletMap.hasLayer(m.layer));
+    leafletMap.getContainer().classList.toggle('sp-nibio-aktiv', active);
   }
 
   // RETTET 2026-08-24 (bruker: statiske tekster under kartet vises selv om
