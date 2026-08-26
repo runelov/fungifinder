@@ -1,5 +1,19 @@
 # Endringslogg
 
+## 0.32.7 — NIBIO-referanselagene åpnet for alle innloggede brukere
+
+De tre NIBIO WMS-referanselagene (Treslag/Bonitet/Kronedekning, se
+`NIBIO_LAYER_META` i `js/app.js`) var admin-only siden de erstattet det
+gamle voksestedslaget (v0.32.0, "valider i ro og mak" før bredere
+utrulling). Etter en drøy ukes admin-bruk uten treff å rette på, er
+gatingen i `updateNibioLayersAvailability()` byttet fra `isAdmin()` til
+`personalFeaturesEnabled()` — samme grense som resten av de
+innloggingskrevende funksjonene i appen (funn, hogstfelt, tur-forslag)
+bruker. Lagene viser uansett bare NIBIOs egne offentlige referansedata,
+ikke noe admin-sensitivt, så det var ingen grunn til å holde dem tilbake
+fra vanlige `bruker`-kontoer. Uinnloggede ser fortsatt ikke lagene i det
+hele tatt.
+
 ## 0.32.6 — NIBIO-lag: gråtonet bakgrunn mens laget er aktivt
 
 Tredje funn fra samme designkritikk som v0.32.5: NIBIOs egne kategoriske
