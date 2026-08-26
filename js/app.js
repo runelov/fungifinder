@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.32.6';
-  const APP_BUILD_DATE = '2026-08-25';
+  const APP_VERSION = '0.32.7';
+  const APP_BUILD_DATE = '2026-08-26';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
   // kommentar der) — de to må holdes i sync manuelt siden repoet bevisst
@@ -4047,12 +4047,15 @@
   // for å bygge egen rendring viser disse laget NIBIOs EGNE, ferdig
   // rendrede WMS-kartbilder (ekte skogfigurer, samme datakilde som
   // terrengscoringen for treslag) — se nibioLayer()/initMap() for selve
-  // laget. Admin-only inntil videre, samme begrunnelse som forgjengeren
-  // hadde ("valider i ro og mak" før bredere utrulling) — legges til/
-  // fjernes fra selve lag-kontrollen dynamisk her, i stedet for kun å
-  // styre CSS-synlighet, slik at vanlige brukere verken ser avkrysningene
-  // eller kan skru dem på via DevTools. Kalt fra reflectAccountUi()
-  // (dermed ved oppstart, innlogging og utlogging).
+  // laget. Var admin-only til 2026-08-26 ("valider i ro og mak" før bredere
+  // utrulling, samme begrunnelse som forgjengeren hadde) — validert og nå
+  // åpnet for alle innloggede brukere (ikke bare admin), siden lagene bare
+  // viser NIBIOs egne offentlige referansedata og ikke noe admin-sensitivt.
+  // Fortsatt skjult for uinnloggede (samme grense som personalFeaturesEnabled()
+  // ellers bruker) — legges til/fjernes fra selve lag-kontrollen dynamisk
+  // her, i stedet for kun å styre CSS-synlighet, slik at uinnloggede verken
+  // ser avkrysningene eller kan skru dem på via DevTools. Kalt fra
+  // reflectAccountUi() (dermed ved oppstart, innlogging og utlogging).
   function updateNibioLayersAvailability(){
     if (!layersControl) return;
     // removeLayer() FØRST, uansett (IKKE removeOverlay() — L.Control.Layers
@@ -4062,7 +4065,7 @@
     // å kalle flere ganger uten å hope opp duplikate rader i lag-
     // kontrollen (addOverlay() sjekker ikke selv om laget allerede finnes).
     NIBIO_LAYER_META.forEach(m => { if (m.layer) layersControl.removeLayer(m.layer); });
-    if (isAdmin()) {
+    if (personalFeaturesEnabled()) {
       NIBIO_LAYER_META.forEach(m => { if (m.layer) layersControl.addOverlay(m.layer, `${m.label} (NIBIO)`); });
     } else {
       NIBIO_LAYER_META.forEach(m => {
