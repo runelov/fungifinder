@@ -1,6 +1,6 @@
 #!/bin/sh
-# Sjekker at APP_VERSION (js/app.js) og alle tre ?v=-cache-busterne i
-# index.html (css/styles.css, js/api-client.js, js/app.js) er i sync før
+# Sjekker at APP_VERSION (js/app.js) og alle ?v=-cache-busterne i
+# index.html (css/styles.css, js/analytics.js, js/api-client.js, js/app.js) er i sync før
 # commit — se README.md "Versjonering og caching" for hvorfor dette ikke
 # bare er kosmetisk (?v= ER cache-busting-mekanismen, ingen build-steg her).
 #
@@ -18,7 +18,7 @@ if [ -z "$app_version" ]; then
 fi
 
 mismatch=0
-for fil in "css/styles.css" "js/api-client.js" "js/app.js"; do
+for fil in "css/styles.css" "js/analytics.js" "js/api-client.js" "js/app.js"; do
   v=$(grep -o "${fil}?v=[^\"']*" index.html | head -1 | sed "s|.*?v=||")
   if [ "$v" != "$app_version" ]; then
     echo "pre-commit: index.html sin ?v= for $fil er '$v', men APP_VERSION er '$app_version'" >&2
@@ -28,7 +28,7 @@ done
 
 if [ "$mismatch" -eq 1 ]; then
   echo "" >&2
-  echo "Alle tre ?v= i index.html må bumpes sammen med APP_VERSION ved hver release" >&2
+  echo "Alle ?v= i index.html må bumpes sammen med APP_VERSION ved hver release" >&2
   echo "— se README.md 'Versjonering og caching'. Commit avbrutt." >&2
   exit 1
 fi

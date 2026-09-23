@@ -16,14 +16,14 @@ function les(relPath) {
 }
 
 describe('versjonskonsistens (regresjon for v0.30.3/v0.30.4-klassen cache-busting-bugs)', () => {
-  test('APP_VERSION i app.js matcher ?v= på css/styles.css, js/api-client.js og js/app.js i index.html, og toppen av CHANGELOG.md', () => {
+  test('APP_VERSION i app.js matcher ?v= på css/styles.css, js/analytics.js, js/api-client.js og js/app.js i index.html, og toppen av CHANGELOG.md', () => {
     const appJs = les('js/app.js');
     const versjonMatch = appJs.match(/const APP_VERSION = '([^']+)'/);
     assert.ok(versjonMatch, 'fant ikke APP_VERSION i js/app.js');
     const versjon = versjonMatch[1];
 
     const indexHtml = les('index.html');
-    for (const fil of ['css/styles.css', 'js/api-client.js', 'js/app.js']) {
+    for (const fil of ['css/styles.css', 'js/analytics.js', 'js/api-client.js', 'js/app.js']) {
       const re = new RegExp(fil.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\?v=([^"\']+)');
       const m = indexHtml.match(re);
       assert.ok(m, `fant ikke ?v=-parameter for ${fil} i index.html`);
@@ -43,6 +43,26 @@ describe('Turnstile-nøkkel (regresjon for produksjonshendelsen 2026-07-20)', ()
     const m = indexHtml.match(/data-sitekey="([^"]+)"/);
     assert.ok(m, 'fant ikke data-sitekey i index.html');
     assert.notEqual(m[1], '1x00000000000000000000AA', 'index.html bruker Cloudflares always-pass-testnøkkel — hører kun hjemme i worker/api/.dev.vars');
+  });
+});
+
+describe('Webanalyse (PostHog) — personvernoppsett', () => {
+  // Se README.md "Webanalyse (PostHog)": oppsettet er valgt for å slippe
+  // samtykkebanner og for å aldri sende personopplysninger. Disse
+  // innstillingene skal ikke kunne endres i forbifarten.
+  const analyticsJs = les('js/analytics.js');
+  for (const [navn, re] of [
+    ['EU-host', /api_host:\s*POSTHOG_HOST/],
+    ['EU-host-verdi', /POSTHOG_HOST = 'https:\/\/eu\.i\.posthog\.com'/],
+    ["persistence: 'memory' (ingen cookies/localStorage)", /persistence:\s*'memory'/],
+    ['autocapture av', /autocapture:\s*false/],
+    ['opptak av økter av', /disable_session_recording:\s*true/],
+    ['URL-stripping', /sanitize_properties/],
+  ]) {
+    test(navn, () => assert.match(analyticsJs, re));
+  }
+  test('app.js kaller aldri posthog.identify()', () => {
+    assert.doesNotMatch(les('js/app.js'), /identify\(/);
   });
 });
 
