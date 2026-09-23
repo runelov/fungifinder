@@ -23,12 +23,13 @@ export async function sendInnloggingsLenke(epost, lenkeUrl, kode, env) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      // FungiFinder eier ikke sitt eget domene ennå — gjenbruker samme
-      // Resend-konto og allerede-verifiserte avsender-subdomene som
-      // Bondøya (mail.bondoya.no, se dens worker/api/src/lib/epost.js),
-      // bare med en egen lokal-del så avsenderidentiteten skiller seg
-      // tydelig fra Bondøyas egne e-poster i innboksen.
-      from: 'FungiFinder <fungifinder@mail.bondoya.no>',
+      // Eget verifisert Resend-domene (mail.fungifinder.no) siden
+      // 2026-09-23. Før det gjenbrukte FungiFinder Bondøyas
+      // mail.bondoya.no, fordi Resends gratiskonto bare tillot ett
+      // verifisert domene — nå tillater den tre. Samme Resend-konto og
+      // API-nøkkel som Bondøya fortsatt, men endringer i Bondøyas
+      // sendedomene påvirker ikke lenger FungiFinders innloggingsepost.
+      from: 'FungiFinder <innlogging@mail.fungifinder.no>',
       to: epost,
       subject: 'Logg inn på FungiFinder',
       html: `<p>Klikk for å logge inn: <a href="${lenkeUrl}">${lenkeUrl}</a></p><p>Bruker du FungiFinder som en snarvei på hjemskjermen? Lenken over åpnes i Safari, ikke i selve appen. Skriv i stedet inn denne koden under "Konto" i appen: <b>${kode}</b></p><p>Lenken og koden er gyldig i 15 minutter og kan kun brukes én gang.</p>`,
