@@ -134,6 +134,38 @@ Artfakta/SLU Artdatabanken og Artsdatabankens rødliste, se
   tilgjengelig for alle som har lenken, men `fungifinder-api` krever gyldig
   sesjon for all lese-/skrivetilgang til terreng-/personlige data.
 
+## Webanalyse (PostHog)
+
+Uttesting av [PostHog](https://posthog.com) som webanalyse, lagt inn i
+v0.33.0 via `js/analytics.js`. Selve integrasjonen er en tynn
+`window.Analytics`-wrapper (`settRolle()`, `track()`), så resten av appen
+aldri snakker direkte med PostHog. Dermed er det enkelt å bytte verktøy
+eller fjerne analysen igjen.
+
+**Personvernvalg (låst av tester i `test/repo-consistency.test.js`):**
+EU Cloud; `persistence: 'memory'` (ingen cookies eller localStorage, så
+ekomlovens samtykkekrav slår ikke inn); ingen `identify()`; ingen
+autocapture og ingen opptak av økter; query/hash strippes fra URL-er.
+Prisen er at hver sidelasting blir en ny anonym besøkende. Vil vi senere
+måle retensjon, må vi over på `localStorage`/cookie-persistens, og da
+trenger vi samtykke.
+
+**Nye hendelser:** kall `window.Analytics?.track('navn', { … })` fra
+`app.js`. Hold egenskapene grove (enum-lignende verdier), aldri fritekst,
+e-post, kortnavn eller koordinater.
+
+**Oppsett (én gang):**
+
+1. Opprett et prosjekt i PostHog **EU Cloud** (`eu.posthog.com`).
+2. Under Project settings: slå på **«Discard client IP data»**, og sett
+   sesjonsopptak, autocapture og surveys til av (de er av i klienten også,
+   men dobbel sikring).
+3. Lim inn prosjektnøkkelen (`phc_…`) i `POSTHOG_KEY` i `js/analytics.js`.
+   Den er en offentlig klientnøkkel, ikke en hemmelighet.
+4. Nevn PostHog i personvernerklæringen, hvis/når appen får en.
+
+Lokalt (`localhost`) og på andre domener sendes ingenting.
+
 ## Enhetstester
 
 Ingen build/lint-steg her fortsatt, men det finnes nå et enhetstestregime

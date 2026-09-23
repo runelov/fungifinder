@@ -1,7 +1,7 @@
 (function(){
 
-  const APP_VERSION = '0.32.7';
-  const APP_BUILD_DATE = '2026-08-26';
+  const APP_VERSION = '0.33.0';
+  const APP_BUILD_DATE = '2026-09-23';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
   // kommentar der) — de to må holdes i sync manuelt siden repoet bevisst
@@ -792,6 +792,7 @@
       if (isAdmin()) { renderAdminBrukere(); renderAdminInvitasjoner(); renderAdminStatistikk(); }
     }
     updateNibioLayersAvailability();
+    window.Analytics?.settRolle(currentUser ? currentUser.rolle : 'anonym', APP_VERSION);
   }
 
   function wireLoginForm(){
@@ -830,6 +831,7 @@
       statusEl.textContent = 'Sjekker …';
       try {
         currentUser = await window.ApiClient.verifiserKode(epost, kode);
+        window.Analytics?.track('innlogget', { metode: 'kode' });
         statusEl.textContent = '';
         reflectAccountUi();
         await loadLocations();
@@ -3796,6 +3798,7 @@
       // gjensidig utelukkelse: når ett NIBIO-lag slås PÅ, slår vi de to
       // andre AV programmatisk.
       if (e.type === 'overlayadd') {
+        window.Analytics?.track('nibio_lag_aktivert', { lag: NIBIO_LAYER_META.find(m => m.layer === e.layer).wmsName });
         NIBIO_LAYER_META.forEach(m => {
           if (m.layer && m.layer !== e.layer && leafletMap.hasLayer(m.layer)) leafletMap.removeLayer(m.layer);
         });
@@ -4395,6 +4398,7 @@
       alert('Logg inn under ⚙ Preferanser & Konto → Konto for å foreslå områder.');
       return;
     }
+    window.Analytics?.track('omradeforslag_bedt_om');
     const summary = document.getElementById('sp-route-summary');
     summary.style.display = '';
     summary.textContent = 'Beregner forslag …';
@@ -5437,6 +5441,7 @@
         userFinds.push({ id:'f_'+Date.now(), locId: targetLocId, speciesId, mengde, note, date });
       }
       await saveFinds();
+      window.Analytics?.track(editingFind ? 'funn_endret' : 'funn_registrert', { nytt_sted: !!newlyCreatedLocation });
       if (newlyCreatedLocation) triggerPointEnrichment(newlyCreatedLocation.id, newlyCreatedLocation.lat, newlyCreatedLocation.lon);
       slot.innerHTML = '';
       render();
@@ -5827,12 +5832,13 @@
   // re-hente, ikke bare re-rendre et allerede innlastet array.
   document.querySelectorAll('#sp-mode-seg button').forEach(btn => btn.addEventListener('click', async () => {
     filterMode = btn.dataset.mode;
+    window.Analytics?.track('filtermodus_byttet', { modus: filterMode });
     clearRoute();
     await loadLocations();
     if (filterMode === 'radius') zoomToRadiusSelection(); // vis hele sirkelen igjen om et senter allerede var valgt
     render();
   }));
-  document.querySelectorAll('#sp-viewmode-seg button').forEach(btn => btn.addEventListener('click', () => { viewMode = btn.dataset.viewmode; clearRoute(); render(); }));
+  document.querySelectorAll('#sp-viewmode-seg button').forEach(btn => btn.addEventListener('click', () => { viewMode = btn.dataset.viewmode; window.Analytics?.track('visning_byttet', { visning: viewMode }); clearRoute(); render(); }));
   // Debounces zoomToRadiusSelection() — 'input' fyrer kontinuerlig under
   // dragging, og fitBounds() på hver eneste mellomverdi ga en hakkete/
   // urolig kartanimasjon i stedet for én jevn bevegelse til sluttverdien.

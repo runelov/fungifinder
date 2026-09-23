@@ -1,5 +1,36 @@
 # Endringslogg
 
+## 0.33.0 — Webanalyse med PostHog (uttesting, personvernvennlig)
+
+Ny `js/analytics.js` legger inn PostHog (EU Cloud) som webanalyse, som en
+uttesting av verktøyet. Oppsettet er bevisst stramt, så vi slipper
+samtykkebanner og aldri sender personopplysninger:
+
+- **Ingen cookies, ingenting i localStorage** (`persistence: 'memory'`).
+  Ulempen er en ny anonym ID per sidelasting, så vi kan ikke måle
+  retensjon eller «samme bruker igjen».
+- **Ingen `identify()`**, aldri e-post, kortnavn eller koordinater. Eneste
+  egenskap om brukeren er rollen (`anonym`/`bruker`/`admin`), registrert
+  som super property sammen med `app_versjon`.
+- **Ingen autocapture og ingen opptak av økter** (kartet ville ellers vist
+  brukernes steder). Surveys, heatmaps, dead clicks og ytelsesmåling er
+  også slått av, og Do Not Track respekteres.
+- **Query-string og hash strippes** fra alle URL-egenskaper før sending,
+  siden `?invitasjon=<token>` står i URL-en ved første sidelasting.
+- Kjører kun på `fungifinder.no`/`www.fungifinder.no` (lokalt sendes
+  ingenting). PostHog-prosjektet er opprettet i EU Cloud med «Discard
+  client IP data» på.
+
+Eksplisitte hendelser: `innlogget` (kodeinnlogging), `nibio_lag_aktivert`
+(`lag`), `funn_registrert`/`funn_endret` (`nytt_sted`),
+`omradeforslag_bedt_om`, `filtermodus_byttet` (`modus`) og
+`visning_byttet` (`visning`), i tillegg til sidevisning og sideforlating.
+
+`js/analytics.js?v=` er lagt til i versjonssjekken i både pre-commit-hooken
+og `test/repo-consistency.test.js`. Den nye testgruppen «Webanalyse
+(PostHog) — personvernoppsett» låser innstillingene over, slik at de ikke
+kan endres i forbifarten.
+
 ## 0.32.7 — NIBIO-referanselagene åpnet for alle innloggede brukere
 
 De tre NIBIO WMS-referanselagene (Treslag/Bonitet/Kronedekning, se
