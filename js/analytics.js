@@ -23,6 +23,41 @@
 
   const aktiv = !!POSTHOG_KEY && PROD_HOSTS.includes(location.hostname);
 
+  // Fasit over alle hendelser appen sender — test/repo-consistency.test.js
+  // sjekker at hvert track('…')-kall i js/app.js bruker et navn herfra.
+  // Nye hendelser legges til her FØRST. Egenskaper holdes grove og
+  // ikke-personlige (se kommentaren ved track() under).
+  const HENDELSER = new Set([
+    // Innlogging
+    'innloggingslenke_bedt_om', // lenke sendt på e-post (ikke selve innloggingen)
+    'innlogget',                // { metode: 'kode' | 'lenke' }
+    // Art og geografi
+    'art_valgt',                // { art }
+    'favoritt_endret',          // { art, handling: 'lagt_til' | 'fjernet' }
+    'visning_byttet',           // { visning: 'single' | 'favorites' }
+    'filtermodus_byttet',       // { modus: 'fylke' | 'kommune' | 'radius' }
+    'fylke_valgt',              // { fylke } ('alle' = nullstilt)
+    'kommune_valgt',            // { kommune } ('alle' = nullstilt, 'ukjent' = fritekst uten treff i kommuneregisteret)
+    // Områdeforslag
+    'omradeforslag_bedt_om',    // { visning, filtermodus }
+    'omradeforslag_vist',       // { antall } eller { antall: 0, utfall }
+    'foreslatt_omrade_apnet',   // { plass, score_gruppe }
+    // Kart
+    'bakgrunnskart_byttet',     // { kart }
+    'kartlag_endret',           // { lag, aktiv } — kun brukerklikk i lagvelgeren
+    'fullskjerm_kart',          // { aktiv }
+    'min_posisjon_brukt',       // ingen egenskaper — ALDRI koordinater
+    // Steder og preferanser
+    'stedsdetaljer_apnet',      // { kilde: 'score_forklaring' | 'vis_i_kart' }
+    'preferanse_endret',        // { valg, aktiv }
+    'sted_merket_hogd',         // { aktiv }
+    'hogstfelt_lagt_til',
+    'deling_av_funn_endret',    // { aktiv }
+    // Funn
+    'funn_registrert',          // { art, nytt_sted }
+    'funn_endret',              // { art }
+  ]);
+
   const URL_EGENSKAPER = ['$current_url', '$referrer', '$initial_referrer', '$initial_current_url', '$pathname'];
   function strippUrl(verdi) {
     if (typeof verdi !== 'string') return verdi;
@@ -89,6 +124,7 @@
     // Hold hendelsesnavn og egenskaper grove og ikke-personlige — aldri
     // fritekst, e-post, kortnavn eller koordinater.
     track(hendelse, egenskaper) {
+      if (!HENDELSER.has(hendelse)) { console.warn(`Analytics: ukjent hendelse «${hendelse}» — legg den til i HENDELSER i js/analytics.js`); return; }
       if (!aktiv) return;
       try { window.posthog.capture(hendelse, egenskaper || {}); } catch (e) { /* analyse skal aldri velte appen */ }
     },

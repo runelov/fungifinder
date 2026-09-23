@@ -1,6 +1,6 @@
 (function(){
 
-  const APP_VERSION = '0.33.0';
+  const APP_VERSION = '0.34.0';
   const APP_BUILD_DATE = '2026-09-23';
 
   // index.html laster dette scriptet med ?v=<versjon> som cache-buster (se
@@ -809,6 +809,7 @@
       statusEl.textContent = 'Sender …';
       try {
         const data = await window.ApiClient.beOmLenke(epost, turnstileToken);
+        window.Analytics?.track('innloggingslenke_bedt_om');
         statusEl.textContent = '✓ ' + data.melding;
       } catch (err) {
         statusEl.textContent = '⚠ ' + err.message;
@@ -865,6 +866,18 @@
       clearRoute();
       render();
     });
+  }
+
+  // ---------- ?innlogget=lenke (satt av Worker-ens magic-link-redirect) ----------
+  // Eneste måte å skille en fersk magic-link-innlogging fra en vanlig
+  // sidelasting med eksisterende sesjon (se worker/api/src/routes/auth.js).
+  // Fjernes fra URL-en straks, så en reload ikke teller innloggingen på nytt.
+  function checkUrlInnlogget(){
+    const p = new URLSearchParams(location.search);
+    if (p.get('innlogget') !== 'lenke') return;
+    if (currentUser) window.Analytics?.track('innlogget', { metode: 'lenke' });
+    p.delete('innlogget');
+    history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p.toString() : '') + location.hash);
   }
 
   // ---------- invitasjonsregistrering (?invitasjon=<token> i URL-en) ----------
@@ -3361,6 +3374,7 @@
   // opprinnelige, mindre området.
   function toggleMapFullscreen(){
     mapFullscreen = !mapFullscreen;
+    window.Analytics?.track('fullskjerm_kart', { aktiv: mapFullscreen });
     document.getElementById('sp-map-panel').classList.toggle('sp-map-fullscreen', mapFullscreen);
     document.body.classList.toggle('sp-map-fullscreen-active', mapFullscreen);
     document.getElementById('sp-map-fullscreen-toggle').textContent = mapFullscreen ? '✕ Lukk fullskjerm' : '⛶ Fullskjerm';
@@ -3787,6 +3801,30 @@
     // 'overlayremove' er Leaflets EGNE hendelser fra L.Control.Layers sin
     // checkbox-interaksjon (ikke et generisk map.removeLayer()-ekko, se
     // RETTET-kommentaren i updateNibioLayersAvailability()).
+    // Webanalyse: kun ekte brukerklikk i lagvelgeren. L.Control.Layers
+    // fyrer overlayadd/overlayremove/baselayerchange også når appen selv
+    // legger til/fjerner lag (NIBIO-utelukkelsen under, utlogging), men
+    // _handlingClick er bare sann inni kontrollens egen klikkhåndtering
+    // (verifisert mot leaflet-src.js 1.9.4, se kommentaren lenger ned).
+    // Registrert FØR NIBIO-lytteren under, slik at et NIBIO-klikk telles
+    // før utelukkelsen fjerner de andre lagene programmatisk.
+    const KARTLAG_ID = new Map([
+      [topoLayer, 'topo'], [standardLayer, 'standard'], [satelliteLayer, 'satellitt'],
+      [routeLayer, 'foreslatte_omrader'], [hogstLayer, 'hogstfelt'], [findsLayer, 'mine_funn'],
+      [artskartLayer, 'artsdatabanken_funn'], [delteFunnLayer, 'delte_funn'],
+    ]);
+    const kartlagId = (layer) => KARTLAG_ID.get(layer)
+      || ('nibio_' + (NIBIO_LAYER_META.find(m => m.layer === layer)?.label || 'ukjent').toLowerCase());
+    let nibioUtelukkerProgrammatisk = false; // settes rundt utelukkelses-løkken i NIBIO-lytteren under
+    leafletMap.on('overlayadd overlayremove', (e) => {
+      if (!layersControl?._handlingClick || nibioUtelukkerProgrammatisk) return;
+      window.Analytics?.track('kartlag_endret', { lag: kartlagId(e.layer), aktiv: e.type === 'overlayadd' });
+    });
+    leafletMap.on('baselayerchange', (e) => {
+      if (!layersControl?._handlingClick) return;
+      window.Analytics?.track('bakgrunnskart_byttet', { kart: kartlagId(e.layer) });
+    });
+
     leafletMap.on('overlayadd overlayremove', (e) => {
       if (!NIBIO_LAYER_META.some(m => m.layer === e.layer)) return;
       // RETTET (designkritikk 2026-08-25) — NIBIO-lagene ligger som
@@ -3798,10 +3836,14 @@
       // gjensidig utelukkelse: når ett NIBIO-lag slås PÅ, slår vi de to
       // andre AV programmatisk.
       if (e.type === 'overlayadd') {
-        window.Analytics?.track('nibio_lag_aktivert', { lag: NIBIO_LAYER_META.find(m => m.layer === e.layer).wmsName });
+        // Vakten: removeLayer() her skjer mens _handlingClick fortsatt er
+        // sann (se under), og ville ellers blitt telt som brukerklikk av
+        // webanalyse-lytteren over.
+        nibioUtelukkerProgrammatisk = true;
         NIBIO_LAYER_META.forEach(m => {
           if (m.layer && m.layer !== e.layer && leafletMap.hasLayer(m.layer)) leafletMap.removeLayer(m.layer);
         });
+        nibioUtelukkerProgrammatisk = false;
         // Verifisert direkte mot leaflet-src.js 1.9.4: en removeLayer()
         // kalt herfra skjer MENS L.Control.Layers sin egen _onInputClick
         // fortsatt har _handlingClick=true (vi er inni samme synkrone
@@ -4339,15 +4381,17 @@
         ? `🅿️ ${escapeHtml(a.parking.notat) || `Nærmeste kjente parkeringsplass, ca ${a.parking.distM} m unna`}`
         : '🅿️ Ingen kjent parkeringsplass blant de kjente punktene i området';
       const popupHtml = `<b>Område ${i+1}: ${escapeHtml(a.anchor.loc.name)}</b><br/>Beste score i området: ${score}<br/>${parkeringTekst}<br/>${describeRouteTerrain(a.members)}`;
+      // Webanalyse: plass i lista + grov score, aldri koordinater/stedsnavn.
+      const sporApnet = () => window.Analytics?.track('foreslatt_omrade_apnet', { plass: i + 1, score_gruppe: `${Math.floor(score / 10) * 10}-${Math.floor(score / 10) * 10 + 9}` });
 
       L.circle([a.anchor.loc.lat, a.anchor.loc.lon], {
         radius: a.radiusM, color, weight: 3.5, fillColor: color, fillOpacity: 0.13
-      }).bindPopup(popupHtml, POPUP_OPTS).addTo(routeLayer);
+      }).bindPopup(popupHtml, POPUP_OPTS).on('popupopen', sporApnet).addTo(routeLayer);
 
       L.marker([a.anchor.loc.lat, a.anchor.loc.lon], {
         icon: L.divIcon({ className: 'sp-area-badge', html: String(i + 1), iconSize: [26, 26] }),
         zIndexOffset: 500
-      }).bindPopup(popupHtml, POPUP_OPTS).addTo(routeLayer);
+      }).bindPopup(popupHtml, POPUP_OPTS).on('popupopen', sporApnet).addTo(routeLayer);
 
       a.members.forEach(m => {
         const marker = buildLocationMarker(m.loc, m.res);
@@ -4398,7 +4442,7 @@
       alert('Logg inn under ⚙ Preferanser & Konto → Konto for å foreslå områder.');
       return;
     }
-    window.Analytics?.track('omradeforslag_bedt_om');
+    window.Analytics?.track('omradeforslag_bedt_om', { visning: viewMode, filtermodus: filterMode });
     const summary = document.getElementById('sp-route-summary');
     summary.style.display = '';
     summary.textContent = 'Beregner forslag …';
@@ -4406,6 +4450,7 @@
 
     if (viewMode === 'favorites' && !favoriteSpecies.length) {
       summary.textContent = 'Ingen favoritter valgt — merk minst én art med ★, eller bytt til enkeltart-modus.';
+      window.Analytics?.track('omradeforslag_vist', { antall: 0, utfall: 'ingen_favoritter' });
       return;
     }
 
@@ -4429,6 +4474,7 @@
         ? ' Prøv å zoome ut i kartet, eller velg et fylke/kommune/radius.'
         : '';
       summary.innerHTML = 'Ingen steder å foreslå områder fra i valgt område.' + zoomHint;
+      window.Analytics?.track('omradeforslag_vist', { antall: 0, utfall: 'ingen_treff' });
       return;
     }
 
@@ -4453,6 +4499,7 @@
     const anchors = clusterIntoZones(anchorCandidates, areaCount, AREA_RADIUS_KM);
     if (!anchors.length) {
       summary.textContent = 'Fant ingen gode områder i valgt filter — de best scorende punktene ligger alle tett på bebyggelse (høy befolkningstetthet).';
+      window.Analytics?.track('omradeforslag_vist', { antall: 0, utfall: 'bare_tettbygd' });
       return;
     }
 
@@ -4467,6 +4514,7 @@
     areas.forEach(a => { a.parking = bestParkingForArea(a.members); });
 
     suggestedRoute = { areas };
+    window.Analytics?.track('omradeforslag_vist', { antall: areas.length });
     renderAreasOnMap();
 
     // RETTET 2026-08-22 (kart-lagfiks, fase 2+3): teksten under beskrev
@@ -4500,13 +4548,17 @@
     }).join('');
     el.querySelectorAll('.sp-species-btn').forEach(btn => btn.addEventListener('click', (e) => {
       if (e.target.closest('.sp-fav-star')) return; // håndteres separat under
-      selectedSpecies = btn.dataset.id; viewMode = 'single'; clearRoute(); render();
+      selectedSpecies = btn.dataset.id; viewMode = 'single';
+      window.Analytics?.track('art_valgt', { art: selectedSpecies });
+      clearRoute(); render();
     }));
     el.querySelectorAll('.sp-fav-star').forEach(star => star.addEventListener('click', async (e) => {
       e.stopPropagation();
       const id = star.dataset.fav;
-      if (favoriteSpecies.includes(id)) favoriteSpecies = favoriteSpecies.filter(x => x !== id);
+      const fjernes = favoriteSpecies.includes(id);
+      if (fjernes) favoriteSpecies = favoriteSpecies.filter(x => x !== id);
       else favoriteSpecies.push(id);
+      window.Analytics?.track('favoritt_endret', { art: id, handling: fjernes ? 'fjernet' : 'lagt_til' });
       await saveFavorites();
       render();
     }));
@@ -5223,13 +5275,18 @@
     container.innerHTML = html;
 
     container.querySelectorAll('[data-action="find"]').forEach(btn => btn.addEventListener('click', () => openFindModal(btn.dataset.loc)));
-    container.querySelectorAll('[data-action="locate"]').forEach(btn => btn.addEventListener('click', () => locateOnMap(btn.dataset.loc)));
+    container.querySelectorAll('[data-action="locate"]').forEach(btn => btn.addEventListener('click', () => {
+      window.Analytics?.track('stedsdetaljer_apnet', { kilde: 'vis_i_kart' });
+      locateOnMap(btn.dataset.loc);
+    }));
     container.querySelectorAll('[data-action="cut"]').forEach(btn => btn.addEventListener('click', async () => {
       const id = btn.dataset.loc;
       if (userCuts.includes(id)) userCuts = userCuts.filter(x => x !== id); else userCuts.push(id);
+      window.Analytics?.track('sted_merket_hogd', { aktiv: userCuts.includes(id) });
       await saveCuts(); render();
     }));
     container.querySelectorAll('[data-score-loc]').forEach(el => el.addEventListener('click', () => {
+      window.Analytics?.track('stedsdetaljer_apnet', { kilde: 'score_forklaring' });
       openScoreBreakdownModal(el.dataset.scoreLoc, el.dataset.scoreSpecies);
     }));
     const visFlereBtn = document.getElementById('sp-vis-flere');
@@ -5441,7 +5498,8 @@
         userFinds.push({ id:'f_'+Date.now(), locId: targetLocId, speciesId, mengde, note, date });
       }
       await saveFinds();
-      window.Analytics?.track(editingFind ? 'funn_endret' : 'funn_registrert', { nytt_sted: !!newlyCreatedLocation });
+      if (editingFind) window.Analytics?.track('funn_endret', { art: speciesId });
+      else window.Analytics?.track('funn_registrert', { art: speciesId, nytt_sted: !!newlyCreatedLocation });
       if (newlyCreatedLocation) triggerPointEnrichment(newlyCreatedLocation.id, newlyCreatedLocation.lat, newlyCreatedLocation.lon);
       slot.innerHTML = '';
       render();
@@ -5688,6 +5746,7 @@
     document.getElementById('sp-hogst-save').addEventListener('click', async () => {
       const dato = document.getElementById('sp-hogst-date').value || todayStr;
       hogstOmrader.push({ id: 'h_' + Date.now(), lat, lon, radiusM, dato });
+      window.Analytics?.track('hogstfelt_lagt_til');
       leafletMap.removeLayer(previewCircle);
       slot.innerHTML = '';
       markingHogstMode = false;
@@ -5733,11 +5792,22 @@
   document.getElementById('sp-toggle-knownfinds').addEventListener('click', () => { deprioritizeKnownFinds = !deprioritizeKnownFinds; bumpScoreCache(); render(); });
   document.getElementById('sp-toggle-hogst').addEventListener('click', () => { hideHogst = !hideHogst; render(); });
   document.getElementById('sp-toggle-artskart-recent').addEventListener('click', () => { artskartOnlyRecent = !artskartOnlyRecent; render(); });
+  // Webanalyse for de åtte bryterne over — egne lyttere registrert ETTER
+  // hovedlytterne, så tilstandsvariabelen allerede er byttet når de kjører.
+  Object.entries({
+    stille_omrader: () => prioritizeQuiet, sti: () => weighTrailDistance, vei: () => weighRoadDistance,
+    egen_funnhistorikk: () => weighOwnFindHistory, vaer: () => weighWeather, kjente_funn: () => deprioritizeKnownFinds,
+    skjul_hogst: () => hideHogst, bare_nye_artsfunn: () => artskartOnlyRecent,
+  }).forEach(([valg, tilstand], i) => {
+    const id = ['quiet', 'sti', 'vei', 'ownhistory', 'weather', 'knownfinds', 'hogst', 'artskart-recent'][i];
+    document.getElementById('sp-toggle-' + id).addEventListener('click', () => window.Analytics?.track('preferanse_endret', { valg, aktiv: tilstand() }));
+  });
   // Påvirker IKKE min egen scoring/kart (kun hva ANDRE ser av mine funn),
   // så ingen bumpScoreCache() her — kun lagring + re-render for å
   // oppdatere selve bryteren sin visuelle "on"-tilstand.
   document.getElementById('sp-toggle-del-funn').addEventListener('click', async () => {
     delFunn = !delFunn;
+    window.Analytics?.track('deling_av_funn_endret', { aktiv: delFunn });
     render();
     await saveDelFunn();
   });
@@ -5747,6 +5817,7 @@
   // et kort øyeblikk viser forrige filters steder.
   document.getElementById('sp-fylke-filter').addEventListener('change', async (e) => {
     fylkeFilter = e.target.value;
+    window.Analytics?.track('fylke_valgt', { fylke: fylkeFilter });
     clearRoute();
     zoomToAreaSelection();
     await loadLocations();
@@ -5755,6 +5826,10 @@
   document.getElementById('sp-kommune-filter-input').addEventListener('change', async (e) => {
     const val = e.target.value.trim();
     kommuneFilter = val === '' ? 'alle' : val;
+    // Fritekstfelt — send kun registerets offisielle navn (så «vestby» og
+    // «Vestby» telles som samme kommune), aldri vilkårlig brukerinput.
+    const registerNavn = kommuneRegister.find(k => k.kommunenavn.toLowerCase() === kommuneFilter.toLowerCase())?.kommunenavn;
+    window.Analytics?.track('kommune_valgt', { kommune: kommuneFilter === 'alle' ? 'alle' : (registerNavn || 'ukjent') });
     clearRoute();
     zoomToAreaSelection();
     await loadLocations();
@@ -5789,6 +5864,7 @@
   });
   document.getElementById('sp-kommune-clear').addEventListener('click', async () => {
     kommuneFilter = 'alle';
+    window.Analytics?.track('kommune_valgt', { kommune: 'alle' });
     document.getElementById('sp-kommune-filter-input').value = '';
     clearRoute();
     await loadLocations();
@@ -5804,6 +5880,7 @@
   // hvis du allerede står i Radius-modus, oppdaterer "min posisjon" nå også
   // selve radius-senteret, ikke bare kartvisningen.
   document.getElementById('sp-my-location-btn').addEventListener('click', (e) => useMyLocation((lat, lon) => {
+    window.Analytics?.track('min_posisjon_brukt'); // aldri lat/lon
     showMyLocationOnMap(lat, lon);
     if (filterMode === 'radius') {
       radiusCenter = { lat, lon };
@@ -5891,6 +5968,7 @@
     // under, men MÅ være ferdig (eller ha gitt opp) FØR den, siden
     // loadArtsfunn() der leser leafletMap.getBounds() for sitt bbox-hent.
     await Promise.all([geolocateStartupView(), initAuth()]);
+    checkUrlInnlogget();
     // RETTET 2026-08-15 (UX-gjennomgang): listevisning er fortsatt default
     // på mobil for INNLOGGEDE brukere (mest nyttig når man har tusenvis av
     // ekte, scorede steder å skumlese) — men for en ikke-innlogget

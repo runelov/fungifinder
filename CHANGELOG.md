@@ -1,5 +1,50 @@
 # Endringslogg
 
+## 0.34.0 — Detaljert bruksanalyse (webanalyse, runde 2)
+
+Utvider PostHog-sporingen fra v0.33.0 til hele kjerneflyten og de
+viktigste valgene i appen. Personvernoppsettet er uendret: ingen cookies,
+ingen `identify()`, ingen autocapture. Alle egenskaper er grove,
+enum-lignende verdier, aldri koordinater, fritekst, e-post eller kortnavn.
+
+**Nytt:** `innloggingslenke_bedt_om`, `innlogget` med `metode: lenke`
+(i tillegg til `kode`), `art_valgt`, `favoritt_endret`, `fylke_valgt`,
+`kommune_valgt`, `omradeforslag_vist` (`antall`, eller `utfall` ved
+tomt resultat), `foreslatt_omrade_apnet` (`plass` og `score_gruppe`),
+`bakgrunnskart_byttet`, `kartlag_endret`, `fullskjerm_kart`,
+`min_posisjon_brukt`, `stedsdetaljer_apnet`, `preferanse_endret` (de åtte
+bryterne under Preferanser), `sted_merket_hogd`, `hogstfelt_lagt_til` og
+`deling_av_funn_endret`. `omradeforslag_bedt_om` har fått `visning` og
+`filtermodus`, og `funn_registrert`/`funn_endret` har fått `art`.
+
+**Erstattet:** `nibio_lag_aktivert` er slått sammen med `kartlag_endret`
+(`lag: nibio_treslag` osv.), som nå dekker alle overlegg.
+
+Detaljer som er verdt å kjenne til:
+
+- **Magic-link-innlogging** kunne ikke skilles fra en vanlig sidelasting
+  med eksisterende sesjon. Worker-en (`/auth/verifiser`) sender nå til
+  `APP_URL?innlogget=lenke`. Appen sender hendelsen og fjerner
+  parameteren fra URL-en med én gang. Worker-endringen krever
+  `npx wrangler deploy` fra `worker/api/`. Uten den virker alt annet, men
+  `innlogget` med `metode: lenke` kommer ikke.
+- **Kartlag telles bare ved faktiske brukerklikk.** `L.Control.Layers`
+  fyrer `overlayadd`/`overlayremove`/`baselayerchange` også når appen selv
+  legger til eller fjerner lag, for eksempel ved NIBIO-utelukkelse og
+  utlogging. Lytteren sjekker derfor `layersControl._handlingClick`, og en
+  egen vakt rundt NIBIO-utelukkelsesløkken hindrer at lagene som slås av
+  automatisk telles som brukerens valg.
+- **Kommune** er et fritekstfelt. Bare navn som finnes i
+  kommuneregisteret sendes, alt annet blir `ukjent`.
+- **Foreslått område** sender plass i lista og en scoregruppe på ti poeng
+  (f.eks. `70-79`), aldri koordinater eller stedsnavn.
+
+**Hendelsesfasit:** `HENDELSER` i `js/analytics.js` lister alle gyldige
+hendelsesnavn med egenskapene deres. `track()` avviser ukjente navn med en
+advarsel i konsollen. Nye tester i `test/repo-consistency.test.js` sjekker
+at hvert `track()`-kall i `app.js` bruker et registrert navn, og at ingen
+kall sender `lat`/`lon`/`epost`/`kortnavn`/notat.
+
 ## 0.33.0 — Webanalyse med PostHog (uttesting, personvernvennlig)
 
 Ny `js/analytics.js` legger inn PostHog (EU Cloud) som webanalyse, som en
