@@ -17,8 +17,9 @@ samtykkebanner og aldri sender personopplysninger:
   også slått av, og Do Not Track respekteres.
 - **Query-string og hash strippes** fra alle URL-egenskaper før sending,
   siden `?invitasjon=<token>` står i URL-en ved første sidelasting.
-- Kjører kun på `fungifinder.no`/`www.fungifinder.no`, og er en no-op så
-  lenge `POSTHOG_KEY` i filen er tom.
+- Kjører kun på `fungifinder.no`/`www.fungifinder.no` (lokalt sendes
+  ingenting). PostHog-prosjektet er opprettet i EU Cloud med «Discard
+  client IP data» på.
 
 Eksplisitte hendelser: `innlogget` (kodeinnlogging), `nibio_lag_aktivert`
 (`lag`), `funn_registrert`/`funn_endret` (`nytt_sted`),

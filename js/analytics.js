@@ -17,7 +17,7 @@
 (function () {
   // Prosjektnøkkelen (phc_…) er en offentlig klientnøkkel, ikke en
   // hemmelighet — den er laget for å ligge i frontend-kode.
-  const POSTHOG_KEY = '';
+  const POSTHOG_KEY = 'phc_C6CoNQMNktVF483Bzxp8M8yCrydN8pjQnCxfz6vSjQzi';
   const POSTHOG_HOST = 'https://eu.i.posthog.com';
   const PROD_HOSTS = ['fungifinder.no', 'www.fungifinder.no'];
 
