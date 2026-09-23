@@ -64,6 +64,27 @@ describe('Webanalyse (PostHog) — personvernoppsett', () => {
   test('app.js kaller aldri posthog.identify()', () => {
     assert.doesNotMatch(les('js/app.js'), /identify\(/);
   });
+
+  // Alle hendelsesnavn skal være registrert i HENDELSER i js/analytics.js
+  // (fasiten over hva vi sender), og ingen hendelse skal ha
+  // posisjons- eller identitetsfelt som egenskap.
+  const appJs = les('js/app.js');
+  const kall = [...appJs.matchAll(/Analytics\?\.track\('([^']+)'([^;]*)/g)];
+  const registrerte = new Set([...analyticsJs.match(/const HENDELSER = new Set\(\[([\s\S]*?)\]\);/)[1].matchAll(/^\s*'([^']+)'/gm)].map(m => m[1]));
+
+  test('fant faktisk track()-kall og HENDELSER-oppføringer (vern mot feil regex)', () => {
+    assert.ok(kall.length >= 20, `forventet minst 20 track()-kall, fant ${kall.length}`);
+    assert.ok(registrerte.size >= 20, `forventet minst 20 registrerte hendelser, fant ${registrerte.size}`);
+  });
+  test('hvert track()-kall i app.js bruker et navn fra HENDELSER', () => {
+    const ukjente = [...new Set(kall.map(m => m[1]).filter(n => !registrerte.has(n)))];
+    assert.deepEqual(ukjente, [], `ukjente hendelser: ${ukjente.join(', ')}`);
+  });
+  test('ingen track()-kall sender koordinater, e-post eller kortnavn', () => {
+    const forbudt = /\b(lat|lon|lng|epost|kortnavn|email|note|notat)\s*:/;
+    const treff = kall.filter(m => forbudt.test(m[2])).map(m => m[1]);
+    assert.deepEqual(treff, [], `track()-kall med forbudte egenskaper: ${treff.join(', ')}`);
+  });
 });
 
 describe('CORS-konfigurasjon', () => {

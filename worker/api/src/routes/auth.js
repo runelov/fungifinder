@@ -105,13 +105,19 @@ export async function verifiser({ request, env, url }) {
 
   const sesjonToken = await opprettSesjon(rad.bruker_id, env);
 
+  // ?innlogget=lenke lar appen skille en fersk magic-link-innlogging fra en
+  // vanlig sidelasting med eksisterende sesjon (webanalyse, se
+  // js/analytics.js). Appen fjerner parameteren fra URL-en straks.
+  const appUrl = new URL(env.APP_URL);
+  appUrl.searchParams.set('innlogget', 'lenke');
+
   return new Response(null, {
     status: 302,
     headers: {
       // IKKE env.ALLOWED_ORIGIN her — den er bevisst kun en bar opprinnelse
       // (origin, uten sti), riktig for CORS. Egen APP_URL-variabel peker på
       // selve appens fulle URL.
-      Location: env.APP_URL,
+      Location: appUrl.toString(),
       'Set-Cookie': sesjonCookieHeader(sesjonToken),
       ...cors,
     },

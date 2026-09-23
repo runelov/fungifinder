@@ -150,9 +150,19 @@ Prisen er at hver sidelasting blir en ny anonym besøkende. Vil vi senere
 måle retensjon, må vi over på `localStorage`/cookie-persistens, og da
 trenger vi samtykke.
 
-**Nye hendelser:** kall `window.Analytics?.track('navn', { … })` fra
-`app.js`. Hold egenskapene grove (enum-lignende verdier), aldri fritekst,
-e-post, kortnavn eller koordinater.
+**Nye hendelser:** legg navnet til i `HENDELSER` i `js/analytics.js`
+først (med en kommentar om egenskapene), og kall så
+`window.Analytics?.track('navn', { … })` fra `app.js`. Testene feiler hvis
+et navn mangler i `HENDELSER`. Hold egenskapene grove (enum-lignende
+verdier), aldri fritekst, e-post, kortnavn eller koordinater. `HENDELSER`
+er også den løpende oversikten over hva som faktisk spores.
+
+**Kartlag:** lytterne i `initMap()` teller bare ekte klikk i lagvelgeren
+(`layersControl._handlingClick`), ikke lag appen selv legger til eller
+fjerner. Se CHANGELOG 0.34.0.
+
+**Magic-link-innlogging** markeres med `?innlogget=lenke` fra Worker-en
+(`worker/api/src/routes/auth.js`), og appen fjerner parameteren straks.
 
 **Oppsett (én gang):**
 
