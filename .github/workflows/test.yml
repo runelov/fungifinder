@@ -11,6 +11,12 @@ on:
   push:
     branches: [main]
 
+# Minst mulig GITHUB_TOKEN-tilgang: jobben leser bare koden (checkout).
+# Uten denne arver den repoets default-rettigheter (CodeQL-varsel
+# actions/missing-workflow-permissions).
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
