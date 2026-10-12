@@ -1,5 +1,20 @@
 # Endringslogg
 
+## 0.35.0 — Webanalyse (PostHog) fjernet
+
+PostHog-uttestingen fra v0.33.0/0.34.0 er avsluttet. Verktøyet svarte
+ikke til forventningene, så all webanalyse er tatt ut igjen.
+
+**Fjernet:** `js/analytics.js` og skript-taggen i `index.html`, alle
+`Analytics`-kall i `js/app.js`, `?innlogget=lenke` på redirecten etter
+magic-link-innlogging (`worker/api/src/routes/auth.js`), README-avsnittet
+«Webanalyse (PostHog)» og personvern-/hendelsestestene i
+`test/repo-consistency.test.js`. Versjonssjekken (pre-commit-hook og test)
+dekker igjen de tre filene `css/styles.css`, `js/api-client.js` og
+`js/app.js`.
+
+Appen sender dermed ingen data til tredjepart for analyse lenger.
+
 ## 0.34.0 — Detaljert bruksanalyse (webanalyse, runde 2)
 
 Utvider PostHog-sporingen fra v0.33.0 til hele kjerneflyten og de
